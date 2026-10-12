@@ -1,0 +1,45 @@
+{
+  "aggregateConfidence" : 71,
+  "artifactUid" : "ART-018f3c9a-7b2e-7c41-9e3a-2b1c4d5e6f70",
+  "informationQualityWeight" : 50,
+  "match" : {
+    "birthPlace" : {
+      "granularity" : "specific",
+      "kind" : "within",
+      "score" : 50
+    },
+    "birthYear" : {
+      "delta" : 3,
+      "kind" : "within",
+      "score" : 60
+    },
+    "conflicts" : [],
+    "name" : {
+      "kind" : "exact",
+      "score" : 100
+    },
+    "nameAlgo" : "double-metaphone",
+    "parents" : {
+      "kind" : "none",
+      "score" : 0
+    },
+    "spouseName" : {
+      "kind" : "exact",
+      "score" : 100
+    }
+  },
+  "personMentionRef" : "p1",
+  "personUid" : "PER-018f3c9a-7b2e-7c41-9e3a-000000000001",
+  "provenance" : {
+    "createdAt" : "2026-02-22T16:00:00Z",
+    "createdBy" : "machine",
+    "reviewStatus" : "machine-suggested",
+    "tool" : "matcher-1.0"
+  },
+  "reviewStatus" : "machine-suggested",
+  "reviewedAt" : null,
+  "reviewedBy" : null,
+  "schemaVersion" : "1.0",
+  "sourceAuthorityWeight" : 60,
+  "uid" : "LNK-018f3c9a-7b2e-7c41-9e3a-000000000043"
+}

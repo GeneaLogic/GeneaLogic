@@ -1,0 +1,65 @@
+{
+  "events": [],
+  "externalIdentifiers": [],
+  "files": [],
+  "language": "en",
+  "locations": [],
+  "mediaType": "image",
+  "mentionRelationships": [
+    {
+      "person1Ref": "p2",
+      "person2Ref": "p1",
+      "type": "parent-child"
+    },
+    {
+      "person1Ref": "p3",
+      "person2Ref": "p1",
+      "type": "parent-child"
+    },
+    {
+      "person1Ref": "p2",
+      "person2Ref": "p3",
+      "type": "couple"
+    }
+  ],
+  "personsMentioned": [
+    {
+      "facts": [
+        {
+          "date": "1938-04-21",
+          "place": "Brooklyn, New York, USA",
+          "type": "Death"
+        }
+      ],
+      "informationQuality": "primary",
+      "localRef": "p1",
+      "nameAsRecorded": "Sidney Feldberg",
+      "role": "subject"
+    },
+    {
+      "facts": [],
+      "informationQuality": "secondary",
+      "localRef": "p2",
+      "nameAsRecorded": "Marcus Feldberg",
+      "role": "parent"
+    },
+    {
+      "facts": [],
+      "informationQuality": "secondary",
+      "localRef": "p3",
+      "nameAsRecorded": "Sarah Hanner",
+      "role": "parent"
+    }
+  ],
+  "provenance": {
+    "createdAt": "2026-07-30T12:00:00Z",
+    "createdBy": "human",
+    "reviewStatus": "asserted"
+  },
+  "schemaVersion": "1.0",
+  "sourceAuthorityTier": "vital",
+  "sourceDerivation": "original",
+  "tags": [],
+  "title": "Sidney Feldberg death certificate, 1938",
+  "uid": "ART-018f3c9a-7b2e-7c41-9e3a-2b1c4d5e6f72"
+}

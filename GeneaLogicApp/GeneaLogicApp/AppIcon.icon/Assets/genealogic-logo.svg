@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="32 24 448 448" role="img" aria-label="GeneaLogic logo: five-generation family tree as a circuit">
+  <title>GeneaLogic – Mark, Copper Accents</title>
+  <!-- traces: each tier is as wide as the pins it lands on -->
+  <g fill="none" stroke="#8DF5C6" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="6">
+      <path d="M74 54V64L84 74H116L126 64V54M100 74V92"/>
+      <path d="M178 54V64L188 74H220L230 64V54M204 74V92"/>
+      <path d="M282 54V64L292 74H324L334 64V54M308 74V92"/>
+      <path d="M386 54V64L396 74H428L438 64V54M412 74V92"/>
+    </g>
+    <g stroke-width="7">
+      <path d="M100 128V142L112 154H192L204 142V128M152 154V172"/>
+      <path d="M308 128V142L320 154H400L412 142V128M360 154V172"/>
+    </g>
+    <g stroke-width="8">
+      <path d="M152 220V230L164 242H348L360 230V220M176 242V264"/>
+      <path d="M208 296H304"/>
+      <path d="M256 296V416"/>
+      <path d="M232 296V344L180 396V416"/>
+      <path d="M280 296V344L332 396V416"/>
+    </g>
+  </g>
+  <!-- pins -->
+  <g fill="none">
+    <path d="M76 99H82M118 99H124M89 86V92M89 128V134M76 110H82M118 110H124M100 86V92M100 128V134M76 121H82M118 121H124M111 86V92M111 128V134M180 99H186M222 99H228M193 86V92M193 128V134M180 110H186M222 110H228M204 86V92M204 128V134M180 121H186M222 121H228M215 86V92M215 128V134M284 99H290M326 99H332M297 86V92M297 128V134M284 110H290M326 110H332M308 86V92M308 128V134M284 121H290M326 121H332M319 86V92M319 128V134M388 99H394M430 99H436M401 86V92M401 128V134M388 110H394M430 110H436M412 86V92M412 128V134M388 121H394M430 121H436M423 86V92M423 128V134" stroke="#8DF5C6" stroke-width="6"/>
+    <path d="M121 182H128M176 182H183M138 165V172M138 220V227M121 196H128M176 196H183M152 165V172M152 220V227M121 210H128M176 210H183M166 165V172M166 220V227M329 182H336M384 182H391M346 165V172M346 220V227M329 196H336M384 196H391M360 165V172M360 220V227M329 210H336M384 210H391M374 165V172M374 220V227" stroke="#8DF5C6" stroke-width="7"/>
+    <path d="M294 278H304M368 278H378M318 254V264M318 328V338M294 296H304M368 296H378M336 254V264M336 328V338M294 314H304M368 314H378M354 254V264M354 328V338" stroke="#8DF5C6" stroke-width="8"/>
+    <path d="M134 278H144M208 278H218M158 254V264M158 328V338M134 296H144M208 296H218M176 254V264M176 328V338M134 314H144M208 314H218M194 254V264M194 328V338" stroke="#F2995C" stroke-width="8"/>
+    <path d="M151 424H158M202 424H209M166 409V416M166 460V467M151 438H158M202 438H209M180 409V416M180 460V467M151 452H158M202 452H209M194 409V416M194 460V467M227 424H234M278 424H285M242 409V416M242 460V467M227 438H234M278 438H285M256 409V416M256 460V467M227 452H234M278 452H285M270 409V416M270 460V467M303 424H310M354 424H361M318 409V416M318 460V467M303 438H310M354 438H361M332 409V416M332 460V467M303 452H310M354 452H361M346 409V416M346 460V467" stroke="#F2995C" stroke-width="8"/>
+  </g>
+  <!-- chip bodies -->
+  <rect x="85.5" y="95.5" width="29" height="29" rx="3" fill="#06171A" stroke="#8DF5C6" stroke-width="7"/>
+  <circle cx="96" cy="106" r="3" fill="#8DF5C6"/>
+  <rect x="189.5" y="95.5" width="29" height="29" rx="3" fill="#06171A" stroke="#8DF5C6" stroke-width="7"/>
+  <circle cx="200" cy="106" r="3" fill="#8DF5C6"/>
+  <rect x="293.5" y="95.5" width="29" height="29" rx="3" fill="#06171A" stroke="#8DF5C6" stroke-width="7"/>
+  <circle cx="304" cy="106" r="3" fill="#8DF5C6"/>
+  <rect x="397.5" y="95.5" width="29" height="29" rx="3" fill="#06171A" stroke="#8DF5C6" stroke-width="7"/>
+  <circle cx="408" cy="106" r="3" fill="#8DF5C6"/>
+  <rect x="131.5" y="175.5" width="41" height="41" rx="3" fill="#06171A" stroke="#8DF5C6" stroke-width="7"/>
+  <circle cx="144" cy="188" r="4" fill="#8DF5C6"/>
+  <rect x="339.5" y="175.5" width="41" height="41" rx="3" fill="#06171A" stroke="#8DF5C6" stroke-width="7"/>
+  <circle cx="352" cy="188" r="4" fill="#8DF5C6"/>
+  <rect x="307.5" y="267.5" width="57" height="57" rx="3" fill="#06171A" stroke="#8DF5C6" stroke-width="7"/>
+  <circle cx="322" cy="282" r="5" fill="#8DF5C6"/>
+  <rect x="147.5" y="267.5" width="57" height="57" rx="3" fill="#06171A" stroke="#F2995C" stroke-width="7"/>
+  <circle cx="162" cy="282" r="5" fill="#F2995C"/>
+  <rect x="161.5" y="419.5" width="37" height="37" rx="3" fill="#06171A" stroke="#F2995C" stroke-width="7"/>
+  <circle cx="173" cy="431" r="3.5" fill="#F2995C"/>
+  <rect x="237.5" y="419.5" width="37" height="37" rx="3" fill="#06171A" stroke="#F2995C" stroke-width="7"/>
+  <circle cx="249" cy="431" r="3.5" fill="#F2995C"/>
+  <rect x="313.5" y="419.5" width="37" height="37" rx="3" fill="#06171A" stroke="#F2995C" stroke-width="7"/>
+  <circle cx="325" cy="431" r="3.5" fill="#F2995C"/>
+  <!-- through-hole pads: open rings, so the hole is transparent -->
+  <g fill="none" stroke="#8DF5C6" stroke-width="9">
+    <circle cx="74" cy="42" r="9.5"/><circle cx="126" cy="42" r="9.5"/><circle cx="178" cy="42" r="9.5"/><circle cx="230" cy="42" r="9.5"/><circle cx="282" cy="42" r="9.5"/><circle cx="334" cy="42" r="9.5"/><circle cx="386" cy="42" r="9.5"/><circle cx="438" cy="42" r="9.5"/>
+  </g>
+</svg>

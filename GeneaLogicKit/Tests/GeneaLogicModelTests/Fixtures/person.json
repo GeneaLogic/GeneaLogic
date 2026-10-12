@@ -1,0 +1,29 @@
+{
+  "facts" : [
+    {
+      "date" : "1871",
+      "place" : "Illinois, USA",
+      "supportedByLinks" : [
+        "LNK-018f3c9a-7b2e-7c41-9e3a-000000000043"
+      ],
+      "type" : "Birth"
+    }
+  ],
+  "identifierURI" : null,
+  "names" : [
+    {
+      "full" : "John Smith",
+      "given" : "John",
+      "surname" : "Smith",
+      "type" : "birth"
+    }
+  ],
+  "provenance" : {
+    "createdAt" : "2026-02-22T15:04:05Z",
+    "createdBy" : "human",
+    "reviewStatus" : "human-verified",
+    "tool" : null
+  },
+  "schemaVersion" : "1.0",
+  "uid" : "PER-018f3c9a-7b2e-7c41-9e3a-000000000001"
+}

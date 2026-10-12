@@ -1,0 +1,18 @@
+{
+  "archiveUID" : "018f3c9a-0000-7000-8000-000000000001",
+  "files" : [
+    {
+      "byteLength" : 10485760,
+      "path" : "artifacts/ART-018f3c9a-7b2e-7c41-9e3a-2b1c4d5e6f70/census-1920.tif",
+      "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "byteLength" : 4096,
+      "path" : "artifacts/ART-018f3c9a-7b2e-7c41-9e3a-2b1c4d5e6f70/record.json",
+      "sha256" : "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
+    }
+  ],
+  "name" : "Smith Family Archive",
+  "schemaVersion" : "1.0",
+  "updatedAt" : "2026-02-22T15:04:05Z"
+}

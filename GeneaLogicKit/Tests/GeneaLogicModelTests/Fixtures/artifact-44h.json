@@ -1,0 +1,57 @@
+{
+  "events": [],
+  "externalIdentifiers": [],
+  "files": [],
+  "language": "ru",
+  "locations": [],
+  "mediaType": "image",
+  "personsMentioned": [
+    {
+      "attributes": {
+        "ageAsRecorded": "31"
+      },
+      "facts": [
+        {
+          "date": "1892",
+          "place": "Łomża",
+          "type": "Birth"
+        },
+        {
+          "informationQuality": "secondary",
+          "place": "Warszawa",
+          "type": "Residence"
+        },
+        {
+          "type": "Occupation",
+          "value": "tailor"
+        }
+      ],
+      "informationQuality": "primary",
+      "localRef": "p1",
+      "nameAsRecorded": "Мотек Штернфельд",
+      "nameLanguage": "ru",
+      "nameScript": "Cyrl",
+      "role": "subject"
+    },
+    {
+      "facts": [],
+      "informationQuality": "secondary",
+      "localRef": "p2",
+      "nameAsRecorded": "Chaim Rozen",
+      "nameLanguage": "yi",
+      "nameScript": "Latn",
+      "role": "godparent"
+    }
+  ],
+  "provenance": {
+    "createdAt": "2026-07-22T12:00:00Z",
+    "createdBy": "human",
+    "reviewStatus": "asserted"
+  },
+  "schemaVersion": "1.0",
+  "sourceAuthorityTier": "church",
+  "sourceDerivation": "original",
+  "tags": [],
+  "title": "Łomża metrical register, 1892, akt 14",
+  "uid": "ART-018f3c9a-7b2e-7c41-9e3a-2b1c4d5e6f71"
+}

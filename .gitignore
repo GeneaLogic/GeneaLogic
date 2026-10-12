@@ -1,0 +1,19 @@
+# Swift Package Manager
+.build/
+.build-linux/
+.build-linux-*/
+.swiftpm/
+
+# Xcode (patterns are unanchored so they match the nested GeneaLogicApp/ project too)
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+
+# macOS
+.DS_Store
+
+# Claude Code — personal/local settings, notes and worktrees (shared settings.json IS committed)
+.claude/settings.local.json
+CLAUDE.local.md
+.claude/worktrees/

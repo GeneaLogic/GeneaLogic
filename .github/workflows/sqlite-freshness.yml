@@ -1,0 +1,72 @@
+name: SQLite freshness
+
+# Monthly check that the vendored SQLite amalgamation (GeneaLogicKit/Sources/CSQLite)
+# is current with upstream — primarily so we don't silently miss security fixes in a
+# dependency we carry in-tree. When we're behind, this opens (or refreshes) a single
+# tracking issue rather than failing a build; bump with scripts/update-sqlite.sh.
+#
+# Dependabot can't help here: there's no package manifest to track — the amalgamation
+# is a vendored C file we own. This scheduled job is the equivalent.
+
+on:
+  schedule:
+    - cron: '17 9 1 * *'   # 09:17 UTC on the 1st of each month
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    name: Compare vendored vs. upstream SQLite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          pinned="$(grep -E '#define SQLITE_VERSION ' \
+            GeneaLogicKit/Sources/CSQLite/include/sqlite3.h \
+            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
+
+          curl -fsSL --max-time 60 https://sqlite.org/download.html -o download.html
+          latest="$(grep -E '^PRODUCT,[^,]+,[^,]*sqlite-amalgamation-[0-9]+\.zip,' download.html \
+            | head -1 | cut -d, -f2)"
+
+          echo "Vendored: $pinned   Upstream latest: $latest"
+          if [ "$pinned" = "$latest" ]; then
+            echo "Vendored SQLite is current. Nothing to do."
+            exit 0
+          fi
+
+          # Ensure the dedup label exists, then reuse an open issue if one is already filed.
+          gh label create sqlite-update --color ededed \
+            --description "Vendored SQLite needs updating" 2>/dev/null || true
+
+          title="Vendored SQLite is behind upstream ($pinned → $latest)"
+          # Build the body with printf so every line stays indented inside this
+          # block scalar — a line at column 0 would prematurely end the YAML block.
+          body="$(printf '%s\n' \
+            "The vendored SQLite amalgamation (\`GeneaLogicKit/Sources/CSQLite\`) is **$pinned**; upstream latest is **$latest**." \
+            "" \
+            "Run \`scripts/update-sqlite.sh\` to refresh it — it verifies the download's SHA3-256 against sqlite.org before vendoring — then re-verify both platforms:" \
+            "\`swift test --package-path GeneaLogicKit\` and \`scripts/linux-test.sh\`." \
+            "" \
+            "See the [SQLite release history](https://sqlite.org/changes.html) for security-relevant fixes." \
+            "" \
+            "_Filed automatically by the SQLite freshness workflow._")"
+
+          existing="$(gh issue list --state open --label sqlite-update \
+            --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            echo "Refreshing existing tracking issue #$existing"
+            gh issue edit "$existing" --title "$title" --body "$body"
+          else
+            echo "Opening a new tracking issue"
+            gh issue create --title "$title" --body "$body" --label sqlite-update
+          fi

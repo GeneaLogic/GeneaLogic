@@ -1,0 +1,18 @@
+{
+  "person1Uid" : "PER-018f3c9a-7b2e-7c41-9e3a-000000000001",
+  "person2Uid" : "PER-018f3c9a-7b2e-7c41-9e3a-000000000014",
+  "provenance" : {
+    "createdAt" : "2026-02-22T15:04:05Z",
+    "createdBy" : "human",
+    "reviewStatus" : "human-verified",
+    "tool" : null
+  },
+  "reviewStatus" : "human-verified",
+  "schemaVersion" : "1.0",
+  "supportedByLinks" : [
+    "LNK-018f3c9a-7b2e-7c41-9e3a-000000000043",
+    "LNK-018f3c9a-7b2e-7c41-9e3a-000000000101"
+  ],
+  "type" : "parent-child",
+  "uid" : "REL-018f3c9a-7b2e-7c41-9e3a-000000000007"
+}

@@ -1,0 +1,38 @@
+GeneaLogic
+Copyright 2026 The GeneaLogic Authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE),
+except for the GeneaLogic Archive Format specification
+(GeneaLogicKit/schema/genealogic-archive-1.0.md and its copy under
+GeneaLogicKit/Sources/GeneaLogicArchive/Resources/), which is licensed under the
+Creative Commons Attribution 4.0 International License (CC BY 4.0):
+https://creativecommons.org/licenses/by/4.0/
+
+"GeneaLogic" is a trademark. The licenses above grant no rights in it; see
+TRADEMARKS.md.
+
+-------------------------------------------------------------------------------
+
+This product includes or depends on the following third-party software, each
+under its own license:
+
+  * SQLite (vendored in GeneaLogicKit/Sources/CSQLite/)
+    Public domain. https://sqlite.org/copyright.html
+
+  * SwiftCrypto, https://github.com/apple/swift-crypto
+    Copyright 2019 The SwiftCrypto Project. Apache License 2.0.
+    Its NOTICE: this product contains a derivation of various files from
+    SwiftNIO (https://github.com/apple/swift-nio, Apache License 2.0).
+
+  * BoringSSL, https://boringssl.googlesource.com/boringssl
+    Vendored by SwiftCrypto and linked on non-Apple platforms (Linux builds of
+    the engine and `genea`). Apache License 2.0, except its generated
+    fiat-crypto code (MIT, Apache License 2.0 or BSD-1-Clause, at your option).
+    Each file's header states its license.
+
+  * Swift ASN.1, https://github.com/apple/swift-asn1
+    Copyright 2022 The SwiftASN1 Project. Apache License 2.0.
+
+  * Swift Argument Parser, https://github.com/apple/swift-argument-parser
+    Copyright Apple Inc. and the Swift project authors. Apache License 2.0
+    with Runtime Library Exception.
