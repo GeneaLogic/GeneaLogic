@@ -14,8 +14,9 @@
 ## How work is tracked
 
 - **Milestones say when; labels say what.** A milestone is a release, named by version:
-  `0.1` is the first public build, `0.2`, `0.3`, … are app development, and `1.0` is
-  reserved for a format and CLI stability promise. Labels name the layer (`engine`,
+  `0.1` is the first public build; `0.2` is app development that needs no format change;
+  `0.3` is format additions, landed before `1.0` locks the format; and `1.0` is reserved
+  for a format and CLI stability promise. Labels name the layer (`engine`,
   `app`, `cli`, `format`) and the kind (`bug`, `decision`, `feature-request`,
   `enhancement`). `parked` marks a deliberate deferral, and the issue says what un-parks
   it. Issues are not tagged by slice; a slice's PR links the issues it closes.
@@ -105,8 +106,8 @@ and the release pipeline produces a signed, notarized, versioned build.
 | 1 | Multi-writer / sync | ✅ done |
 | 2 | Format stress testing | ✅ done (2026-10-09) |
 | 3 | Go public — slices 72–76 (with 74b) | ✅ done (2026-10-12) |
-| 4 | **Triage** | **now** |
-| 5 | Mac-likeness, second pass | |
+| 4 | Triage | ✅ done (2026-10-12) |
+| 5 | **Mac-likeness, second pass** | **now** |
 | 6 | Distribution | |
 
 ### Workstream 3 — go public
@@ -139,30 +140,30 @@ Worked in this repo on slice branches as usual. The public repo starts from the 
 
 ### Workstream 4 — triage
 
-The open issues, the parked ones, and this ROADMAP's refactors and contributor-docs work,
-which are filed as issues first. Every open item ends with a
-milestone, or parked with the trigger that un-parks it.
+Every open issue now has a milestone, or is parked with the trigger that un-parks it. The
+ROADMAP's refactors and contributor-docs work were filed as issues. Two calls worth keeping:
 
-- **GeneaLogicKit can't be a SwiftPM URL dependency** (found in 73). SwiftPM needs the
-  manifest at the repository root, and the package is in `GeneaLogicKit/`. A root
-  `Package.swift` that points at its sources would fix it. Until then the README says
-  to depend on it by local path.
-- **A cold build prints ~180 warnings** (found in 73's hand-test). Nearly all come from the
-  vendored `sqlite3.c`, which SwiftPM shows for a path dependency and for the package's own
-  builds. A wrapper `.c` that silences warnings and includes the amalgamation would quiet
-  them without `unsafeFlags`, which a URL dependency refuses. The other one is a deprecated
-  `String(cString:)` in `MachineKey.swift`.
+- **The trash is one slice in `0.2`:** [#2](https://github.com/GeneaLogic/GeneaLogic/issues/2) with [#10](https://github.com/GeneaLogic/GeneaLogic/issues/10) and [#11](https://github.com/GeneaLogic/GeneaLogic/issues/11), which are un-parked to be
+  decided beside it. Widening `TrashEntry.kind` is the format question it settles.
+- **The gazetteer and the name-variant table became one `0.3` decision ([#23](https://github.com/GeneaLogic/GeneaLogic/issues/23))**, ahead of
+  [#15](https://github.com/GeneaLogic/GeneaLogic/issues/15). The tables may live in the archive (a format change), and "nearby" may need a new
+  match `kind` (a closed vocabulary). Both have to be settled before `1.0`, even if a real
+  gazetteer comes later. It depends on workstream 6, which settles bundling and the App Group
+  container.
 
 ### Workstream 5 — Mac-likeness, second pass
 
 Opens with two behavior-preserving splits:
 
-- **`ArchiveModel.swift`** (~4,000 lines; sections in the order slices were built) into
-  per-domain files. Separate platform-neutral model logic from macOS-only UI, so an iOS
-  target can share it later. The `mutate` and write-queue pattern stays as it is.
-- **`ArtifactDetailView.swift`** (~1,900 lines).
+- **`ArchiveModel.swift`** into per-domain files ([#19](https://github.com/GeneaLogic/GeneaLogic/issues/19)), separating platform-neutral
+  model logic from macOS-only UI so an iOS target can share it later.
+- **`ArtifactDetailView.swift`** ([#20](https://github.com/GeneaLogic/GeneaLogic/issues/20)).
 
 Then [#9](https://github.com/GeneaLogic/GeneaLogic/issues/9) (inspector and toolbar layering in macOS 27) and whatever the pass finds.
+
+The rest of `0.1` is outside the Mac pass, and can go before or between its slices: making
+GeneaLogicKit a SwiftPM URL dependency and quieting its cold build ([#17](https://github.com/GeneaLogic/GeneaLogic/issues/17), [#18](https://github.com/GeneaLogic/GeneaLogic/issues/18), one slice), and
+the bugs [#3](https://github.com/GeneaLogic/GeneaLogic/issues/3), [#4](https://github.com/GeneaLogic/GeneaLogic/issues/4) and [#8](https://github.com/GeneaLogic/GeneaLogic/issues/8).
 
 ### Workstream 6 — distribution
 
@@ -192,18 +193,10 @@ Terminal, which breaks the agent-drives-the-CLI case 47 was built for.
 
 ### Alongside 5 and 6 — contributor docs
 
-Not a gate for going public; filed as issues at triage.
-
-- **DocC catalog**: a Getting Started article, and topic groups that sort `Archive`'s
-  public members into core use, integrity, and sync/recovery.
-- **Comment convention**: the rule first, then history only if it still explains
-  something. Applied to the public API now, and to other files as they are touched.
-- **CONTRIBUTING guides**: *adding a record type* (13 files in the archive module plus
-  CLI and app for `Dismissal`; the property-test generator in `GeneaLogicTestSupport` is
-  the easy one to miss), and *adding a phonetic keyer*.
-- **Move reconciliation out of `Archive.open`** (manifest merge, witness, pruning,
-  conflicting versions) into its own file, and write ARCHITECTURE's ordered account of
-  what happens when an archive opens, with why each step comes where it does.
+Not a gate for `0.1`, so milestoned `0.2`: a DocC catalog ([#21](https://github.com/GeneaLogic/GeneaLogic/issues/21)), the comment convention on
+the public API ([#22](https://github.com/GeneaLogic/GeneaLogic/issues/22)), CONTRIBUTING guides for adding a record type and a phonetic keyer
+([#25](https://github.com/GeneaLogic/GeneaLogic/issues/25)), and moving reconciliation out of `Archive.open` with an ordered account of opening
+in ARCHITECTURE ([#26](https://github.com/GeneaLogic/GeneaLogic/issues/26)).
 
 ## Next — app development, by milestone
 
@@ -240,7 +233,8 @@ Starting list, with what each depends on:
     tool identifier.
 - **App Intents** (Shortcuts, Siri, Spotlight), after the `ArchiveModel` split. The typed
   ids map onto App Intents entities.
-- **The open feature requests** ([#1](https://github.com/GeneaLogic/GeneaLogic/issues/1), [#2](https://github.com/GeneaLogic/GeneaLogic/issues/2), [#5](https://github.com/GeneaLogic/GeneaLogic/issues/5), [#6](https://github.com/GeneaLogic/GeneaLogic/issues/6), [#7](https://github.com/GeneaLogic/GeneaLogic/issues/7)), sized at triage.
+- **The open feature requests**, milestoned at triage (workstream 4): app features in `0.2`,
+  format additions in `0.3`.
 
 ## Later
 
@@ -279,20 +273,12 @@ Windows does not have.
 
 Each with what un-parks it.
 
-- **Gazetteer-backed place matcher** — Phase 4 or later; the fork is where the data comes
-  from ([matcher phase](slices/phase-3-matcher.md)). 45o took the concrete pain out.
-- **User-curated name-variant table** (`MatchKind.knownVariant` already exists) — a
-  matcher accuracy upgrade; probably the bigger win than more phonetic keyers.
 - **Ngram blocking below 45p's floor** — parked with data; the scale slice may un-park it.
-- **Phonetic keyer protocol** — one implementation today, so not built speculatively.
-  Filed as a `good first issue` with the design: internal (matcher output is provenance),
-  keyed by ISO 15924 script, `Matcher.toolIdentifier` bumped when a keyer is added.
+- **[#24](https://github.com/GeneaLogic/GeneaLogic/issues/24)** (phonetic keyer protocol) — one implementation today, so not built
+  speculatively; un-parks when a second keyer is proposed. A `good first issue`.
 - **USB/network scanner ingest** (`ImageCaptureCore`) — only if wanted.
 - **A persisted, cross-relaunch undo journal** — only if wanted; the trash is a narrow
   recovery carve-out, not a general journal.
-- **[#10](https://github.com/GeneaLogic/GeneaLogic/issues/10), [#11](https://github.com/GeneaLogic/GeneaLogic/issues/11)** (Replace File loses the prior master after quit; deleted conclusions have
-  no cross-session trash) — trash-backed answers that widen `TrashEntry.kind`, a format
-  change beside [#2](https://github.com/GeneaLogic/GeneaLogic/issues/2).
 - **[#12](https://github.com/GeneaLogic/GeneaLogic/issues/12)** (re-run and backup contract for migration steps) — lands with the first real
   migration step. Until then it is the one deferral that can break workstream 2's exit
   criterion.
