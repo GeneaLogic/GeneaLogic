@@ -153,13 +153,24 @@ ROADMAP's refactors and contributor-docs work were filed as issues. Two calls wo
 
 ### Workstream 5 — Mac-likeness, second pass
 
-Opens with two behavior-preserving splits:
+**Opens with the question of the app's floor.** An archive window is a
+`WindowGroup(for: URL.self)`, so Open Recent, Finder opens, restoration and the sandbox
+bridge are all hand-built, and window tabs are switched off. A read-only `DocumentGroup`
+viewer, with the engine still the only writer, would give the app these from the system.
+ARCHITECTURE §7 deferred it until the SDK 27 `Document` API was usable, and it now is. That
+is the reason to raise the app to macOS 27. The engine and CLI stay at macOS 26. Nothing
+else in SDK 27 justifies the move by itself.
 
-- **`ArchiveModel.swift`** into per-domain files ([#19](https://github.com/GeneaLogic/GeneaLogic/issues/19)), separating platform-neutral
-  model logic from macOS-only UI so an iOS target can share it later.
-- **`ArtifactDetailView.swift`** ([#20](https://github.com/GeneaLogic/GeneaLogic/issues/20)).
-
-Then [#9](https://github.com/GeneaLogic/GeneaLogic/issues/9) (inspector and toolbar layering in macOS 27) and whatever the pass finds.
+| Slice | Contents |
+| --- | --- |
+| [**77**](slices/77-does-documentgroup-fit-the-engine.md) | A prototype that decides go or no-go on `DocumentGroup`, and therefore the floor |
+| **78** | Split `ArchiveModel.swift` by domain ([#19](https://github.com/GeneaLogic/GeneaLogic/issues/19)). Code moves into files, and model logic is separated from macOS-only UI. No new observable sub-models: if they are ever needed, they follow 81's document/window seam and the scale slice's measurements |
+| **79** | Split `ArtifactDetailView.swift` ([#20](https://github.com/GeneaLogic/GeneaLogic/issues/20)) into `View` types that each take only the data they read, not computed `some View` sections |
+| **79b** | Row identity: editable lists are identified by `\.offset`, so a mid-list delete hands state to the wrong row. Mentions use `localRef`. Events, places, names and recorded facts get in-memory ids (not a format change) |
+| **80** *(on go)* | The app's floor to macOS 27, and CI on Xcode 27 |
+| **81** *(on go)* | Archive windows become `DocumentGroup` documents, retiring the hand-built window machinery (maybe two slices) |
+| **82** | [#9](https://github.com/GeneaLogic/GeneaLogic/issues/9) (inspector and toolbar layering), after 81 changes the window chrome |
+| **83+** | **The audit:** a second [UI audit](UI-AUDIT.md) (G1…), from the user's notes, a run-through of the sample archive, Apple's HIG and SwiftUI guidance. Candidates so far: default and minimum window size, Quick Look on Space, Help and About, copy and paste, context menus that match the menu bar, full keyboard access and VoiceOver, undo action names, and the SDK 27 dialog overloads if the floor moves |
 
 The rest of `0.1` is outside the Mac pass, and can go before or between its slices: making
 GeneaLogicKit a SwiftPM URL dependency and quieting its cold build ([#17](https://github.com/GeneaLogic/GeneaLogic/issues/17), [#18](https://github.com/GeneaLogic/GeneaLogic/issues/18), one slice), and
