@@ -205,3 +205,8 @@ sample, with real keystrokes.
 **Stopped here, as agreed: this is the no-go case.** Making ⌘S safe would mean reaching
 into SwiftUI's private document class, which is fighting the framework at its center.
 Questions 4, 5 and 7 were not run.
+
+**Decided 2026-10-18: no-go.** The app stays a `WindowGroup` on macOS 26. Slices 80 and
+81 are dropped, and the ROADMAP's ladder is renumbered. A move to macOS 27 is not ruled
+out if another benefit justifies it. The archive's own undo stack, found here, goes to
+the audit.

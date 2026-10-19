@@ -4250,6 +4250,25 @@ been two slices.
   strings, never a blanket regex. The issues were filed before the tree was rewritten, to
   know their numbers.
 
+- **77 — does DocumentGroup fit the engine?** (a prototype on `spike-77`, never merged; no
+  format change). **The decision: no-go.** The app stays a `WindowGroup` on macOS 26.
+  Slices 80 and 81 are dropped. The floor can still move to 27 for another reason. A
+  read-only `DocumentGroup` viewer opened the archive cleanly: atime showed SwiftUI reads
+  nothing inside the package, and `genea add` on an open archive caused no re-read or
+  alert. Undo marking the viewer *Edited* was fixable with the model's own `UndoManager`,
+  and that also settles slice 52's grouping trade-off. **What killed it:** File ▸ Save and
+  ⌘S replace the whole package even for an unedited viewer, and neither
+  `CommandGroup(replacing: .saveItem)`, AppKit menu pruning nor a blocking responder
+  stops them. **Invariant:** the engine is the only thing that writes an archive, and
+  nothing the app hosts may offer a save. **Gotchas:** a save stages a hard-linked
+  sibling (`<name>.sb-…`) and swaps the tree in, so it copies no bytes and keeps file
+  inodes (the open index survives). Writing *in place* into a staged file changes the
+  original. `URLDocumentConfiguration.fileURL` is main-actor isolated, and
+  `writer(configuration:)` runs off it; reading it there crashed. A change made in a
+  `.task` isn't noticed until the next event. Background computer-use can't deliver
+  keystrokes or a key window, so menu and typing checks need the app in front. The
+  `xcode-27` runner label exists (preview) if CI ever needs it.
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the
