@@ -14,6 +14,28 @@ macOS 27.
 **Layer.** App only, and a **prototype**: no format change, no engine change. The slice
 merges a decision, not code.
 
+**Why read-only, not read-write.** A writable `Document` saves by asking the document for
+a snapshot of its in-memory state and handing it to a `DocumentWriter`, whose one method
+writes to a `destination` URL. Apple's guide says that destination is not the document's
+`fileURL`, and the SDK has no option to write in place. The system then swaps the new
+package in for the old. So the engine can only take part by building the whole package anew
+at each save. Making the engine write only on save would undo four guarantees:
+
+- **An edit is on disk the moment it is made**, which slices 65 and 69 and
+  `kill-test.sh` test. On-save writing loses whatever came after the last autosave.
+- **`genea` and agents write alongside the window**, under the `flock` (47, 51).
+  Replacing the whole package overwrites their writes, or raises "changed by another
+  application".
+- **Sync sees changes per file** (48–61). A package swap looks like a delete and a
+  re-create, and off APFS it copies all the media on every save.
+- **The index is open inside the package.** Swapping the package out from under an open
+  SQLite connection and its WAL is how an index gets corrupted.
+
+GeneaLogic's archive is the files on disk, written by more than one writer. It is more
+like a library than a document. Read-write would add Save, Revert, Versions and the
+edited dot, and none of them mean much for an archive that is always saved. Everything
+wanted from `DocumentGroup` comes with the viewer.
+
 **What the prototype is.** The smallest change that puts an archive in a document
 window: a `DocumentGroup(viewer:makeReadableDocument:)` scene with a custom
 `DocumentReader`, hosting the existing `ArchiveContainerView`, with the floor at
@@ -22,6 +44,11 @@ Throwaway archives only, never a real one.
 
 **The questions.** Each gets an answer, or "unknown without building X".
 
+0. **The premise.** Check this first, with a throwaway writable `Document` on a scratch
+   package. On one save, log `destination` against `configuration.fileURL`, and see how
+   the result replaces the original. If the destination *is* the file URL, or the
+   replacement is per file, read-write comes back as an option. Then put the question
+   to the user before going on.
 1. **Opening.** Can `read(from:progress:)` hand over enough to open the archive through
    the engine, without SwiftUI reading or coordinating every file in the package? A
    coordinated read of the package may make iCloud Drive download all of it, which
