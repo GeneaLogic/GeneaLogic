@@ -181,3 +181,27 @@ experiment is needed: can the archive keep its undo history off the document's
 **8. CI: answered.** GitHub's `xcode-27` runner label is a public preview (macOS 27.0.1,
 Xcode 27.0 default, build 27A266a, the same as the local build). There is also an
 `xcode-27-xlarge` label. Preview means queueing and instability are possible.
+
+**6, continued. Undo is fixable; Save is not.** Checked on spike-77 at `56d9bd5`, on the
+sample, with real keystrokes.
+
+- **The archive's own `UndoManager` works.** Each archive window gave `ArchiveModel`
+  its own stack, with Edit ▸ Undo/Redo routed to a field being edited, or else to the
+  archive. A committed edit reached disk and never marked the document *Edited*.
+  Typing in a field didn't either. ⌘Z inside a field undid the typing, and outside it
+  undid the archive edit ("Undo Edit Original Format", reverted on disk). The window then
+  closed with no alert and no save, 17 s after the edit. This also settles the grouping
+  trade-off slice 52 recorded on `ArchiveModel.undoManager`.
+- **File ▸ Save replaces the package even when nothing is edited**, and so does ⌘S. A
+  read-only `DocumentGroup` still installs AppKit's whole document menu: New Document,
+  Save, Save As…, Duplicate, Rename…, Move To…, Revert To ▸ Browse All Versions….
+  `CFBundleTypeRole` `Viewer` changes nothing, and nor does removing the writable scratch
+  group. **Three ways to remove or disable them all failed:**
+  `CommandGroup(replacing: .saveItem)` doesn't reach them; pruning the AppKit menu is
+  undone by SwiftUI's rebuild; and a responder ahead of the window controller is skipped,
+  because the items go to the document directly. Each Save is a full-tree swap plus an
+  attempt to keep the old package as a version.
+
+**Stopped here, as agreed: this is the no-go case.** Making ⌘S safe would mean reaching
+into SwiftUI's private document class, which is fighting the framework at its center.
+Questions 4, 5 and 7 were not run.
