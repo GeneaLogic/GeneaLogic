@@ -1103,23 +1103,27 @@ exist from the first commit.
 A SwiftUI app that opens a `.genea` package and edits it in place via
 GeneaLogicKit.
 
-> **Phase-2 hosting decision — `WindowGroup`, not `DocumentGroup` (for now).**
-> The intent above is a "document-based app," but `DocumentGroup`'s model
-> (read a snapshot into memory → SwiftUI writes a `FileWrapper` back on save)
-> fights the engine, which is the sole writer and persists *immediately* and
-> atomically (`rename(2)`) while maintaining `.index/index.sqlite`. Two writers
-> to one package is a corruption risk. The clean reconciliation — a **read-only
-> `DocumentGroup` viewer** (`ReadableDocument`) plus engine-owned out-of-band
-> writes coordinated via the document's `NSFileCoordinator` — exists only in the
-> **SDK-27 / macOS-27** document API, which won't run on the current macOS 26
-> toolchain. So Phase 2 uses a plain **`WindowGroup`** with an app-driven flow:
-> opening uses SwiftUI `.fileImporter` (filtered to the registered `.genea`
-> package type), creating uses `NSSavePanel` (no SwiftUI idiom for picking a
-> not-yet-existing destination the engine then populates); the engine owns every
-> write and the app patches its in-memory `[ArtifactSummary]` list from each
-> mutation's return value (no full reload). **Revisit the `ReadableDocument`
-> viewer once the deployment target can move to macOS 27** — it would add native
-> recents/restore at the cost of per-mutation coordinated-write bookkeeping.
+> **Hosting decision — `WindowGroup`, not `DocumentGroup` (Phase 2; re-tested and
+> confirmed in slice 77).** The intent above is a "document-based app," but a
+> writable `Document` saves by staging a sibling package (hard-linked from the
+> original) and swapping the whole tree in. That is on-autosave rather than
+> on-mutation writing, and it raises a modal "changed by another application" alert
+> whenever `genea`, an agent or sync has touched the archive. The engine is the sole
+> writer, persists *immediately* and atomically (`rename(2)`), and shares the archive
+> with other processes, so a writable document is out. The SDK-27 **read-only
+> `DocumentGroup` viewer** (`ReadableDocument`) was prototyped in 77 and opens an
+> archive cleanly: SwiftUI reads nothing inside the package, and outside writes cause
+> no re-read or alert. Two things broke it. Undo marks a viewer *Edited*, which is
+> fixable with an undo stack of the model's own. But **File ▸ Save and ⌘S replace the
+> whole package even for an unedited viewer**, and no supported means removes or
+> disables them: `CommandGroup(replacing: .saveItem)`, AppKit menu pruning and a
+> blocking responder all failed. So the app keeps a plain **`WindowGroup`** with an
+> app-driven flow: opening uses SwiftUI `.fileImporter` (filtered to the registered
+> `.genea` package type), creating uses `NSSavePanel`, the engine owns every write, and
+> the app patches its in-memory lists from each mutation's return value. Native
+> behaviour (recents, restoration, tabs) is built by hand. **Revisit** only if a later
+> SDK lets a viewer drop the save commands. The macOS 27 floor is not ruled out for
+> other reasons; 77's findings are in its spec.
 >
 > **Window model → multi-archive, one archive per window (slice 4, as built).**
 > Slices 1–3 used a single app-wide model (one archive at a time). Slice 4 moved to
