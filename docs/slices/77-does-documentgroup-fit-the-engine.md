@@ -152,3 +152,32 @@ opens the archive through the engine as it does today.
   `Archive.open` today, so the document system's coordinated read cannot make it worse.
 - **Seen in passing, for the audit:** the window title shows the extension (`Demo.genea`)
   and the window opens at 900×450.
+
+**3. Changes from outside: workable.** With the sample open, `genea add` wrote a new
+artifact from Terminal. The document's file presenter logged that it observed the
+change, but there was no re-read (`read` and `apply` did not run again), no alert, and no
+*Edited*. Slice 51's poll showed the new artifact as before. So the document system
+neither replaces slice 51 nor fights it, as long as the document is not edited (see 6).
+
+**2. The engine's own writes: uncoordinated, and nothing objects until a save.** A tag
+typed in the inspector reached `record.json` at once. Nothing was coordinated, and the
+package was neither re-read nor replaced. The cost shows up only when the document
+system tries to save (6), because it then treats the engine's writes as "another
+application's".
+
+**6. Undo: not workable as built. This threatens the go/no-go.** The same edit marked
+the read-only document *Edited* in the title bar. The window's `UndoManager`, which
+`ArchiveModel` registers on, is the document's. An edited document autosaves (about
+15 s later) and saves on close. Closing raised question 0's "could not be autosaved.
+The file has been changed by another application" alert, triggered by the app's own
+writes. **Save Anyway replaced the package** even though the document has no writer: the
+package inode changed, the files stayed hard-linked (so the open index and lock kept
+their inodes, and `genea verify` was clean), and NSDocument tried to keep the old package
+as a version. That failed only because the sample is in `/tmp`. The File menu also
+offers Save, Save As…, Duplicate and Revert To for a viewer. Before going on, one
+experiment is needed: can the archive keep its undo history off the document's
+`UndoManager`, so that the document is never edited and never saves?
+
+**8. CI: answered.** GitHub's `xcode-27` runner label is a public preview (macOS 27.0.1,
+Xcode 27.0 default, build 27A266a, the same as the local build). There is also an
+`xcode-27-xlarge` label. Preview means queueing and instability are possible.
