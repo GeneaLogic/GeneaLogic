@@ -44,8 +44,8 @@ import Testing
             // — so timing reads immediately after the call measures a write that
             // has not begun, and would pass no matter how the engine locks. Found
             // exactly that way: this test passed against the pre-52 lock order
-            // until this sleep was added.
-            try? await Task.sleep(for: .milliseconds(100))
+            // until it waited. It now asks the engine rather than sleeping a guess.
+            try await Self.untilBlocked(try #require(model.archive))
 
             let started = ContinuousClock.now
             for _ in 0..<50 {
@@ -74,16 +74,24 @@ import Testing
         let (model, root) = try AppTestSupport.makeModel(undo: false)
         defer { AppTestSupport.remove(root) }
 
+        // Long enough that the write cannot give up while the deadlines below run.
+        let archive = try #require(model.archive)
+        archive.lockTimeout = 30
+
         try await AppTestSupport.withCompetitor(holdingTheLockAt: root) {
             model.createPerson(given: "Marcus", surname: "Hanner")
             #expect(!model.isWaitingOnAnotherProcess, "not before the delay")
 
-            // Polled to a deadline rather than sampled once at delay+200ms: the
-            // suite runs in parallel, and a sibling test that issues 400 writes
-            // can push this one's indicator task past a fixed margin. That made
-            // this test flaky — a *timing* flake, not a behaviour change, which is
-            // the kind most likely to be re-diagnosed as a real bug later.
-            let deadline = ContinuousClock.now + .seconds(3)
+            // **The clock starts once the write is blocked, not when it is issued**
+            // (CI, slice 77). Before it reaches the flock the write needs the main
+            // actor to start its `Task` and then the write queue; on a loaded
+            // runner that hop alone ate a deadline counted from the call, and the
+            // test failed with the indicator never armed because nothing was
+            // waiting yet. Polled to deadlines rather than sampled once, because
+            // the suites run in parallel — a *timing* flake, not a behaviour
+            // change, is the kind most likely to be re-diagnosed as a real bug.
+            try await Self.untilBlocked(archive)
+            let deadline = ContinuousClock.now + .seconds(10)
             while !model.isWaitingOnAnotherProcess && ContinuousClock.now < deadline {
                 try? await Task.sleep(for: .milliseconds(20))
             }
@@ -177,5 +185,16 @@ import Testing
             let message = try #require(model.actionError)
             #expect(message.localizedCaseInsensitiveContains("another"), "got: \(message)")
         }
+    }
+
+    /// Waits until the engine reports a write parked on the competitor's lock.
+    /// Reads `isWaitingForAnotherProcess`, which takes none of the archive's
+    /// locks, so it answers while the write is blocked.
+    private static func untilBlocked(_ archive: Archive) async throws {
+        let deadline = ContinuousClock.now + .seconds(10)
+        while !archive.isWaitingForAnotherProcess && ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        try #require(archive.isWaitingForAnotherProcess, "the write never reached the lock")
     }
 }
