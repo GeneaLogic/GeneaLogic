@@ -37,6 +37,9 @@ struct ArchiveContainerView: View {
     /// window (a belt-and-suspenders case behind `ArchiveOpenCoordinator`, slice 31)
     /// fails to claim the archive's slot and dismisses itself.
     @State private var windowToken = UUID()
+    /// SPIKE 77: the archive's own undo stack, kept off the document's `UndoManager`
+    /// so an archive edit never marks the read-only document edited.
+    @State private var archiveUndo = UndoManager()
 
     /// An `ArtifactID?` view over the scene-stored raw id, handed down to the list
     /// and detail. The detail resolves it against `model.artifacts` only when
@@ -117,8 +120,7 @@ struct ArchiveContainerView: View {
                     model.refreshIfChangedExternally()
                 }
             }
-            .onAppear { model.undoManager = undoManager }
-            .onChange(of: undoManager) { _, manager in model.undoManager = manager }
+            .onAppear { model.undoManager = archiveUndo }
             // Release the access `acquire`d before this window opened — but only if
             // this window actually owned the archive's slot. A dismissed duplicate
             // never owned it, so it must not revoke the surviving window's scope.

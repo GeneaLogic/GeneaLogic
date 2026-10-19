@@ -58,6 +58,7 @@ struct ArchiveDocumentView: View {
             } else {
                 ArchiveContainerView(url: url)
                     .id(url)
+                    .background(SpikeSaveBlockerInstaller())
             }
         } else {
             ProgressView()

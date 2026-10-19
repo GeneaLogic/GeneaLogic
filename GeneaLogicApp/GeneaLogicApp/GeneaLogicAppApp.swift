@@ -18,13 +18,10 @@ struct GeneaLogicAppApp: App {
         } makeReadableDocument: { configuration, _ in
             ArchiveDocument(configuration: configuration)
         }
+        .commands { SpikeUndoCommands() }
 
-        // SPIKE 77, question 0.
-        DocumentGroup { document in
-            ScratchDocumentView(document: document)
-        } makeDocument: { configuration, _ in
-            ScratchDocument(configuration: configuration)
-        }
+        // SPIKE 77, question 0's scratch document group is out: with it present,
+        // the File menu carries the writable document commands.
 
         // Popped-out file previews (the inline preview pane's "open in a separate
         // window" action). Keyed by a `FilePreviewRequest` carrying a temp-copy URL;
@@ -56,5 +53,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // AppKit restores windows before this fires; drain any buffered opens now
         // (the coordinator adds one runloop hop for SwiftUI scene registration).
         MainActor.assumeIsolated { ArchiveOpenCoordinator.shared.launchDidFinish() }
+
+        // SPIKE 77: log, then prune, AppKit's document commands; prune again whenever a
+        // menu opens, in case SwiftUI rebuilds them.
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                SpikeMenuSurgery.logFileMenu()
+                SpikeMenuSurgery.run()
+            }
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main
+        ) { _ in MainActor.assumeIsolated { SpikeMenuSurgery.run() } }
     }
 }
