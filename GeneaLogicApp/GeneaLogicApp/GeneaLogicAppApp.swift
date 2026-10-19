@@ -10,33 +10,20 @@ struct GeneaLogicAppApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        // SPIKE 77, question 0: first scene, per Apple's guide.
+        // SPIKE 77, question 1: archives as read-only documents. The
+        // `WindowGroup(for: URL.self)` and its commands are out while this is tried;
+        // welcome and New Archive are question 5.
+        DocumentGroup { document in
+            ArchiveDocumentView(document: document)
+        } makeReadableDocument: { configuration, _ in
+            ArchiveDocument(configuration: configuration)
+        }
+
+        // SPIKE 77, question 0.
         DocumentGroup { document in
             ScratchDocumentView(document: document)
         } makeDocument: { configuration, _ in
             ScratchDocument(configuration: configuration)
-        }
-
-        // One archive per window, keyed by the archive's URL. The value-based
-        // group de-duplicates by value, so opening an already-open archive
-        // focuses its window instead of spawning a second (this is also what
-        // retires the old "Finder double-click opens a second window" issue). A
-        // `nil` value is the welcome state; see `RootWindow`. (ARCHITECTURE.md §7.)
-        WindowGroup(for: URL.self) { $url in
-            RootWindow(url: $url)
-        }
-        // Restore archive windows across launches via the **OS** mechanism, which
-        // correctly honors the user's "Close windows when quitting an app" setting
-        // (clean-slate users get a clean slate; restore users get their windows
-        // back). The system persists each window's bare `URL` value, which carries
-        // no live sandbox scope, so a restored window re-derives one from that
-        // archive's app-scoped bookmark in `ArchiveModel.load()` (via
-        // `ArchiveAccessStore.ensureAccess`); a window whose archive has since been
-        // moved/deleted shows a clear "can no longer reach this archive" state.
-        // (ARCHITECTURE.md §7.)
-        .restorationBehavior(.automatic)
-        .commands {
-            ArchiveCommands()
         }
 
         // Popped-out file previews (the inline preview pane's "open in a separate
