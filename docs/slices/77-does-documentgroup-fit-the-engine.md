@@ -18,18 +18,21 @@ merges a decision, not code.
 a snapshot of its in-memory state and handing it to a `DocumentWriter`, whose one method
 writes to a `destination` URL. Apple's guide says that destination is not the document's
 `fileURL`, and the SDK has no option to write in place. The system then swaps the new
-package in for the old. So the engine can only take part by building the whole package anew
-at each save. Making the engine write only on save would undo four guarantees:
+package in for the old. So the engine can only take part by building the package anew at
+each save, inside the writer. That would undo two guarantees (question 0 checked both,
+and corrected two weaker reasons first given here):
 
 - **An edit is on disk the moment it is made**, which slices 65 and 69 and
-  `kill-test.sh` test. On-save writing loses whatever came after the last autosave.
-- **`genea` and agents write alongside the window**, under the `flock` (47, 51).
-  Replacing the whole package overwrites their writes, or raises "changed by another
-  application".
-- **Sync sees changes per file** (48–61). A package swap looks like a delete and a
-  re-create, and off APFS it copies all the media on every save.
-- **The index is open inside the package.** Swapping the package out from under an open
-  SQLite connection and its WAL is how an index gets corrupted.
+  `kill-test.sh` test. An autosave comes about 15 seconds after a change, so on-save
+  writing loses whatever came after the last one.
+- **`genea` and agents write alongside the window**, under the `flock` (47, 51). Any
+  outside write between a change and its autosave stops the save behind a modal
+  "changed by another application" alert. For an archive designed to be written from
+  Terminal while it is open, that alert would be routine.
+
+Two reasons first given here were wrong or unproven. The swap does not copy the media:
+the staging package is hard-linked from the original. And the open index may well survive
+a swap that keeps its file's inode, though that was not tested.
 
 GeneaLogic's archive is the files on disk, written by more than one writer. It is more
 like a library than a document. Read-write would add Save, Revert, Versions and the
@@ -104,3 +107,30 @@ the prototype build): open the sample from Finder and from the Open panel. Check
 Recent, a second window as a tab, the title-bar menu, quit and relaunch. Run `genea add`
 against the open archive from Terminal. Then judge whether it feels like a Mac document
 app, which is the reason for the slice.
+
+## Findings
+
+**0. The premise holds: read-only stands.** Checked on spike-77's `ScratchDocument`, a
+writable `Document` over a scratch package with a 50 MB file, a small counter file and a
+subdirectory.
+
+- **The destination is not the document's URL.** It is a sibling,
+  `One.geneaspike.sb-<id>-<random>`, which the system creates before `write` runs. It is
+  pre-filled with **hard links** to every file in the original, as it is on disk at that
+  moment, and every directory is recreated. After `write`, the sibling replaces the
+  original. The package's inode and every subdirectory's inode change, and file inodes
+  are kept. No bytes are copied, which was checked on APFS only.
+- **It is not per file.** The whole tree is replaced at every save.
+- **Writing into a pre-linked file in place changes the original before the swap.** A
+  temporary file then a rename, as `AtomicIO` does, would not.
+- **Autosave fires about 15 s after a change.** A change made outside an event
+  (in a `.task`) is not noticed until the next event.
+- **An outside write in that window stops the autosave behind a modal alert:** "could not
+  be autosaved. The file has been changed by another application", offering Save As,
+  Revert and Save Anyway. *Save Anyway* kept the outside writes, because staging links
+  what is on disk at save time. So the cost is the alert, not silent loss. Only an
+  uncoordinated write made during `write` itself would be dropped.
+- **Gotcha:** `URLDocumentConfiguration.fileURL` is main-actor isolated in the SDK, and
+  `writer(configuration:)` is called off the main actor during a save. Reading it there
+  with `MainActor.assumeIsolated` crashed the app (a libdispatch assertion). Carry the
+  URL in the snapshot, which is built on the main actor.
