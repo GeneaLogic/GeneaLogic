@@ -134,3 +134,21 @@ subdirectory.
   `writer(configuration:)` is called off the main actor during a save. Reading it there
   with `MainActor.assumeIsolated` crashed the app (a libdispatch assertion). Carry the
   URL in the snapshot, which is built on the main actor.
+
+**1. Opening: workable.** A `ReadableDocument` whose `Reader` returns only the `source`
+URL. `apply` hands it to the existing `ArchiveContainerView`, and `ArchiveModel.load()`
+opens the archive through the engine as it does today.
+
+- **`source` is the archive's real URL.** It is not a copy. `read` runs off the main
+  thread. `configuration.fileURL` is `nil` in `makeReadableDocument` and set by `apply`.
+- **SwiftUI reads nothing inside the package.** Measured by file access times, on the
+  sample archive (72 files). Every file's atime was set to 2020, then the archive was
+  opened. With the engine not opened, nothing moved. With it opened, two files moved,
+  `manifest.json` and the index, which is the engine's own open. SwiftUI does take one
+  coordinated read of the package and adds a file presenter for it, which question 3 is
+  about.
+- **iCloud adds no new cost.** 57b measured that a package-born `.genea` in iCloud Drive
+  is one ubiquitous item, so anything that opens it downloads all of it. That is true of
+  `Archive.open` today, so the document system's coordinated read cannot make it worse.
+- **Seen in passing, for the audit:** the window title shows the extension (`Demo.genea`)
+  and the window opens at 900×450.
