@@ -10,6 +10,13 @@ struct GeneaLogicAppApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
+        // SPIKE 77, question 0: first scene, per Apple's guide.
+        DocumentGroup { document in
+            ScratchDocumentView(document: document)
+        } makeDocument: { configuration, _ in
+            ScratchDocument(configuration: configuration)
+        }
+
         // One archive per window, keyed by the archive's URL. The value-based
         // group de-duplicates by value, so opening an already-open archive
         // focuses its window instead of spawning a second (this is also what
@@ -40,6 +47,7 @@ struct GeneaLogicAppApp: App {
             FilePreviewWindow(request: request)
         }
         .restorationBehavior(.disabled)
+
     }
 }
 
