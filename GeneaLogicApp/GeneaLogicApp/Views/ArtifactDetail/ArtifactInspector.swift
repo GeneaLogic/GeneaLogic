@@ -65,6 +65,13 @@ struct ArtifactInspector: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        // **The inspector sits under the toolbar, like Preview's and Pages'** (slice 80):
+        // it describes the artifact in the detail column, so it belongs at that
+        // column's level. The inspector always runs full height; what made it look
+        // in front of or behind the toolbar was whether SwiftUI drew the toolbar's
+        // edge over it, and that depended on how the inspector came to be shown (#9).
+        // A hard top edge draws the band and its divider every time.
+        .scrollEdgeEffectStyle(.hard, for: .top)
     }
 }
 

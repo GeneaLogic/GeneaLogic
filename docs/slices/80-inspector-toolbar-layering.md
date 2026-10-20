@@ -48,6 +48,12 @@ and the inspector starts below it, as in Preview.
    Moving `.inspector` outside the split view is ruled out by fork 1. **Alternative:** go
    straight to Feedback.
 
+   **Outcome:** the toolbar background changed nothing. Comparing #9's screenshots
+   showed why: the inspector is full height in both, and only the toolbar's scroll edge
+   over it differs. So the fix is a hard top scroll edge on the inspector's scroll view
+   (`scrollEdgeEffectStyle(.hard, for: .top)`), drawn the same way in every case
+   checked: relaunch, hide/show, tab switch. See SLICE-LOG.
+
 ## Out of scope
 
 - **An empty glass capsule** sat in the toolbar beside **+** once, at 900×450, with the

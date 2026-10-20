@@ -4324,6 +4324,20 @@ been two slices.
   artifact's second mention is `p2`), and the detail views outlive a selection change, so
   each list is `.id`'d by its record or a row's state follows it to the next one.
 
+- **80 — inspector and toolbar layering** (app only, one modifier; no format change).
+  **The decision:** the artifact inspector sits under the toolbar, as in Preview and Pages,
+  because it describes the artifact in the detail column. Xcode's runs full height because
+  it serves the whole window. **The finding:** the inspector never moved. In both of #9's
+  screenshots "Details" is at the same height. What changed was whether SwiftUI drew the
+  toolbar's scroll edge over it: never when the detail appeared with the inspector already
+  shown, sometimes after a hide and show. `scrollEdgeEffectStyle(.hard, for: .top)` on the
+  inspector's scroll view draws it every time. **Gotchas:** the obvious fixes don't touch
+  this. Presenting after appearance (at once or 50 ms later), wrapping the detail in a
+  `NavigationStack`, and `toolbarBackgroundVisibility(.visible, for: .windowToolbar)` all
+  left it full height with no edge. Screenshots can't measure it: the band and the
+  inspector differ by a few levels of grey in dark mode, so the visible signal is the hairline
+  divider. **Untested on macOS 26.**
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the
