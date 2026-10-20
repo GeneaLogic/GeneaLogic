@@ -68,70 +68,150 @@ struct RowFocus {
     let id: AnyHashable
 }
 
+/// What an editor reports about an edit, so the row it replaced can take focus back
+/// (79b). `saved` is called as the editor saves, with the value it is writing; `committed`
+/// once the write has committed, with that value and the list it lives in as the write
+/// left it (`nil` if the record is gone).
+struct EditReport<Value> {
+    let saved: (Value) -> Void
+    let committed: (Value, [Value]?) -> Void
+}
+
 /// Brings keyboard focus back to a row after its edit sheet replaced it.
 ///
 /// An edit changes the row's value, and so its identity: the view that held focus is gone
 /// by the time the sheet closes, and focus would otherwise fall back to the start of the
-/// pane. So the sheet reports what it wrote, and focus moves to the row that now shows it.
+/// pane. So the editor reports where its value ended up, and focus moves to that row.
 ///
-/// Two things have to have happened first, in either order: the reload that brings in the
-/// new value, and the end of the sheet's dismissal (focus set while it is still closing is
-/// lost when it finishes). So the request remembers which one came first. Only an edit
-/// opened from a focused row, and one that changed something, asks for this, so a mouse
-/// user never gets a focus ring they didn't have.
-struct RowFocusReturn<Key: Hashable> {
-    /// The key of the value the edit wrote.
-    let key: Key
-    /// The index the edited row was drawn at.
-    let hint: Int
+/// The target is taken from the **committed** record, never guessed from a reload: a
+/// reload can land before the write does (it waits on the archive lock), and a write that
+/// found nothing to replace changes nothing to reload. Focus then waits for two things,
+/// in either order: the row's view (the reload after the commit) and the end of the
+/// sheet's dismissal (focus set while it is still closing is lost when it finishes).
+///
+/// Only an edit opened from a focused row, that changed something, asks for this, so a
+/// mouse user never gets a focus ring they didn't have. The rules live in one place:
+/// `request(for:…)` starts it, `sheetClosed` marks the close, and `returnsRowFocus`
+/// settles it against the rows on screen.
+struct RowFocusReturn: Equatable {
+    private enum Stage: Equatable {
+        /// The editor is open, and hasn't saved.
+        case editing
+        /// Saved; the write hasn't committed.
+        case saved
+        /// Committed: the written row's id in the committed record.
+        case committed(AnyHashable)
+    }
+
+    private var stage = Stage.editing
     private var sheetIsGone = false
-    /// The written row, once a reload has brought it in.
-    private var arrived: AnyHashable?
 
-    init(key: Key, hint: Int) {
-        self.key = key
-        self.hint = hint
+    /// Starts a return for `row`, if it has focus (`focused`), and returns the report its
+    /// editor fills in; otherwise `nil`, and nothing is asked. `key` keys the list the way
+    /// the host's `ForEach` does.
+    static func request<Key: Hashable, Value: Equatable>(
+        for row: KeyedRow<Key, Value>, focused: AnyHashable?,
+        in state: Binding<RowFocusReturn?>, key: @escaping (Value) -> Key
+    ) -> EditReport<Value>? {
+        guard focused == AnyHashable(row.id) else { return nil }
+        state.wrappedValue = RowFocusReturn()
+        return EditReport(
+            saved: { written in
+                // An unchanged value leaves the row, and its focus, where they were.
+                if written == row.element {
+                    state.wrappedValue = nil
+                } else {
+                    state.wrappedValue?.stage = .saved
+                }
+            },
+            committed: { written, list in
+                guard state.wrappedValue?.stage == .saved else { return }
+                let rows = (list ?? []).keyedRows(by: key)
+                let matching = rows.filter { $0.id.key == key(written) }
+                // Of equal rows, the one at the edited position.
+                guard
+                    let target = matching.first(where: { $0.index == row.index }) ?? matching.first
+                else {
+                    state.wrappedValue = nil  // The write found nothing to replace.
+                    return
+                }
+                state.wrappedValue?.stage = .committed(AnyHashable(target.id))
+            })
     }
 
-    /// The row now showing the written value: the one at `hint` if its key matches, else
-    /// the first that does.
-    func target<Element>(in rows: [KeyedRow<Key, Element>]) -> AnyHashable? {
-        let matching = rows.filter { $0.id.key == key }
-        return (matching.first { $0.index == hint } ?? matching.first).map { AnyHashable($0.id) }
-    }
-
-    /// After a reload: the row to focus now, if the sheet has already closed. A reload
-    /// after it closed answers the request either way, so one whose write found nothing
-    /// to replace is dropped rather than left to fire on some later, unrelated reload.
-    static func reloaded<Element>(
-        _ request: inout RowFocusReturn?, rows: [KeyedRow<Key, Element>]
-    ) -> AnyHashable? {
-        guard var pending = request else { return nil }
-        let target = pending.target(in: rows)
-        if pending.sheetIsGone {
-            request = nil
-            return target
+    /// The sheet has finished closing. Closed without saving, there is nothing to return.
+    static func sheetClosed(_ state: Binding<RowFocusReturn?>) {
+        guard let current = state.wrappedValue else { return }
+        if current.stage == .editing {
+            state.wrappedValue = nil
+        } else {
+            state.wrappedValue?.sheetIsGone = true
         }
-        pending.arrived = target
-        request = pending
-        return nil
     }
 
-    /// When the sheet has finished closing: the row to focus now, if its reload has
-    /// already landed.
-    static func sheetClosed(_ request: inout RowFocusReturn?) -> AnyHashable? {
-        guard var pending = request else { return nil }
-        if let arrived = pending.arrived {
-            request = nil
-            return arrived
+    /// What the request does next, given the rows on screen.
+    enum Outcome: Equatable {
+        /// Keep waiting: for the save, the commit, the reload, or the sheet to close.
+        case wait
+        /// Focus this row, and the request is done.
+        case focus(AnyHashable)
+        /// Give up: the first new rows after the commit don't have the target (a later
+        /// write removed it).
+        case drop
+    }
+
+    /// The rule, apart from the view: focus the target once its row is on screen and the
+    /// sheet is gone; drop it if the rows change after the commit without it.
+    func outcome(rowIDs: [AnyHashable], rowsChanged: Bool) -> Outcome {
+        guard case .committed(let target) = stage else { return .wait }
+        if rowIDs.contains(target) { return sheetIsGone ? .focus(target) : .wait }
+        return rowsChanged ? .drop : .wait
+    }
+
+    fileprivate static func settle(
+        _ state: Binding<RowFocusReturn?>, rowIDs: [AnyHashable], rowsChanged: Bool,
+        focus: FocusState<AnyHashable?>.Binding
+    ) {
+        switch state.wrappedValue?.outcome(rowIDs: rowIDs, rowsChanged: rowsChanged) {
+        case .focus(let target):
+            state.wrappedValue = nil
+            // A turn later, so a row the reload just built is there to take focus.
+            Task { focus.wrappedValue = target }
+        case .drop:
+            state.wrappedValue = nil
+        case .wait, nil:
+            break
         }
-        pending.sheetIsGone = true
-        request = pending
-        return nil
+    }
+}
+
+/// Hosts a list's focus return: settles `state` whenever it moves or the rows change.
+private struct RowFocusReturning: ViewModifier {
+    let state: Binding<RowFocusReturn?>
+    let rowIDs: [AnyHashable]
+    let focus: FocusState<AnyHashable?>.Binding
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: state.wrappedValue) {
+                RowFocusReturn.settle(state, rowIDs: rowIDs, rowsChanged: false, focus: focus)
+            }
+            .onChange(of: rowIDs) {
+                RowFocusReturn.settle(state, rowIDs: rowIDs, rowsChanged: true, focus: focus)
+            }
     }
 }
 
 extension View {
+    /// Returns keyboard focus to a row of this list after its editor replaced it. `rowIDs`
+    /// are the ids of the rows on screen, as their `ForEach` identifies them.
+    func returnsRowFocus(
+        _ state: Binding<RowFocusReturn?>, rowIDs: [AnyHashable],
+        focus: FocusState<AnyHashable?>.Binding
+    ) -> some View {
+        modifier(RowFocusReturning(state: state, rowIDs: rowIDs, focus: focus))
+    }
+
     /// Binds this control to `focus` when one is given.
     @ViewBuilder
     func rowFocus(_ focus: RowFocus?) -> some View {

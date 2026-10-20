@@ -4312,12 +4312,15 @@ been two slices.
   neither address a write nor survive the reload after it. **Invariants:** no editable
   `ForEach` is keyed by offset; a write that no longer finds its element does nothing,
   rather than acting on whatever moved into its slot. **The cost, paid back:** an edited
-  row is a new view, so keyboard focus had nowhere to return. The editor now reports the
-  value it wrote, and focus moves to that row once both its reload and the sheet's close
-  have happened, in either order (focus set while a sheet is still closing is lost).
-  **Gotcha:** the app target is main-actor by default, and the write closures run off it
-  (slice 52), so the helpers are `nonisolated`. The Facts tiebreak was comparing id strings
-  (`person#10` before `person#2`); ties now keep store order.
+  row is a new view, so keyboard focus had nowhere to return. The model's edit verbs now
+  take a `committed` callback with the record as the write left it; the editor finds its
+  row there, and focus moves once the reload shows it and the sheet has closed, in either
+  order. **Gotcha (review):** the first cut guessed the target from whichever reload came
+  next, but a reload can land before a write waiting on the lock, and a write that found
+  nothing triggers none. **Gotcha:** the app target is main-actor by default, and the
+  write closures run off it (slice 52), so the helpers they call are `nonisolated`. The
+  Facts tiebreak was comparing id strings (`person#10` before `person#2`); ties now keep
+  store order.
 
 ## Carryovers and parked work
 

@@ -1,5 +1,6 @@
 import Foundation
 import GeneaLogicModel
+import SwiftUI
 import Testing
 
 @testable import GeneaLogicApp
@@ -60,47 +61,126 @@ import Testing
     @Test func aMentionIsFoundByLocalRef() {
         let mentions = [
             PersonMention(
-            localRef: "p2", nameAsRecorded: "Anna", role: .subject, informationQuality: .primary),
+                localRef: "p2", nameAsRecorded: "Anna", role: .subject, informationQuality: .primary
+            ),
             PersonMention(
-            localRef: "p3", nameAsRecorded: "Piotr", role: .subject, informationQuality: .primary),
+                localRef: "p3", nameAsRecorded: "Piotr", role: .subject,
+                informationQuality: .primary),
         ]
         #expect(mentions.position(near: 2, where: { $0.localRef == "p3" }) == 1)
     }
 
     // MARK: Focus after an edit
 
-    /// The usual order: the write is quick, so its reload lands while the sheet is still
-    /// closing, and focus waits for the close.
-    @Test func focusWaitsForTheSheetWhenTheReloadComesFirst() {
-        var request: RowFocusReturn<Event>? = RowFocusReturn(key: death, hint: 1)
-        let rows = [birth, death].keyedRows()
-        #expect(RowFocusReturn.reloaded(&request, rows: rows) == nil)
-        #expect(RowFocusReturn.sheetClosed(&request) == AnyHashable(rows[1].id))
-        #expect(request == nil)
+    /// Edits the second of `[birth, census]` from a focused row, as a host would: the
+    /// request, its report for the editor, and the binding `@State` would give it.
+    private func editCensus(
+        focused: Bool = true
+    ) -> (held: Held, report: EditReport<Event>?, ids: (Event...) -> [AnyHashable]) {
+        let held = Held()
+        let row = [birth, census].keyedRows()[1]
+        let report = RowFocusReturn.request(
+            for: row, focused: focused ? AnyHashable(row.id) : nil, in: held.binding,
+            key: { $0 })
+        return (held, report, { $0.keyedRows().map { AnyHashable($0.id) } })
     }
 
-    @Test func focusWaitsForTheReloadWhenTheSheetClosesFirst() {
-        var request: RowFocusReturn<Event>? = RowFocusReturn(key: death, hint: 1)
-        #expect(RowFocusReturn.sheetClosed(&request) == nil)
-        let rows = [birth, death].keyedRows()
-        #expect(RowFocusReturn.reloaded(&request, rows: rows) == AnyHashable(rows[1].id))
-        #expect(request == nil)
+    /// The usual order: the write is quick, so its reload lands while the sheet is still
+    /// closing, and focus waits for the close.
+    @Test func focusWaitsForTheCloseWhenTheReloadComesFirst() throws {
+        let (held, report, ids) = editCensus()
+        report?.saved(death)
+        report?.committed(death, [birth, death])
+        let request = try #require(held.request)
+        #expect(request.outcome(rowIDs: ids(birth, death), rowsChanged: true) == .wait)
+        RowFocusReturn.sheetClosed(held.binding)
+        #expect(
+            held.request?.outcome(rowIDs: ids(birth, death), rowsChanged: false)
+                == .focus(AnyHashable(RowKey(key: death, occurrence: 0))))
+    }
+
+    @Test func focusWaitsForTheReloadWhenTheCloseComesFirst() {
+        let (held, report, ids) = editCensus()
+        report?.saved(death)
+        report?.committed(death, [birth, death])
+        RowFocusReturn.sheetClosed(held.binding)
+        #expect(held.request?.outcome(rowIDs: ids(birth, census), rowsChanged: false) == .wait)
+        #expect(
+            held.request?.outcome(rowIDs: ids(birth, death), rowsChanged: true)
+                == .focus(AnyHashable(RowKey(key: death, occurrence: 0))))
+    }
+
+    /// The finding: a reload that lands before the write commits (it waited on the archive
+    /// lock) doesn't have the new row yet. It must not answer the request.
+    @Test func aReloadBeforeTheCommitDoesNotDropTheRequest() {
+        let (held, report, ids) = editCensus()
+        report?.saved(death)
+        RowFocusReturn.sheetClosed(held.binding)
+        #expect(held.request?.outcome(rowIDs: ids(birth), rowsChanged: true) == .wait)
+        report?.committed(death, [birth, death])
+        #expect(
+            held.request?.outcome(rowIDs: ids(birth, death), rowsChanged: true)
+                == .focus(AnyHashable(RowKey(key: death, occurrence: 0))))
+    }
+
+    /// The finding: a write that found nothing to replace changes nothing on screen, so no
+    /// reload would ever answer it. The commit says so, and the request goes at once.
+    @Test func aWriteThatFoundNothingAsksForNothing() {
+        let (held, report, _) = editCensus()
+        report?.saved(death)
+        report?.committed(death, [birth])
+        #expect(held.request == nil)
+    }
+
+    /// A later write removed the target before its reload: the first new rows answer it.
+    @Test func rowsWithoutTheTargetAfterTheCommitDropIt() {
+        let (held, report, ids) = editCensus()
+        report?.saved(death)
+        report?.committed(death, [birth, death])
+        #expect(held.request?.outcome(rowIDs: ids(birth), rowsChanged: true) == .drop)
+    }
+
+    @Test func closingWithoutSavingAsksForNothing() {
+        let (held, _, _) = editCensus()
+        RowFocusReturn.sheetClosed(held.binding)
+        #expect(held.request == nil)
+    }
+
+    /// An unchanged value leaves the row's view, and its focus, where they were.
+    @Test func anUnchangedSaveAsksForNothing() {
+        let (held, report, _) = editCensus()
+        report?.saved(census)
+        #expect(held.request == nil)
+    }
+
+    /// A mouse-opened edit gets no focus ring it didn't have.
+    @Test func anUnfocusedRowAsksForNothing() {
+        let (held, report, _) = editCensus(focused: false)
+        #expect(report == nil)
+        #expect(held.request == nil)
     }
 
     /// Of two equal rows, focus goes to the one that was edited.
     @Test func focusPrefersTheEditedRowAmongEqualOnes() {
-        var request: RowFocusReturn<Event>? = RowFocusReturn(key: birth, hint: 2)
-        _ = RowFocusReturn.sheetClosed(&request)
-        let rows = [birth, census, birth].keyedRows()
-        #expect(RowFocusReturn.reloaded(&request, rows: rows) == AnyHashable(rows[2].id))
+        let held = Held()
+        let row = [birth, census, birth].keyedRows()[2]
+        let report = RowFocusReturn.request(
+            for: row, focused: AnyHashable(row.id), in: held.binding, key: { $0 })
+        report?.saved(census)
+        report?.committed(census, [birth, census, census])
+        RowFocusReturn.sheetClosed(held.binding)
+        let ids = [birth, census, census].keyedRows().map { AnyHashable($0.id) }
+        #expect(
+            held.request?.outcome(rowIDs: ids, rowsChanged: true)
+                == .focus(AnyHashable(RowKey(key: census, occurrence: 1))))
     }
+}
 
-    /// A write that found nothing to replace never brings its row in. The request is
-    /// dropped, rather than left to fire on a later reload that happens to show the value.
-    @Test func aWriteThatFoundNothingDropsTheRequest() {
-        var request: RowFocusReturn<Event>? = RowFocusReturn(key: death, hint: 1)
-        _ = RowFocusReturn.sheetClosed(&request)
-        #expect(RowFocusReturn.reloaded(&request, rows: [birth].keyedRows()) == nil)
-        #expect(request == nil)
+/// A focus-return request held outside a view, the way `@State` holds it.
+private final class Held {
+    var request: RowFocusReturn?
+
+    var binding: Binding<RowFocusReturn?> {
+        Binding(get: { self.request }, set: { self.request = $0 })
     }
 }

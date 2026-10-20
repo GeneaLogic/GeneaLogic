@@ -29,8 +29,8 @@ struct PersonDetailView: View {
     /// Keyboard focus among the Names and Facts rows, so it can come back to a row its
     /// editor replaced (79b), with what each list's editor still owes.
     @FocusState private var focusedRow: AnyHashable?
-    @State private var nameFocusReturn: RowFocusReturn<PersonName>?
-    @State private var factFocusReturn: RowFocusReturn<FactRow.Key>?
+    @State private var nameFocusReturn: RowFocusReturn?
+    @State private var factFocusReturn: RowFocusReturn?
     /// This person's relationships, resolved to display rows (relative name + role).
     /// Loaded alongside `person` and reloaded off `mutationVersion` (slice 43).
     @State private var relatives: [RelativeRow] = []
@@ -69,39 +69,24 @@ struct PersonDetailView: View {
                     of: loaded, relationships: relationships))
             relatives = loadRelatives(from: relationships)
             relationshipSuggestions = model.suggestedRelationships(for: personID)
-            if let loaded {
-                let name = RowFocusReturn.reloaded(&nameFocusReturn, rows: loaded.names.keyedRows())
-                let fact = RowFocusReturn.reloaded(
-                    &factFocusReturn, rows: factRows(loaded).map(\.keyed))
-                // A turn later, so the row the reload just built is there to take focus.
-                if let target = name ?? fact { Task { focusedRow = target } }
-            }
         }
         .sheet(
             item: $nameEditorRequest,
-            onDismiss: {
-                if let target = RowFocusReturn.sheetClosed(&nameFocusReturn) {
-                    focusedRow = target
-                }
-            }
+            onDismiss: { RowFocusReturn.sheetClosed($nameFocusReturn) }
         ) { request in
             PersonEditorSheet(
                 personID: personID, index: request.index, existing: request.existing,
-                onSaved: request.returnsFocus ? { nameSaved($0, request) } : nil
+                report: request.report
             )
             .environment(model)
         }
         .sheet(
             item: $factEditorRequest,
-            onDismiss: {
-                if let target = RowFocusReturn.sheetClosed(&factFocusReturn) {
-                    focusedRow = target
-                }
-            }
+            onDismiss: { RowFocusReturn.sheetClosed($factFocusReturn) }
         ) { request in
             FactEditorSheet(
                 personID: personID, mode: request.mode,
-                onSaved: request.returnsFocus ? { factSaved($0, request.mode) } : nil
+                report: request.report
             )
             .environment(model)
         }
@@ -177,8 +162,9 @@ struct PersonDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
+                let rows = person.names.keyedRows()
                 VStack(alignment: .leading, spacing: 2) {
-                    ForEach(person.names.keyedRows()) { row in
+                    ForEach(rows) { row in
                         AssertionRow(
                             title: Self.nameLine(row.element),
                             subtitle: Self.nameSubtitle(row.element),
@@ -186,12 +172,16 @@ struct PersonDetailView: View {
                             onEdit: {
                                 nameEditorRequest = NameEditorRequest(
                                     index: row.index, existing: row.element,
-                                    returnsFocus: focusedRow == AnyHashable(row.id))
+                                    report: RowFocusReturn.request(
+                                        for: row, focused: focusedRow, in: $nameFocusReturn,
+                                        key: { $0 }))
                             },
                             editFocus: RowFocus(state: $focusedRow, id: row.id)
                         ) { removeName(row.element, near: row.index) }
                     }
                 }
+                .returnsRowFocus(
+                    $nameFocusReturn, rowIDs: rows.map { AnyHashable($0.id) }, focus: $focusedRow)
             }
         }
     }
@@ -233,12 +223,16 @@ struct PersonDetailView: View {
                             onEdit: {
                                 factEditorRequest = FactEditorRequest(
                                     mode: row.editMode,
-                                    returnsFocus: focusedRow == AnyHashable(row.id))
+                                    report: RowFocusReturn.request(
+                                        for: row.keyed, focused: focusedRow,
+                                        in: $factFocusReturn, key: row.key))
                             },
                             editFocus: RowFocus(state: $focusedRow, id: row.id)
                         ) { removeFactRow(row) }
                     }
                 }
+                .returnsRowFocus(
+                    $factFocusReturn, rowIDs: rows.map { AnyHashable($0.id) }, focus: $focusedRow)
             }
         }
     }
@@ -517,9 +511,9 @@ struct PersonDetailView: View {
 
     // MARK: - Mutations
 
-    /// Removes the name at `index` (undoable). The bounds check lives inside the
-    /// `updatePerson` closure, over the record at write time, so a stale index (from a
-    /// concurrent edit/undo) is a no-op rather than a crash.
+    /// Removes `name` (undoable). It is found by value, starting at the row's index,
+    /// inside the `updatePerson` closure, over the record at write time: a list that
+    /// shifted since (a concurrent edit or undo) removes this name or nothing (79b).
     private func removeName(_ name: PersonName, near index: Int) {
         model.updatePerson(of: personID, actionName: "Remove Name") { person in
             guard let position = person.names.position(of: name, near: index) else { return }
@@ -548,27 +542,6 @@ struct PersonDetailView: View {
                 else { return }
                 relationship.facts.remove(at: position)
             }
-        }
-    }
-
-    /// An edited name was written: focus goes back to its row once it lands (79b).
-    private func nameSaved(_ written: PersonName, _ request: NameEditorRequest) {
-        guard let index = request.index, written != request.existing else { return }
-        nameFocusReturn = RowFocusReturn(key: written, hint: index)
-    }
-
-    /// An edited fact was written: focus goes back to its row once it lands (79b). The
-    /// store is the one the row came from, since an edit never re-homes a fact.
-    private func factSaved(_ written: PersonFact, _ mode: FactEditorSheet.Mode) {
-        switch mode {
-        case .editPerson(let index, let existing) where written != existing:
-            factFocusReturn = RowFocusReturn(
-                key: FactRow.Key(store: .person, fact: written), hint: index)
-        case .editCouple(let relationshipID, let index, let existing, _) where written != existing:
-            factFocusReturn = RowFocusReturn(
-                key: FactRow.Key(store: .couple(relationshipID), fact: written), hint: index)
-        default:
-            break
         }
     }
 
@@ -662,8 +635,8 @@ private struct NameEditorRequest: Identifiable {
     let id = UUID()
     let index: Int?
     let existing: PersonName?
-    /// Whether the row it edits had keyboard focus, which comes back to it (79b).
-    var returnsFocus = false
+    /// Where an edit's name ends up, when the row it edits had keyboard focus (79b).
+    var report: EditReport<PersonName>? = nil
 }
 
 /// One Suggested Relationships row on the person pane (slice 45l): the claim from this
@@ -744,6 +717,13 @@ private struct FactRow: Identifiable {
 
     var id: RowKey<Key> { keyed.id }
     var fact: PersonFact { keyed.element }
+
+    /// How a fact in this row's store is keyed, for re-keying the store after an edit.
+    /// An edit never re-homes a fact, so the store is this row's.
+    var key: (PersonFact) -> Key {
+        let store = keyed.id.key.store
+        return { Key(store: store, fact: $0) }
+    }
 
     /// The editor mode that opens this row for editing, routed to the right store.
     var editMode: FactEditorSheet.Mode {

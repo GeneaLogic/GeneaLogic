@@ -117,15 +117,17 @@ extension ArchiveModel {
     /// create/delete redelete ping-pong: an edit restores a snapshot, it doesn't
     /// re-create a record. `uid`/`schemaVersion` are immutable via the engine path.
     ///
-    /// The `mutate` closure edits by array index and must bounds-check against the
-    /// record it's handed (an index captured at row-render time can go stale before
-    /// the write commits — a concurrent undo, say — so the guard lives *inside* the
-    /// closure, over the current record).
+    /// `edit` finds the element it changes in the record it's handed, by value, with the
+    /// row's index only as a hint (`Array.position(of:near:)`, 79b): the list can shift
+    /// between drawing the row and the write committing (a concurrent undo, say), so the
+    /// lookup lives *inside* the closure, over the current record.
     /// `edit` is `@Sendable`, and the before-snapshot is taken on the write queue,
-    /// both for the reasons spelled out on `updateMetadata`.
+    /// both for the reasons spelled out on `updateMetadata`. `committed` gets the person
+    /// as the write left it; see `updateMetadata`.
     func updatePerson(
         of id: PersonID, actionName: String = "Edit Person",
-        _ edit: @escaping @Sendable (inout Person) -> Void
+        _ edit: @escaping @Sendable (inout Person) -> Void,
+        committed: (@MainActor (Person?) -> Void)? = nil
     ) {
         guard archive?.person(withID: id) != nil else {
             actionError =
@@ -141,6 +143,7 @@ extension ArchiveModel {
                 registerPersonEdit(of: id, to: before, redoingTo: after, actionName: actionName)
             }
             bumpAndRefresh()
+            committed?(after)
         }
     }
 

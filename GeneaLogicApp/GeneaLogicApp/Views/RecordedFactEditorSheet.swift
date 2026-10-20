@@ -10,8 +10,9 @@ import SwiftUI
 /// both sets of parents) can finally say *whose* recorded birth is whose (§10.6).
 ///
 /// The mention is addressed by its **`localRef`** (stable within the artifact, unlike an
-/// array index), the fact by its value, starting at its index (79b). Every commit writes through
-/// `ArchiveModel.updateMetadata`, so it's **undoable** (⌘Z) like any other evidence edit.
+/// array index), the fact by its value, starting at its index (79b). Every commit writes
+/// through `ArchiveModel.updateMetadata`, so it's **undoable** (⌘Z) like any other
+/// evidence edit.
 ///
 /// Type is restricted to ``FactType/recordedCases`` (person + couple facts, minus the
 /// parent-child qualifiers, which describe a concluded *edge*, not an observation about
@@ -32,10 +33,11 @@ struct RecordedFactEditorSheet: View {
     /// several mentions).
     let mentionName: String
     let mode: Mode
-    /// Called with the fact an edit wrote, so its row can take focus back (79b).
-    let onSaved: ((RecordedFact) -> Void)?
+    /// Where an edit's fact ended up, so its row can take focus back (79b).
+    let report: EditReport<RecordedFact>?
 
-    /// Add a new fact, or edit the one at `index` within the mention's `facts`.
+    /// Add a new fact, or edit `existing`, found by value starting at `index` within the
+    /// mention's `facts` (79b).
     enum Mode {
         case add
         case edit(index: Int, existing: RecordedFact)
@@ -51,13 +53,13 @@ struct RecordedFactEditorSheet: View {
 
     init(
         artifactID: ArtifactID, mentionRef: String, mentionName: String, mode: Mode,
-        onSaved: ((RecordedFact) -> Void)? = nil
+        report: EditReport<RecordedFact>? = nil
     ) {
         self.artifactID = artifactID
         self.mentionRef = mentionRef
         self.mentionName = mentionName
         self.mode = mode
-        self.onSaved = onSaved
+        self.report = report
         switch mode {
         case .add:
             _factType = State(initialValue: .birth)
@@ -190,8 +192,11 @@ struct RecordedFactEditorSheet: View {
                 else { return }
                 record.personsMentioned[position].facts[target] = fact
             }
+        } committed: { [report, mentionRef] after in
+            report?.committed(
+                fact, after?.personsMentioned.first { $0.localRef == mentionRef }?.facts)
         }
-        if isEditing { onSaved?(fact) }
+        if isEditing { report?.saved(fact) }
         dismiss()
     }
 }

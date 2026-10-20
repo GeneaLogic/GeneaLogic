@@ -336,11 +336,12 @@ private struct MentionRecordedFacts: View {
 
     @FocusState private var focusedFact: AnyHashable?
     /// Focus owed to a fact whose editor replaced it (79b).
-    @State private var focusReturn: RowFocusReturn<RecordedFact>?
+    @State private var focusReturn: RowFocusReturn?
 
     var body: some View {
+        let rows = mention.facts.keyedRows()
         VStack(alignment: .leading, spacing: 2) {
-            ForEach(mention.facts.keyedRows()) { row in
+            ForEach(rows) { row in
                 AssertionRow(
                     title: row.element.type.displayName,
                     subtitle: Self.factSubtitle(row.element),
@@ -380,12 +381,7 @@ private struct MentionRecordedFacts: View {
             }
         }
         .padding(.top, 2)
-        .onChange(of: mention.facts) { _, facts in
-            if let target = RowFocusReturn.reloaded(&focusReturn, rows: facts.keyedRows()) {
-                // A turn later, so the row the reload just built is there to take focus.
-                Task { focusedFact = target }
-            }
-        }
+        .returnsRowFocus($focusReturn, rowIDs: rows.map { AnyHashable($0.id) }, focus: $focusedFact)
     }
 
     /// Opens the fact editor to add a fact to this mention, addressed by its stable
@@ -399,20 +395,14 @@ private struct MentionRecordedFacts: View {
     /// Opens the fact editor on `row`, like `addFact`. When the row has keyboard focus,
     /// focus comes back to it once the editor's change lands (79b).
     private func editFact(_ row: KeyedRow<RecordedFact, RecordedFact>) {
-        let returnsFocus = focusedFact == AnyHashable(row.id)
+        let report = RowFocusReturn.request(
+            for: row, focused: focusedFact, in: $focusReturn, key: { $0 })
         var request = ArtifactSheet(
             .mentionFact(
                 mentionRef: mention.localRef, mentionName: mention.nameAsRecorded,
-                mode: .edit(index: row.index, existing: row.element),
-                onSaved: returnsFocus
-                    ? { saved in
-                        guard saved != row.element else { return }
-                        focusReturn = RowFocusReturn(key: saved, hint: row.index)
-                    } : nil))
-        if returnsFocus {
-            request.onDismiss = {
-                if let target = RowFocusReturn.sheetClosed(&focusReturn) { focusedFact = target }
-            }
+                mode: .edit(index: row.index, existing: row.element), report: report))
+        if report != nil {
+            request.onDismiss = { [$focusReturn] in RowFocusReturn.sheetClosed($focusReturn) }
         }
         sheet = request
     }

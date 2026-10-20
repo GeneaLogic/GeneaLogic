@@ -19,8 +19,8 @@ struct PersonEditorSheet: View {
     let index: Int?
     /// The existing name to prefill from when editing.
     let existing: PersonName?
-    /// Called with the name an edit wrote, so its row can take focus back (79b).
-    let onSaved: ((PersonName) -> Void)?
+    /// Where an edit's name ended up, so its row can take focus back (79b).
+    let report: EditReport<PersonName>?
 
     @State private var nameType: NameType
     @State private var given: String
@@ -31,12 +31,12 @@ struct PersonEditorSheet: View {
 
     init(
         personID: PersonID, index: Int?, existing: PersonName?,
-        onSaved: ((PersonName) -> Void)? = nil
+        report: EditReport<PersonName>? = nil
     ) {
         self.personID = personID
         self.index = index
         self.existing = existing
-        self.onSaved = onSaved
+        self.report = report
         _nameType = State(initialValue: existing?.type ?? .birth)
         _given = State(initialValue: existing?.given ?? "")
         _surname = State(initialValue: existing?.surname ?? "")
@@ -153,6 +153,12 @@ struct PersonEditorSheet: View {
             script: script.trimmedNonEmpty)
         let actionName = index == nil ? "Add Name" : "Edit Name"
         let existing = existing
+        // What an edit leaves in the record: the existing name with the owned fields set.
+        let written = existing.map {
+            var edited = $0
+            Self.assignOwnedFields(of: name, to: &edited)
+            return edited
+        }
         model.updatePerson(of: personID, actionName: actionName) { person in
             if let index {
                 guard let existing, let position = person.names.position(of: existing, near: index)
@@ -161,11 +167,10 @@ struct PersonEditorSheet: View {
             } else {
                 person.names.append(name)
             }
+        } committed: { [report, index] after in
+            if index != nil, let written { report?.committed(written, after?.names) }
         }
-        if index != nil, var written = existing {
-            Self.assignOwnedFields(of: name, to: &written)
-            onSaved?(written)
-        }
+        if index != nil, let written { report?.saved(written) }
         dismiss()
     }
 
@@ -175,8 +180,11 @@ struct PersonEditorSheet: View {
     /// them (a name tagged via the CLI lost both on any edit here, including a
     /// one-character typo fix), and it would destroy the next field added the same way.
     /// Writing the owned fields is opt-*in* — a new field is preserved by default, and a
-    /// new field this sheet should edit fails visibly by not editing.
-    private static func assignOwnedFields(of name: PersonName, to target: inout PersonName) {
+    /// new field this sheet should edit fails visibly by not editing. `nonisolated`: the
+    /// write's closure calls it off the main actor (52).
+    private nonisolated static func assignOwnedFields(
+        of name: PersonName, to target: inout PersonName
+    ) {
         target.type = name.type
         target.given = name.given
         target.surname = name.surname

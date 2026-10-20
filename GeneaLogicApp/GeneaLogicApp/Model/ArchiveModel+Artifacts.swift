@@ -312,9 +312,14 @@ extension ArchiveModel {
     /// snapshotted the original: the second edit's undo restored a state that
     /// skipped the first, and one ⌘Z silently discarded two edits. Inside `work`
     /// the serial queue guarantees the first edit has already committed.
+    ///
+    /// **`committed` gets the record as the write left it**, on the main actor, once the
+    /// write has committed (never on failure). An editor uses it to learn where what it
+    /// wrote ended up, which an index or a reload cannot tell it (79b's focus return).
     func updateMetadata(
         of id: ArtifactID, actionName: String = "Edit",
-        _ edit: @escaping @Sendable (inout Artifact) -> Void
+        _ edit: @escaping @Sendable (inout Artifact) -> Void,
+        committed: (@MainActor (Artifact?) -> Void)? = nil
     ) {
         guard archive?.artifact(withID: id) != nil else {
             actionError =
@@ -332,6 +337,7 @@ extension ArchiveModel {
                     of: id, to: before, redoingTo: after, actionName: actionName)
             }
             bumpAndRefresh()
+            committed?(after)
         }
     }
 

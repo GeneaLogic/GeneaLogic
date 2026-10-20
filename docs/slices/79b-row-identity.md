@@ -62,10 +62,12 @@ go wrong:
 the slice.)* When an edit is opened from a row with keyboard focus, and changes the
 value, focus returns to the row that now shows the written value. That covers names,
 recorded facts, person facts and couple facts. A mention keeps its `localRef` through
-an edit, so its row survives and needs nothing. The editor reports the value it wrote.
-Focus moves once both the reload carrying it has landed and the sheet has finished
-closing, in either order, because focus set while the sheet is still closing is lost. A
-mouse-opened edit asks for nothing, so no focus ring appears that wasn't there.
+an edit, so its row survives and needs nothing. The target comes from the **committed**
+record: `updateMetadata`, `updatePerson` and `updateRelationship` take an optional
+`committed` callback with the record as the write left it. Focus moves once the reload
+after the commit has shown the row and the sheet has finished closing, in either order,
+because focus set while the sheet is still closing is lost. A mouse-opened edit asks for
+nothing, so no focus ring appears that wasn't there.
 
 Judgment calls, not forks: the identity helper and the position helper live in one
 `Support/` file, with `index` still on each keyed row for the hint. `FactRow`'s sort
