@@ -83,93 +83,6 @@ extension ArchiveModel {
             onScanned: { [weak self] url in self?.ingestScanned([url], mode: .attach(to: id)) })
     }
 
-    /// Routes a freshly captured Continuity Camera file through new-artifact
-    /// ingest or attach-to-existing. `.replace` is never a scan target.
-    ///
-    /// **A scan is deleted only once it has landed** (slice 67). Until then
-    /// this removed the temp file as soon as `ingest`/`attach` returned, and
-    /// since 52 they only enqueue their write — so the engine found the file
-    /// already gone: an empty artifact, and a capture that existed nowhere else.
-    /// A scan the engine refuses is **kept** and the error offers it in Finder
-    /// (fork b, settled the other way on `/code-review`): a refusal can be
-    /// transient — `archiveBusy` after another process holds the lock for five
-    /// seconds — and a document scan may be many pages.
-    func ingestScanned(_ urls: [URL], mode: ImportMode) {
-        let extractor = MetadataExtractors.makeDefault()
-        switch mode {
-        case .addMedia:
-            consumeScans(urls, unopened: "Open an archive before adding media.") { archive in
-                Self.ingestEach(urls, into: archive, extractor: extractor)
-            } commit: { [self] outcomes in
-                commitIngest(outcomes)
-            }
-        case .attach(let id):
-            consumeScans(urls, unopened: "Open an archive before attaching files.") { archive in
-                Self.attachEach(urls, to: id, in: archive, extractor: extractor)
-            } commit: { [self] outcomes in
-                commitAttach(outcomes, to: id)
-            }
-        case .replace:
-            break
-        }
-    }
-
-    /// What the error alert says: `actionError`, then — while any refused scan
-    /// is kept — that it was kept. Composed here rather than written into
-    /// `actionError` once, so a later error replacing the text cannot drop it.
-    var errorMessage: String {
-        let note: String? =
-            switch keptScans.count {
-            case 0: nil
-            case 1: "The scan was kept. Show it in Finder to add it again."
-            default: "The scans were kept. Show them in Finder to add them again."
-            }
-        return [actionError, note].compactMap(\.self).joined(separator: "\n\n")
-    }
-
-    /// The scan path's `mutate`: runs `each` — `ingestEach` or `attachEach`,
-    /// whose outcomes line up with `urls` — deletes the scans that landed, inside
-    /// the write, and keeps the rest.
-    ///
-    /// Owns its "no archive" case rather than leaving it to `mutate`, whose early
-    /// return would skip the work closure — and with it any decision about the
-    /// scan at all.
-    private func consumeScans<Outcome: FileOutcome>(
-        _ urls: [URL], unopened: String,
-        each: @escaping @Sendable (Archive) -> [Outcome],
-        commit: @escaping @MainActor ([Outcome]) -> Void
-    ) {
-        guard archive != nil else {
-            actionError = unopened
-            keepScans(urls)
-            return
-        }
-        mutate(unopened: unopened) { archive in
-            let outcomes = each(archive)
-            var kept: [URL] = []
-            for (url, outcome) in zip(urls, outcomes) {
-                if outcome.failure == nil { Self.discardScan(at: url) } else { kept.append(url) }
-            }
-            return (outcomes: outcomes, kept: kept)
-        } commit: { [self] result in
-            commit(result.outcomes)
-            if !result.kept.isEmpty { keepScans(result.kept) }
-        }
-    }
-
-    /// Adds `urls` to the scans the alert offers.
-    private func keepScans(_ urls: [URL]) {
-        keptScans += urls.filter { !keptScans.contains($0) }
-    }
-
-    /// Deletes a scan that landed, and the per-capture folder
-    /// `ContinuityScanner` wrote it into. `rmdir` only removes an empty
-    /// directory, so a URL that did not come from the scanner keeps its parent.
-    private nonisolated static func discardScan(at url: URL) {
-        try? FileManager.default.removeItem(at: url)
-        rmdir(url.deletingLastPathComponent().path)
-    }
-
     /// Presents the importer in attach mode: picked files are attached to the
     /// artifact `id` under the default role (the per-artifact "Attach File…"
     /// action in the detail view). The role is corrected afterward via the
@@ -185,19 +98,6 @@ extension ArchiveModel {
     func beginReplace(fileID: FileID, artifactID: ArtifactID) {
         importMode = .replace(fileID: fileID, artifactID: artifactID)
         isImporterPresented = true
-    }
-
-    /// Routes a completed importer selection to new-artifact ingest,
-    /// attach-to-existing, or replace, per the mode set when the importer was presented.
-    func handleImport(_ urls: [URL]) {
-        switch importMode {
-        case .addMedia:
-            ingest(urls)
-        case .attach(let id):
-            attach(urls, to: id)
-        case .replace(let fileID, let artifactID):
-            if let url = urls.first { replaceFile(fileID, in: artifactID, with: url) }
-        }
     }
 
     // MARK: - Sheets

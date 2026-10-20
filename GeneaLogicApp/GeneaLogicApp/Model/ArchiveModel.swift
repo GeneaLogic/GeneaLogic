@@ -74,6 +74,17 @@ final class ArchiveModel {
     /// read-only as a suggestion in `ArtifactDetailView`.
     var capturedMetadata: [ArtifactID: EmbeddedMetadata] = [:]
 
+    /// Scans a refused write kept, offered by the error alert's *Show in
+    /// Finder*. Cleared only when the user dismisses the alert.
+    ///
+    /// **Accumulates** (cloud review of 67–71): scans arrive one capture at a
+    /// time, so a second refusal before the first alert is dismissed used to
+    /// replace the first capture's entry — and this offer is the only way back
+    /// to a file in a folder the user cannot find. For the same reason a later
+    /// error that has nothing to do with scans does not clear it; the alert
+    /// still says the scans are kept (`errorMessage`), which stays true.
+    var keptScans: [URL] = []
+
     // MARK: People
 
     /// The People-tab browse list: every concluded person, sorted by display name.
@@ -346,17 +357,6 @@ final class ArchiveModel {
     /// with no scanner), in which case the scan actions simply do nothing.
     weak var continuityScanner: (any ContinuityScanning)?
 
-    /// Scans a refused write kept, offered by the error alert's *Show in
-    /// Finder*. Cleared only when the user dismisses the alert.
-    ///
-    /// **Accumulates** (cloud review of 67–71): scans arrive one capture at a
-    /// time, so a second refusal before the first alert is dismissed used to
-    /// replace the first capture's entry — and this offer is the only way back
-    /// to a file in a folder the user cannot find. For the same reason a later
-    /// error that has nothing to do with scans does not clear it; the alert
-    /// still says the scans are kept (`errorMessage`), which stays true.
-    var keptScans: [URL] = []
-
     // MARK: - Errors and notices
 
     /// A fatal "couldn't open this archive" message, shown inline in place of the
@@ -404,6 +404,15 @@ final class ArchiveModel {
     func showInfo(_ message: String, title: String) {
         actionInfoTitle = title
         actionInfo = message
+    }
+
+    /// Converts a thrown error into a user-facing message. `ArchiveError` already
+    /// has a friendly `description`; other errors fall back to `String(describing:)`.
+    func describe(_ error: Error) -> String {
+        if let archiveError = error as? ArchiveError {
+            return archiveError.description
+        }
+        return String(describing: error)
     }
 
     // MARK: - Undo
@@ -785,16 +794,5 @@ final class ArchiveModel {
         guard let undoManager else { return }
         undoManager.registerUndo(withTarget: self) { model in body(model) }
         undoManager.setActionName(actionName)
-    }
-
-    // MARK: - Errors
-
-    /// Converts a thrown error into a user-facing message. `ArchiveError` already
-    /// has a friendly `description`; other errors fall back to `String(describing:)`.
-    func describe(_ error: Error) -> String {
-        if let archiveError = error as? ArchiveError {
-            return archiveError.description
-        }
-        return String(describing: error)
     }
 }

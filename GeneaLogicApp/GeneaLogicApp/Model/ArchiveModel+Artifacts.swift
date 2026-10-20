@@ -360,7 +360,7 @@ extension ArchiveModel {
     /// The security scope is opened and closed **inside** `work` (52): the copy
     /// now happens on the write queue, so a `defer` out here would drop the scope
     /// while the copy is still reading the source.
-    func replaceFile(_ fileID: FileID, in artifactID: ArtifactID, with url: URL) {
+    private func replaceFile(_ fileID: FileID, in artifactID: ArtifactID, with url: URL) {
         mutate(unopened: "Open an archive before replacing files.") { archive in
             let scoped = url.startAccessingSecurityScopedResource()
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
@@ -449,8 +449,9 @@ extension ArchiveModel {
     /// A file revert's inverse is *computed by the engine* — reverting a detach
     /// re-attaches the bytes and mints a fresh trash entry for the redo to find,
     /// and nothing can predict that id. Registering after the await would file
-    /// the step on the wrong stack (see *Undo across the actor hop*), so the
-    /// registration goes up on time and reads its payload from here when it runs.
+    /// the step on the wrong stack (see *Undo across the actor hop* in
+    /// `ArchiveModel.swift`), so the registration goes up on time and reads its
+    /// payload from here when it runs.
     private final class PendingFileChange {
         var change: FileChange?
     }
@@ -628,7 +629,7 @@ extension ArchiveModel {
 
     /// `ingest`'s work: one outcome per URL, **in `urls` order** — the scan path
     /// pairs them back up by position (`consumeScans`).
-    nonisolated static func ingestEach(
+    private nonisolated static func ingestEach(
         _ urls: [URL], into archive: Archive, extractor: (any MetadataExtractor)?
     ) -> [IngestOutcome] {
         var outcomes: [IngestOutcome] = []
@@ -669,7 +670,7 @@ extension ArchiveModel {
     /// `ingest`'s commit. An artifact whose file failed to attach is registered
     /// and selected like any other — it exists, so it must be undoable — and the
     /// failure is reported beside it.
-    func commitIngest(_ outcomes: [IngestOutcome]) {
+    private func commitIngest(_ outcomes: [IngestOutcome]) {
         var created: ArtifactID?
         for outcome in outcomes {
             if let failure = outcome.failure { actionError = describe(failure) }
@@ -691,7 +692,7 @@ extension ArchiveModel {
 
     /// What the scan path needs from either outcome type: whether the file landed.
     /// `nonisolated` like the outcomes themselves — it is read inside the write.
-    nonisolated protocol FileOutcome: Sendable {
+    private nonisolated protocol FileOutcome: Sendable {
         var failure: Error? { get }
     }
 
@@ -700,7 +701,7 @@ extension ArchiveModel {
     ///
     /// `nonisolated`: it is *constructed* off-main, inside the work closure, and
     /// only read on the main actor. A pure value type, already `Sendable`.
-    nonisolated struct IngestOutcome: FileOutcome {
+    private nonisolated struct IngestOutcome: FileOutcome {
         var artifact: ArtifactID?
         var embedded: EmbeddedMetadata?
         var failure: Error?
@@ -726,7 +727,7 @@ extension ArchiveModel {
     /// auto-applied (ARCHITECTURE.md §6.4).
     /// One `mutate` for the whole batch, for the same undo-grouping reason as
     /// `ingest`.
-    func attach(_ urls: [URL], to id: ArtifactID) {
+    private func attach(_ urls: [URL], to id: ArtifactID) {
         let extractor = MetadataExtractors.makeDefault()
         mutate(unopened: "Open an archive before attaching files.") { archive in
             Self.attachEach(urls, to: id, in: archive, extractor: extractor)
@@ -736,7 +737,7 @@ extension ArchiveModel {
     }
 
     /// `attach`'s work: one outcome per URL, in `urls` order (see `ingestEach`).
-    nonisolated static func attachEach(
+    private nonisolated static func attachEach(
         _ urls: [URL], to id: ArtifactID, in archive: Archive,
         extractor: (any MetadataExtractor)?
     ) -> [AttachOutcome] {
@@ -759,7 +760,7 @@ extension ArchiveModel {
     }
 
     /// `attach`'s commit.
-    func commitAttach(_ outcomes: [AttachOutcome], to id: ArtifactID) {
+    private func commitAttach(_ outcomes: [AttachOutcome], to id: ArtifactID) {
         for outcome in outcomes {
             if let failure = outcome.failure { actionError = describe(failure) }
             guard let entry = outcome.entry else { continue }
@@ -778,7 +779,7 @@ extension ArchiveModel {
     /// One file's result from a batch attach — the `ingest` twin.
     /// Constructed off-main and read on the main actor, exactly like
     /// `IngestOutcome` above — `nonisolated` for the same reason.
-    nonisolated struct AttachOutcome: FileOutcome {
+    private nonisolated struct AttachOutcome: FileOutcome {
         var entry: FileEntry?
         var embedded: EmbeddedMetadata?
         var failure: Error?
@@ -788,5 +789,107 @@ extension ArchiveModel {
             self.embedded = embedded
         }
         init(failure: Error) { self.failure = failure }
+    }
+
+    // MARK: - The importer's result, and Continuity Camera scans
+
+    /// Routes a completed importer selection to new-artifact ingest,
+    /// attach-to-existing, or replace, per the mode set when the importer was presented.
+    func handleImport(_ urls: [URL]) {
+        switch importMode {
+        case .addMedia:
+            ingest(urls)
+        case .attach(let id):
+            attach(urls, to: id)
+        case .replace(let fileID, let artifactID):
+            if let url = urls.first { replaceFile(fileID, in: artifactID, with: url) }
+        }
+    }
+
+    /// Routes a freshly captured Continuity Camera file through new-artifact
+    /// ingest or attach-to-existing. `.replace` is never a scan target.
+    ///
+    /// **A scan is deleted only once it has landed** (slice 67). Until then
+    /// this removed the temp file as soon as `ingest`/`attach` returned, and
+    /// since 52 they only enqueue their write — so the engine found the file
+    /// already gone: an empty artifact, and a capture that existed nowhere else.
+    /// A scan the engine refuses is **kept** and the error offers it in Finder
+    /// (fork b, settled the other way on `/code-review`): a refusal can be
+    /// transient — `archiveBusy` after another process holds the lock for five
+    /// seconds — and a document scan may be many pages.
+    func ingestScanned(_ urls: [URL], mode: ImportMode) {
+        let extractor = MetadataExtractors.makeDefault()
+        switch mode {
+        case .addMedia:
+            consumeScans(urls, unopened: "Open an archive before adding media.") { archive in
+                Self.ingestEach(urls, into: archive, extractor: extractor)
+            } commit: { [self] outcomes in
+                commitIngest(outcomes)
+            }
+        case .attach(let id):
+            consumeScans(urls, unopened: "Open an archive before attaching files.") { archive in
+                Self.attachEach(urls, to: id, in: archive, extractor: extractor)
+            } commit: { [self] outcomes in
+                commitAttach(outcomes, to: id)
+            }
+        case .replace:
+            break
+        }
+    }
+
+    /// What the error alert says: `actionError`, then — while any refused scan
+    /// is kept — that it was kept. Composed here rather than written into
+    /// `actionError` once, so a later error replacing the text cannot drop it.
+    var errorMessage: String {
+        let note: String? =
+            switch keptScans.count {
+            case 0: nil
+            case 1: "The scan was kept. Show it in Finder to add it again."
+            default: "The scans were kept. Show them in Finder to add them again."
+            }
+        return [actionError, note].compactMap(\.self).joined(separator: "\n\n")
+    }
+
+    /// The scan path's `mutate`: runs `each` — `ingestEach` or `attachEach`,
+    /// whose outcomes line up with `urls` — deletes the scans that landed, inside
+    /// the write, and keeps the rest.
+    ///
+    /// Owns its "no archive" case rather than leaving it to `mutate`, whose early
+    /// return would skip the work closure — and with it any decision about the
+    /// scan at all.
+    private func consumeScans<Outcome: FileOutcome>(
+        _ urls: [URL], unopened: String,
+        each: @escaping @Sendable (Archive) -> [Outcome],
+        commit: @escaping @MainActor ([Outcome]) -> Void
+    ) {
+        guard archive != nil else {
+            actionError = unopened
+            keepScans(urls)
+            return
+        }
+        mutate(unopened: unopened) { archive in
+            let outcomes = each(archive)
+            var kept: [URL] = []
+            for (url, outcome) in zip(urls, outcomes) {
+                if outcome.failure == nil { Self.discardScan(at: url) } else { kept.append(url) }
+            }
+            return (outcomes: outcomes, kept: kept)
+        } commit: { [self] result in
+            commit(result.outcomes)
+            if !result.kept.isEmpty { keepScans(result.kept) }
+        }
+    }
+
+    /// Adds `urls` to the scans the alert offers.
+    private func keepScans(_ urls: [URL]) {
+        keptScans += urls.filter { !keptScans.contains($0) }
+    }
+
+    /// Deletes a scan that landed, and the per-capture folder
+    /// `ContinuityScanner` wrote it into. `rmdir` only removes an empty
+    /// directory, so a URL that did not come from the scanner keeps its parent.
+    private nonisolated static func discardScan(at url: URL) {
+        try? FileManager.default.removeItem(at: url)
+        rmdir(url.deletingLastPathComponent().path)
     }
 }

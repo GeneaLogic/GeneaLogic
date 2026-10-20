@@ -18,7 +18,7 @@ synchronized folders, so no `.pbxproj` edits):
 | File | Holds |
 | --- | --- |
 | `ArchiveModel.swift` | The class body: **every stored property** (Swift allows none in extensions), grouped by domain under `MARK`s. `load`, `refresh`, `bump`; `mutate`, the write queue, the wait indicator; undo registration across the actor hop; `describe(error)` |
-| `+Artifacts` | Browse, sort, filter, tag facets; ingest, attach, replace, detach; file roles, metadata, export; delete and its undo |
+| `+Artifacts` | Browse, sort, filter, tag facets; ingest, attach, replace, detach; file roles, metadata, export; delete and its undo; the importer's result and kept scans |
 | `+Trash` | Trashed artifacts and files, restore, delete, empty |
 | `+People` | Browse and filter; create, edit, delete, merge, with undo |
 | `+Relationships` | Relationships and couple facts (43–43c) |
@@ -26,7 +26,7 @@ synchronized folders, so no `.pbxproj` edits):
 | `+Review` | Suggested facts, the worklist, suggested relationships, the duplicates lane (42c, 45e–45m) |
 | `+Integrity` | Standing damage, the sweep, repair (56, 57, 59); verify, dangling references, rebuild, rebaseline |
 | `+ExternalChanges` | Noticing another writer (51) and a change on its way in (61) |
-| `+Window` | **The Mac-shaped part:** menu-command routing (F6), sheet triggers, selection and navigation, Continuity Camera, kept scans |
+| `+Window` | **The Mac-shaped part:** menu-command routing (F6), sheet and importer triggers, Continuity Camera's menu, navigation. Triggers only: what happens to the data they bring lives in its domain file |
 
 Nothing in the model imports AppKit or SwiftUI today (`ContinuityScanning` is a protocol
 whose AppKit side is in `Support/`), so "separated from macOS-only UI" means *which

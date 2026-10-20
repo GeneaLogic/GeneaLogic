@@ -37,7 +37,7 @@ expensive call, and the failure mode 55 set out to fix is still silent in the ap
   their own, so they are covered by the banner and the integrity panel. That is the "as
   needed" scoping.
 - **(e) Re-checked on 51's existing poll.** `externalChangeToken()` already runs every
-  1–15s ([ArchiveModel.swift:490](../../GeneaLogicApp/GeneaLogicApp/ArchiveModel.swift:490));
+  1–15s ([`ArchiveModel+ExternalChanges.swift`](../../GeneaLogicApp/GeneaLogicApp/Model/ArchiveModel+ExternalChanges.swift));
   the standing findings are a `SELECT` over a tiny table, so they ride it. **Recommend**
   this over open-only, so damage another process *commits* — the CLI reindexing, an agent
   writing — appears without waiting for a reopen.
