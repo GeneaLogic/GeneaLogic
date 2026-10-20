@@ -55,11 +55,14 @@ struct PersonsMentionedSection: View {
                 let personsByID = Dictionary(
                     model.persons.map { ($0.uid, $0) }, uniquingKeysWith: { first, _ in first })
                 VStack(alignment: .leading, spacing: 2) {
-                    ForEach(Array(persons.enumerated()), id: \.offset) { index, person in
+                    // Keyed by `localRef`, the mention's own identity, which an edit keeps
+                    // (79b). The occurrence only matters if a record repeats a ref.
+                    ForEach(persons.keyedRows(by: \.localRef)) { row in
+                        let person = row.element
                         let link = links.first { $0.personMentionRef == person.localRef }
                         PersonMentionRow(
                             artifactID: artifactID,
-                            index: index,
+                            index: row.index,
                             mention: person,
                             statedRelationships: statedRelationships,
                             allMentions: persons,

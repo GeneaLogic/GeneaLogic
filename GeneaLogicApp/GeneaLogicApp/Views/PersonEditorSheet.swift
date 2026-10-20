@@ -4,7 +4,8 @@ import SwiftUI
 
 /// Adds or edits one `PersonName` on a concluded person — the sheet behind the
 /// People-tab detail pane's **Names** section. A `nil` index adds a new name; a set
-/// index edits the one at that position. Every commit writes through
+/// index edits `existing`, found by value starting at that position (79b). Every commit
+/// writes through
 /// `ArchiveModel.updatePerson`, so it's **undoable** (⌘Z).
 ///
 /// Facts (person and couple) are edited in `FactEditorSheet`; keeping names here and
@@ -18,6 +19,8 @@ struct PersonEditorSheet: View {
     let index: Int?
     /// The existing name to prefill from when editing.
     let existing: PersonName?
+    /// Called with the name an edit wrote, so its row can take focus back (79b).
+    let onSaved: ((PersonName) -> Void)?
 
     @State private var nameType: NameType
     @State private var given: String
@@ -26,10 +29,14 @@ struct PersonEditorSheet: View {
     @State private var language: String
     @State private var script: String
 
-    init(personID: PersonID, index: Int?, existing: PersonName?) {
+    init(
+        personID: PersonID, index: Int?, existing: PersonName?,
+        onSaved: ((PersonName) -> Void)? = nil
+    ) {
         self.personID = personID
         self.index = index
         self.existing = existing
+        self.onSaved = onSaved
         _nameType = State(initialValue: existing?.type ?? .birth)
         _given = State(initialValue: existing?.given ?? "")
         _surname = State(initialValue: existing?.surname ?? "")
@@ -145,28 +152,37 @@ struct PersonEditorSheet: View {
             language: language.trimmedNonEmpty,
             script: script.trimmedNonEmpty)
         let actionName = index == nil ? "Add Name" : "Edit Name"
+        let existing = existing
         model.updatePerson(of: personID, actionName: actionName) { person in
             if let index {
-                guard index < person.names.count else { return }
-                // Assign the fields this sheet **owns**, rather than replacing the
-                // whole `PersonName`. A whole-value assignment silently drops every
-                // field the editor doesn't know about: it destroyed `language` and
-                // `script` the moment slice 44h added them (a name tagged via the CLI
-                // lost both on any edit here, including a one-character typo fix), and
-                // it would destroy the next field added the same way. Writing the
-                // owned fields is opt-*in* — a new field is preserved by default, and
-                // a new field this sheet should edit fails visibly by not editing.
-                person.names[index].type = name.type
-                person.names[index].given = name.given
-                person.names[index].surname = name.surname
-                person.names[index].full = name.full
-                person.names[index].language = name.language
-                person.names[index].script = name.script
+                guard let existing, let position = person.names.position(of: existing, near: index)
+                else { return }
+                Self.assignOwnedFields(of: name, to: &person.names[position])
             } else {
                 person.names.append(name)
             }
         }
+        if index != nil, var written = existing {
+            Self.assignOwnedFields(of: name, to: &written)
+            onSaved?(written)
+        }
         dismiss()
+    }
+
+    /// Assigns the fields this sheet **owns**, rather than replacing the whole
+    /// `PersonName`. A whole-value assignment silently drops every field the editor
+    /// doesn't know about: it destroyed `language` and `script` the moment slice 44h added
+    /// them (a name tagged via the CLI lost both on any edit here, including a
+    /// one-character typo fix), and it would destroy the next field added the same way.
+    /// Writing the owned fields is opt-*in* — a new field is preserved by default, and a
+    /// new field this sheet should edit fails visibly by not editing.
+    private static func assignOwnedFields(of name: PersonName, to target: inout PersonName) {
+        target.type = name.type
+        target.given = name.given
+        target.surname = name.surname
+        target.full = name.full
+        target.language = name.language
+        target.script = name.script
     }
 
     // The type-picker options are anchored on the record's **original** type, not the

@@ -10,7 +10,7 @@ import SwiftUI
 struct PersonMentionRow: View {
     @Environment(ArchiveModel.self) private var model
     let artifactID: ArtifactID
-    /// The mention's position in the loaded record, which its remove addresses.
+    /// The mention's position in the loaded record: the hint its remove starts from.
     let index: Int
     let mention: PersonMention
     /// The whole record's edges and mentions, so the row can name the other end of
@@ -73,14 +73,18 @@ struct PersonMentionRow: View {
         .onHover { isHovering = $0 }
     }
 
-    /// Removes this mention (undoable). The index addresses the loaded record, which
-    /// matches stored order; the bounds check guards against a stale index after a
-    /// concurrent reload. Any `EvidenceLink` pointing at the removed `localRef` is left
-    /// dangling — that's `verifyIntegrity()`'s job (§2.3).
+    /// Removes this mention (undoable). It is found by `localRef`, starting at the row's
+    /// index, in the record the write reads: a list that shifted since removes this
+    /// mention or nothing (79b). Any `EvidenceLink` pointing at the removed `localRef` is
+    /// left dangling — that's `verifyIntegrity()`'s job (§2.3).
     private func deleteMention() {
+        let ref = mention.localRef
         model.updateMetadata(of: artifactID, actionName: "Remove Person Mentioned") {
-            guard $0.personsMentioned.indices.contains(index) else { return }
-            $0.personsMentioned.remove(at: index)
+            guard
+                let position = $0.personsMentioned.position(
+                    near: index, where: { $0.localRef == ref })
+            else { return }
+            $0.personsMentioned.remove(at: position)
         }
     }
 
@@ -330,19 +334,24 @@ private struct MentionRecordedFacts: View {
     let canRelate: Bool
     @Binding var sheet: ArtifactSheet?
 
+    @FocusState private var focusedFact: AnyHashable?
+    /// Focus owed to a fact whose editor replaced it (79b).
+    @State private var focusReturn: RowFocusReturn<RecordedFact>?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            ForEach(Array(mention.facts.enumerated()), id: \.offset) { index, fact in
+            ForEach(mention.facts.keyedRows()) { row in
                 AssertionRow(
-                    title: fact.type.displayName,
-                    subtitle: Self.factSubtitle(fact),
+                    title: row.element.type.displayName,
+                    subtitle: Self.factSubtitle(row.element),
                     icon: "doc.text",
-                    onEdit: { editFact(.edit(index: index, existing: fact)) }
-                ) { deleteFact(index) }
+                    onEdit: { editFact(row) },
+                    editFocus: RowFocus(state: $focusedFact, id: row.id)
+                ) { deleteFact(row.element, near: row.index) }
             }
             HStack(spacing: 12) {
                 Button {
-                    editFact(.add)
+                    addFact()
                 } label: {
                     Label("Add Fact…", systemImage: "plus")
                         .font(.caption)
@@ -371,27 +380,55 @@ private struct MentionRecordedFacts: View {
             }
         }
         .padding(.top, 2)
+        .onChange(of: mention.facts) { _, facts in
+            if let target = RowFocusReturn.reloaded(&focusReturn, rows: facts.keyedRows()) {
+                // A turn later, so the row the reload just built is there to take focus.
+                Task { focusedFact = target }
+            }
+        }
     }
 
-    /// Opens the fact editor on this mention, addressed by its stable `localRef`; its
-    /// name rides along for the editor's heading.
-    private func editFact(_ mode: RecordedFactEditorSheet.Mode) {
+    /// Opens the fact editor to add a fact to this mention, addressed by its stable
+    /// `localRef`; its name rides along for the editor's heading.
+    private func addFact() {
         sheet = ArtifactSheet(
             .mentionFact(
-                mentionRef: mention.localRef, mentionName: mention.nameAsRecorded, mode: mode))
+                mentionRef: mention.localRef, mentionName: mention.nameAsRecorded, mode: .add))
     }
 
-    /// Removes the recorded fact at `index` from this mention (undoable). The mention is
-    /// found by its stable `localRef`; both bounds are checked inside the closure against
-    /// the loaded record. See `PersonMentionRow.deleteMention` on indexing.
-    private func deleteFact(_ index: Int) {
+    /// Opens the fact editor on `row`, like `addFact`. When the row has keyboard focus,
+    /// focus comes back to it once the editor's change lands (79b).
+    private func editFact(_ row: KeyedRow<RecordedFact, RecordedFact>) {
+        let returnsFocus = focusedFact == AnyHashable(row.id)
+        var request = ArtifactSheet(
+            .mentionFact(
+                mentionRef: mention.localRef, mentionName: mention.nameAsRecorded,
+                mode: .edit(index: row.index, existing: row.element),
+                onSaved: returnsFocus
+                    ? { saved in
+                        guard saved != row.element else { return }
+                        focusReturn = RowFocusReturn(key: saved, hint: row.index)
+                    } : nil))
+        if returnsFocus {
+            request.onDismiss = {
+                if let target = RowFocusReturn.sheetClosed(&focusReturn) { focusedFact = target }
+            }
+        }
+        sheet = request
+    }
+
+    /// Removes `fact` from this mention (undoable). The mention is found by its stable
+    /// `localRef`, and the fact by value starting at the row's index, in the record the
+    /// write reads. See `PersonMentionRow.deleteMention` on addressing.
+    private func deleteFact(_ fact: RecordedFact, near index: Int) {
         let ref = mention.localRef
         model.updateMetadata(of: artifactID, actionName: "Remove Recorded Fact") { record in
             guard
-                let position = record.personsMentioned.firstIndex(where: { $0.localRef == ref })
+                let mention = record.personsMentioned.firstIndex(where: { $0.localRef == ref }),
+                let position = record.personsMentioned[mention].facts.position(
+                    of: fact, near: index)
             else { return }
-            guard record.personsMentioned[position].facts.indices.contains(index) else { return }
-            record.personsMentioned[position].facts.remove(at: index)
+            record.personsMentioned[mention].facts.remove(at: position)
         }
     }
 

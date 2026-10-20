@@ -14,6 +14,9 @@ struct ArtifactDetailView: View {
     /// so a section opens one through a single binding and a menu command through the
     /// same state.
     @State private var sheet: ArtifactSheet?
+    /// The request last presented, kept past `sheet` going `nil` so its `onDismiss` can
+    /// run when the dismissal finishes.
+    @State private var presentedSheet: ArtifactSheet?
 
     /// The full record for read-only display, loaded from the index (the browse
     /// summary lacks notes/language/original format and the events/locations the
@@ -111,7 +114,13 @@ struct ArtifactDetailView: View {
         }
         // Presented at the top level (not inside the inspector) so the menu commands —
         // Artifact ▸ Edit Transcript… among them — work even with the inspector hidden.
-        .sheet(item: $sheet) { request in
+        .sheet(
+            item: $sheet,
+            onDismiss: {
+                presentedSheet?.onDismiss?()
+                presentedSheet = nil
+            }
+        ) { request in
             ArtifactSheetContent(
                 request: request, artifactID: artifact.uid,
                 mentions: detail?.personsMentioned ?? [],
@@ -141,6 +150,7 @@ struct ArtifactDetailView: View {
         .onAppear { model.inspectorVisible = inspectorShown }
         .onChange(of: inspectorShown) { _, shown in model.inspectorVisible = shown }
         .onChange(of: selectedFileID) { _, id in model.selectedFile = id }
+        .onChange(of: sheet?.id) { if let sheet { presentedSheet = sheet } }
         .onChange(of: model.pendingInspectorToggle) { _, requested in
             if requested {
                 inspectorShown.toggle()
@@ -224,8 +234,10 @@ struct ArtifactSheet: Identifiable {
         case mention(PersonMentionEditorSheet.Mode)
         /// Add or edit a `RecordedFact` on one mention. The mention is addressed by its
         /// record-local `localRef`; its name rides along for the editor's heading.
+        /// `onSaved` gets the fact an edit wrote, for the row's focus return (79b).
         case mentionFact(
-            mentionRef: String, mentionName: String, mode: RecordedFactEditorSheet.Mode)
+            mentionRef: String, mentionName: String, mode: RecordedFactEditorSheet.Mode,
+            onSaved: ((RecordedFact) -> Void)? = nil)
         /// Resolve a mention to a person. `replacing` is the dangling link this
         /// resolution replaces (slice 44g), or `nil` for a first-time resolve — carried
         /// through so the sheet can unlink the stale citation and create the new one as
@@ -237,6 +249,9 @@ struct ArtifactSheet: Identifiable {
 
     let id = UUID()
     let kind: Kind
+    /// Called once the sheet has finished closing, so a row can take focus back without
+    /// the dismissal overriding it (79b).
+    var onDismiss: (() -> Void)?
 
     init(_ kind: Kind) {
         self.kind = kind
@@ -269,9 +284,10 @@ private struct ArtifactSheetContent: View {
             PersonMentionEditorSheet(
                 artifactID: artifactID, mode: mode, mentions: mentions,
                 statedRelationships: statedRelationships)
-        case .mentionFact(let ref, let name, let mode):
+        case .mentionFact(let ref, let name, let mode, let onSaved):
             RecordedFactEditorSheet(
-                artifactID: artifactID, mentionRef: ref, mentionName: name, mode: mode)
+                artifactID: artifactID, mentionRef: ref, mentionName: name, mode: mode,
+                onSaved: onSaved)
         case .resolve(let mention, let replacing):
             ResolveMentionSheet(artifactID: artifactID, mention: mention, replacing: replacing)
         case .transcript:

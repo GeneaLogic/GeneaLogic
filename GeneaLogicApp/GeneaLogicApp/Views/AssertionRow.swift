@@ -15,6 +15,9 @@ struct AssertionRow: View {
     /// When set, the row's content is a button that opens an editor. When `nil` the
     /// content is plain, selectable text (the row is add/remove only).
     var onEdit: (() -> Void)? = nil
+    /// The focus state the edit button binds to, so focus can come back to this row after
+    /// its editor replaces it (slice 79b). Only meaningful with `onEdit`.
+    var editFocus: RowFocus? = nil
     let onDelete: () -> Void
 
     @State private var isHovering = false
@@ -29,6 +32,7 @@ struct AssertionRow: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .rowFocus(editFocus)
                 .accessibilityHint("Edit")
             } else {
                 rowLabel

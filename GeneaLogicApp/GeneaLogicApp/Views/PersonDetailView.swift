@@ -26,6 +26,11 @@ struct PersonDetailView: View {
     /// The fact add-or-edit request driving the fact editor sheet (person *or* couple
     /// fact — slice 43b), or `nil`.
     @State private var factEditorRequest: FactEditorRequest?
+    /// Keyboard focus among the Names and Facts rows, so it can come back to a row its
+    /// editor replaced (79b), with what each list's editor still owes.
+    @FocusState private var focusedRow: AnyHashable?
+    @State private var nameFocusReturn: RowFocusReturn<PersonName>?
+    @State private var factFocusReturn: RowFocusReturn<FactRow.Key>?
     /// This person's relationships, resolved to display rows (relative name + role).
     /// Loaded alongside `person` and reloaded off `mutationVersion` (slice 43).
     @State private var relatives: [RelativeRow] = []
@@ -64,14 +69,41 @@ struct PersonDetailView: View {
                     of: loaded, relationships: relationships))
             relatives = loadRelatives(from: relationships)
             relationshipSuggestions = model.suggestedRelationships(for: personID)
+            if let loaded {
+                let name = RowFocusReturn.reloaded(&nameFocusReturn, rows: loaded.names.keyedRows())
+                let fact = RowFocusReturn.reloaded(
+                    &factFocusReturn, rows: factRows(loaded).map(\.keyed))
+                // A turn later, so the row the reload just built is there to take focus.
+                if let target = name ?? fact { Task { focusedRow = target } }
+            }
         }
-        .sheet(item: $nameEditorRequest) { request in
-            PersonEditorSheet(personID: personID, index: request.index, existing: request.existing)
-                .environment(model)
+        .sheet(
+            item: $nameEditorRequest,
+            onDismiss: {
+                if let target = RowFocusReturn.sheetClosed(&nameFocusReturn) {
+                    focusedRow = target
+                }
+            }
+        ) { request in
+            PersonEditorSheet(
+                personID: personID, index: request.index, existing: request.existing,
+                onSaved: request.returnsFocus ? { nameSaved($0, request) } : nil
+            )
+            .environment(model)
         }
-        .sheet(item: $factEditorRequest) { request in
-            FactEditorSheet(personID: personID, mode: request.mode)
-                .environment(model)
+        .sheet(
+            item: $factEditorRequest,
+            onDismiss: {
+                if let target = RowFocusReturn.sheetClosed(&factFocusReturn) {
+                    focusedRow = target
+                }
+            }
+        ) { request in
+            FactEditorSheet(
+                personID: personID, mode: request.mode,
+                onSaved: request.returnsFocus ? { factSaved($0, request.mode) } : nil
+            )
+            .environment(model)
         }
         .sheet(item: $replacingEndpoint) { request in
             ReplacePersonSheet(
@@ -146,15 +178,18 @@ struct PersonDetailView: View {
                     .foregroundStyle(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 2) {
-                    ForEach(Array(person.names.enumerated()), id: \.offset) { index, name in
+                    ForEach(person.names.keyedRows()) { row in
                         AssertionRow(
-                            title: Self.nameLine(name),
-                            subtitle: Self.nameSubtitle(name),
+                            title: Self.nameLine(row.element),
+                            subtitle: Self.nameSubtitle(row.element),
                             icon: "person",
                             onEdit: {
-                                nameEditorRequest = NameEditorRequest(index: index, existing: name)
-                            }
-                        ) { removeName(at: index) }
+                                nameEditorRequest = NameEditorRequest(
+                                    index: row.index, existing: row.element,
+                                    returnsFocus: focusedRow == AnyHashable(row.id))
+                            },
+                            editFocus: RowFocus(state: $focusedRow, id: row.id)
+                        ) { removeName(row.element, near: row.index) }
                     }
                 }
             }
@@ -195,7 +230,12 @@ struct PersonDetailView: View {
                             title: row.fact.type.displayName,
                             subtitle: row.subtitle,
                             icon: "calendar",
-                            onEdit: { factEditorRequest = FactEditorRequest(mode: row.editMode) }
+                            onEdit: {
+                                factEditorRequest = FactEditorRequest(
+                                    mode: row.editMode,
+                                    returnsFocus: focusedRow == AnyHashable(row.id))
+                            },
+                            editFocus: RowFocus(state: $focusedRow, id: row.id)
                         ) { removeFactRow(row) }
                     }
                 }
@@ -205,38 +245,32 @@ struct PersonDetailView: View {
 
     /// Builds the merged, date-sorted Facts timeline: the person's own facts plus their
     /// couple facts (from partner relationships), each carrying the store it edits back
-    /// to. Undated/unparseable dates sort last; a composite id keeps the order stable
-    /// across reloads.
+    /// to. Undated/unparseable dates sort last; ties keep store order (the person's facts,
+    /// then each partner's), so the order is stable across reloads.
     private func factRows(_ person: Person) -> [FactRow] {
-        var rows: [FactRow] = []
-        for (index, fact) in person.facts.enumerated() {
-            rows.append(
-                FactRow(
-                    id: "person#\(index)", fact: fact, subtitle: Self.factDetail(fact),
-                    source: .person(index: index)))
+        var rows = person.facts.keyedRows { FactRow.Key(store: .person, fact: $0) }.map {
+            FactRow(keyed: $0, subtitle: Self.factDetail($0.element))
         }
         for relative in relatives where relative.role == .partner {
             let partner = relative.otherExists ? relative.otherName : nil
-            for (index, fact) in relative.facts.enumerated() {
-                rows.append(
-                    FactRow(
-                        id: "\(relative.relationshipID.raw)#\(index)", fact: fact,
-                        subtitle: Self.coupleFactDetail(fact, partner: partner),
-                        source: .couple(relationshipID: relative.relationshipID, index: index),
-                        partner: partner))
+            let store = FactRow.Store.couple(relative.relationshipID)
+            rows += relative.facts.keyedRows { FactRow.Key(store: store, fact: $0) }.map {
+                FactRow(
+                    keyed: $0, subtitle: Self.coupleFactDetail($0.element, partner: partner),
+                    partner: partner)
             }
         }
+        // Order by the EDTF chronological bound (masked/approximate dates sort correctly,
+        // unlike a raw-string compare); undated/unparseable last. The sort is stable, so
+        // ties keep the order built above.
         return rows.sorted { lhs, rhs in
-            // Order by the EDTF chronological bound (masked/approximate dates sort
-            // correctly, unlike a raw-string compare); undated/unparseable last; a
-            // composite-id tiebreak keeps the order stable across reloads.
             let l = Self.factSortBound(lhs.fact)
             let r = Self.factSortBound(rhs.fact)
             switch (l, r) {
-            case let (l?, r?) where l != r: return l < r
+            case let (l?, r?): return l < r
             case (nil, _?): return false  // undated → after a dated one
             case (_?, nil): return true  // dated → before an undated one
-            default: return lhs.id < rhs.id
+            case (nil, nil): return false
             }
         }
     }
@@ -486,30 +520,55 @@ struct PersonDetailView: View {
     /// Removes the name at `index` (undoable). The bounds check lives inside the
     /// `updatePerson` closure, over the record at write time, so a stale index (from a
     /// concurrent edit/undo) is a no-op rather than a crash.
-    private func removeName(at index: Int) {
+    private func removeName(_ name: PersonName, near index: Int) {
         model.updatePerson(of: personID, actionName: "Remove Name") { person in
-            guard index < person.names.count else { return }
-            person.names.remove(at: index)
+            guard let position = person.names.position(of: name, near: index) else { return }
+            person.names.remove(at: position)
         }
     }
 
     /// Removes a Facts-timeline row, routing to the right store: a person fact through
     /// `updatePerson`, a couple fact through `updateRelationship` (both undoable). As with
-    /// names, the bounds check lives inside the mutate closure, over the record at write
-    /// time, so a stale index (from a concurrent edit/undo) is a no-op, not a crash.
+    /// names, the fact is found by value, starting at the row's index, inside the mutate
+    /// closure, over the record at write time: a list that shifted since (a concurrent
+    /// edit or undo) removes this fact or nothing (79b).
     private func removeFactRow(_ row: FactRow) {
-        switch row.source {
-        case .person(let index):
+        let fact = row.fact
+        let index = row.keyed.index
+        switch row.keyed.id.key.store {
+        case .person:
             model.updatePerson(of: personID, actionName: "Remove Fact") { person in
-                guard index < person.facts.count else { return }
-                person.facts.remove(at: index)
+                guard let position = person.facts.position(of: fact, near: index) else { return }
+                person.facts.remove(at: position)
             }
-        case .couple(let relationshipID, let index):
+        case .couple(let relationshipID):
             model.updateRelationship(of: relationshipID, actionName: "Remove Relationship Fact") {
                 relationship in
-                guard index < relationship.facts.count else { return }
-                relationship.facts.remove(at: index)
+                guard let position = relationship.facts.position(of: fact, near: index)
+                else { return }
+                relationship.facts.remove(at: position)
             }
+        }
+    }
+
+    /// An edited name was written: focus goes back to its row once it lands (79b).
+    private func nameSaved(_ written: PersonName, _ request: NameEditorRequest) {
+        guard let index = request.index, written != request.existing else { return }
+        nameFocusReturn = RowFocusReturn(key: written, hint: index)
+    }
+
+    /// An edited fact was written: focus goes back to its row once it lands (79b). The
+    /// store is the one the row came from, since an edit never re-homes a fact.
+    private func factSaved(_ written: PersonFact, _ mode: FactEditorSheet.Mode) {
+        switch mode {
+        case .editPerson(let index, let existing) where written != existing:
+            factFocusReturn = RowFocusReturn(
+                key: FactRow.Key(store: .person, fact: written), hint: index)
+        case .editCouple(let relationshipID, let index, let existing, _) where written != existing:
+            factFocusReturn = RowFocusReturn(
+                key: FactRow.Key(store: .couple(relationshipID), fact: written), hint: index)
+        default:
+            break
         }
     }
 
@@ -603,6 +662,8 @@ private struct NameEditorRequest: Identifiable {
     let id = UUID()
     let index: Int?
     let existing: PersonName?
+    /// Whether the row it edits had keyboard focus, which comes back to it (79b).
+    var returnsFocus = false
 }
 
 /// One Suggested Relationships row on the person pane (slice 45l): the claim from this
@@ -658,31 +719,41 @@ private struct PersonRelationshipSuggestionRow: View {
 }
 
 /// One row in the merged Facts timeline (slice 43b): a fact plus the store it edits back
-/// to — `Person.facts` or a couple `Relationship.facts`. The `id` is a stable composite
-/// so `ForEach` diffs rows across a `mutationVersion` reload.
+/// to — `Person.facts` or a couple `Relationship.facts`. Identified by its store and value
+/// (79b), so `ForEach` diffs rows across a `mutationVersion` reload and a removed row takes
+/// only its own state with it.
 private struct FactRow: Identifiable {
-    let id: String
-    let fact: PersonFact
+    /// The fact, keyed by its store and value, with its index in that store.
+    let keyed: KeyedRow<Key, PersonFact>
     let subtitle: String?
-    let source: Source
     /// The partner's display label for a couple row (for the couple editor's header);
     /// `nil` for a person fact or an unnamed/deleted partner.
     var partner: String? = nil
 
-    /// Which store — and index — this row edits/removes.
-    enum Source {
-        case person(index: Int)
-        case couple(relationshipID: RelationshipID, index: Int)
+    /// Which store a fact lives in.
+    enum Store: Hashable {
+        case person
+        case couple(RelationshipID)
     }
+
+    /// A fact's key: equal facts in different stores are different rows.
+    struct Key: Hashable {
+        let store: Store
+        let fact: PersonFact
+    }
+
+    var id: RowKey<Key> { keyed.id }
+    var fact: PersonFact { keyed.element }
 
     /// The editor mode that opens this row for editing, routed to the right store.
     var editMode: FactEditorSheet.Mode {
-        switch source {
-        case .person(let index):
-            return .editPerson(index: index, existing: fact)
-        case .couple(let relationshipID, let index):
+        switch keyed.id.key.store {
+        case .person:
+            return .editPerson(index: keyed.index, existing: fact)
+        case .couple(let relationshipID):
             return .editCouple(
-                relationshipID: relationshipID, index: index, existing: fact, partner: partner)
+                relationshipID: relationshipID, index: keyed.index, existing: fact,
+                partner: partner)
         }
     }
 }

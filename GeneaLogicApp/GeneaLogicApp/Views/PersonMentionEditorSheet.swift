@@ -247,13 +247,17 @@ struct PersonMentionEditorSheet: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            ForEach(Array(edges.enumerated()), id: \.offset) { index, edge in
+            // Keyed by value, not position, so removing one takes its own row's focus with
+            // it rather than leaving it on the next one's trash (79b). `edges` is this
+            // sheet's own state, so the index is current.
+            ForEach(edges.keyedRows()) { row in
+                let edge = row.element
                 HStack(spacing: 6) {
                     Text(phrase(for: edge))
                         .font(.callout)
                     Spacer(minLength: 0)
                     Button {
-                        edges.remove(at: index)
+                        edges.remove(at: row.index)
                     } label: {
                         Image(systemName: "trash")
                     }

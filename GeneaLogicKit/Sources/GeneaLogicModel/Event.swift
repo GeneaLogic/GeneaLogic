@@ -16,7 +16,7 @@
 /// and `normalized` fields. The `Event` uses a single string to avoid forcing
 /// a normalized form at event-capture time. Flagged for Opus review — the event
 /// location could instead reference a `Location` by index or embed the full struct.
-public struct Event: Codable, Sendable, Equatable {
+public struct Event: Codable, Sendable, Hashable {
     /// Event type string, e.g. `"Census"`, `"Birth"`, `"Death"`.
     /// NOTE: The doc uses bare strings (not an enum) for event types in artifacts,
     /// and GEDCOM X fact types in persons. Kept as `String` for forward-compat.
