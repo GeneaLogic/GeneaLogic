@@ -20,7 +20,8 @@ register the same undo steps with the same names.
 
 | File | Holds |
 | --- | --- |
-| `ArtifactDetailView.swift` | The coordinator: the loaded state (`detail`, `files`, `transcript`, `links`, suggestions, file selection), the `.task` reload, the sheets, menu-command routing, the inspector toggle, and the file actions that need `openWindow` or AppKit (pop out, open externally, save a copy). Its body composes the two halves. Also `ArtifactDetailPlaceholder` |
+| `ArtifactDetailView.swift` | The coordinator: the loaded state (`detail`, `files`, `transcript`, `links`, suggestions, file selection), the `.task` reload, the sheets, menu-command routing and the inspector toggle. Its body composes the two halves. Also `ArtifactDetailPlaceholder` |
+| `ArtifactFileActions.swift` | Pop out, open in the default app, save a copy: the verbs that need `openWindow` or AppKit, shared by the header, the Files rows and the Selected File menu. *(Added while building.)* |
 | `ArtifactDocumentPane.swift` | The pane, `DocumentHeader`, `FileSelectorStrip`, `DocumentPreview`, `FileChip` |
 | `ArtifactInspector.swift` | The inspector's scroll and section order, and `IdentifiersSection` |
 | `EditableArtifactFields.swift` | The fields and `EditRow`. Moved unchanged: it already reads the model itself |
