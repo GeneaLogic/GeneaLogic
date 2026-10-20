@@ -4268,6 +4268,22 @@ been two slices.
   `.task` isn't noticed until the next event. Background computer-use can't deliver
   keystrokes or a key window, so menu and typing checks need the app in front. The
   `xcode-27` runner label exists (preview) if CI ever needs it.
+- **78 — split `ArchiveModel.swift` by domain** (app only; no format or behaviour change).
+  **The decision:** `GeneaLogicApp/Model/` holds the class body (798 lines) and nine
+  `extension ArchiveModel` files, from `+Trash` (81) to `+Artifacts` (895). The body keeps
+  every stored property, because Swift allows none in an extension, grouped by domain
+  under `MARK`s, plus loading, the write queue and the undo plumbing. `+Window` is the
+  Mac-shaped part an iOS target would replace. **Invariants:** `+Window` holds triggers
+  only; what happens to the data they bring lives in its domain file. A member is `private`
+  unless another file uses it: 48 were widened, 21 of them the setters of observed state,
+  and the app being one module means nothing stronger enforces the line. A separate model
+  module waits for the iOS target. **Move check:** the old file's lines and the new files'
+  lines are the same multiset, ignoring access modifiers, `MARK`s, braces and imports, apart
+  from comments the move made wrong. No test changed. **Gotchas:** widening by name
+  widened every overload, including private `pending:` ones used in one file, so the check
+  is "used elsewhere", not "it compiles". `/code-review` found slice 67's keep-refused-scans
+  rule in `+Window`, where an iOS port would have dropped it; moving it to `+Artifacts`
+  re-privatized nine members.
 
 ## Carryovers and parked work
 

@@ -27,7 +27,7 @@ code slice 52 moved off the main actor:
 
 - **A genuine cross-actor read.** [`PersonMentionEditorSheet.swift:486`](../../GeneaLogicApp/GeneaLogicApp/Views/PersonMentionEditorSheet.swift:486)
   passes a closure to `updateMetadata`, whose `edit` parameter is `@escaping @Sendable` and
-  runs inside `mutate`'s off-main work block ([ArchiveModel.swift:741](../../GeneaLogicApp/GeneaLogicApp/ArchiveModel.swift:741)).
+  runs inside `mutate`'s off-main work block ([`ArchiveModel.swift`](../../GeneaLogicApp/GeneaLogicApp/Model/ArchiveModel.swift)).
   It reads `name`/`role`/`quality`/`nameLanguage`/`nameScript` — all `@State` on the sheet —
   from a background thread while the user can still be typing into them. **This is slice
   51 fork (c)'s question from the other direction**, and it was not asked there: (c)
