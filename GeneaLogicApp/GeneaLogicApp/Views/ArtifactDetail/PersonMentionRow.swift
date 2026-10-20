@@ -36,8 +36,7 @@ struct PersonMentionRow: View {
                 // resolution control and recorded facts below have their own actions and
                 // stay outside this button.
                 Button {
-                    sheet = ArtifactSheet(
-                        .mention(.edit(ref: mention.localRef, existing: mention)))
+                    sheet = ArtifactSheet.editMention(mention)
                 } label: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(mention.nameAsRecorded)
@@ -360,8 +359,7 @@ private struct MentionRecordedFacts: View {
                 // record names nobody else — there is then no one to relate this person to.
                 if canRelate {
                     Button {
-                        sheet = ArtifactSheet(
-                            .mention(.edit(ref: mention.localRef, existing: mention)))
+                        sheet = ArtifactSheet.editMention(mention)
                     } label: {
                         Label("Add Relationship…", systemImage: "person.2")
                             .font(.caption)

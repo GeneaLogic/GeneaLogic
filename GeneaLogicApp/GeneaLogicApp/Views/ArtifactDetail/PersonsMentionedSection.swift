@@ -49,6 +49,11 @@ struct PersonsMentionedSection: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
+                // `model.persons` is read here, by the section, so each row takes only
+                // the one person it shows. Indexed once per body run rather than scanned
+                // per mention.
+                let personsByID = Dictionary(
+                    model.persons.map { ($0.uid, $0) }, uniquingKeysWith: { first, _ in first })
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(Array(persons.enumerated()), id: \.offset) { index, person in
                         let link = links.first { $0.personMentionRef == person.localRef }
@@ -59,11 +64,7 @@ struct PersonsMentionedSection: View {
                             statedRelationships: statedRelationships,
                             allMentions: persons,
                             link: link,
-                            // `model.persons` is read here, by the section, so each
-                            // row takes only the one person it shows.
-                            resolvedPerson: link.flatMap { link in
-                                model.persons.first { $0.uid == link.personUid }
-                            },
+                            resolvedPerson: link.flatMap { personsByID[$0.personUid] },
                             sheet: $sheet)
                     }
                 }

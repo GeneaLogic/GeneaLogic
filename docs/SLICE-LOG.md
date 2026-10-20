@@ -4294,8 +4294,11 @@ been two slices.
   **Invariants:** a section's inputs are the values its body reads. State that only one
   section renders is read there: `capturedMetadata` in Embedded Metadata, `persons` in
   Persons Mentioned, which hands each row its one person. A row takes `isSelected` to read
-  and the selection binding only to write. **Move check:** the first commit is a pure move.
-  Its sorted lines match the old file apart from the file-level `MARK`s. **Not done:**
+  and the selection binding only to write. A menu command is refused while a sheet is
+  up: one request means a new one would replace the open editor and drop its input.
+  **Move check:** the first commit is a pure move. Its sorted lines match the old file once
+  imports and access modifiers are stripped (ten types widened), apart from the
+  file-level `MARK`s. **Not done:**
   `AssertionRow` still takes a delete closure (it is shared with People), so its rows
   redraw with their section. Nothing was measured; the boundaries are right by
   construction.

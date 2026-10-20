@@ -32,8 +32,8 @@ register the same undo steps with the same names.
 | `TranscriptSection.swift`, `EmbeddedMetadataSection.swift` | One section each, with its row |
 
 The rule for every type: **inputs are the values its body reads**, plus `artifactID` when
-it acts. `Pending*` and `ResolveRequest` widen from `private` to `internal` where they
-cross a file.
+it acts. A type that crosses a file widens from `private` to `internal`; the `Pending*`
+and `ResolveRequest` wrappers give way to `ArtifactSheet` (fork 2).
 
 ## Design forks
 

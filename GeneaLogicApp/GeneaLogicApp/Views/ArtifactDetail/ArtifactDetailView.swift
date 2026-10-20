@@ -165,7 +165,13 @@ struct ArtifactDetailView: View {
 
     /// Runs an artifact-scoped menu command by opening the same sheet the in-pane
     /// add affordances open.
+    ///
+    /// **Refused while a sheet is up.** The menu bar stays live over a sheet, and
+    /// replacing the request would dismiss the open editor and drop what was typed in
+    /// it. (Before 79 each sheet had its own state, and SwiftUI would not stack a second
+    /// one; this keeps that outcome on purpose rather than by accident.)
     private func performArtifactCommand(_ command: ArchiveModel.ArtifactCommand) {
+        guard sheet == nil else { return }
         switch command {
         case .addEvent: sheet = ArtifactSheet(.assertion(.blankEvent))
         case .addPlace: sheet = ArtifactSheet(.assertion(.blankPlace))
@@ -235,11 +241,19 @@ struct ArtifactSheet: Identifiable {
     init(_ kind: Kind) {
         self.kind = kind
     }
+
+    /// Edit `mention` in the mention editor. The one owner of how a mention is addressed
+    /// for editing, shared by the row's name and its Add Relationship… button.
+    static func editMention(_ mention: PersonMention) -> ArtifactSheet {
+        ArtifactSheet(.mention(.edit(ref: mention.localRef, existing: mention)))
+    }
 }
 
-/// The sheet a request asks for. The mention editor reads the record's mentions and
-/// stated relationships as they are when it opens; the transcript editor writes its
-/// saved text back through `transcript`, since its edit doesn't change `filesLoadKey`.
+/// The sheet a request asks for. The mention editor's mentions and stated relationships
+/// are the coordinator's loaded record, handed down again on every reload, so they stay
+/// live while it is open (an undo underneath it updates them). The transcript editor
+/// writes its saved text back through `transcript`, since its edit doesn't change
+/// `filesLoadKey`.
 private struct ArtifactSheetContent: View {
     let request: ArtifactSheet
     let artifactID: ArtifactID
