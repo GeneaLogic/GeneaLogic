@@ -29,20 +29,24 @@ and the inspector starts below it, as in Preview.
 
 ## Design forks
 
-1. **Which layout is the target?** **Recommended: under the toolbar**, as in Preview. That
-   is what the reporter expected, and the inspector belongs to the detail column, not the
-   window. **Alternative: full height** (the macOS 26 style, as in Xcode). It is what
-   appears today in the common case, so this fork may simply be "make it stay that way."
+1. **Which layout is the target? Agreed: under the toolbar.** Full height depends on
+   what is inspected. Xcode's inspector serves the whole workspace and follows the
+   selection anywhere, so it gets a full-height column. Preview's and Pages' inspect the
+   document in the content area, so they sit beside it under the toolbar. Ours describes
+   the artifact shown in the detail column, so it belongs at that column's level. The
+   code already says so: `.inspector` is on the detail column's content, which is the
+   placement SwiftUI guidance gives for a split view, with the bar over the inspector.
+   The full-height first appearance is SwiftUI not honouring that, not a second
+   design.
 2. **How the slice runs.** The cause is SwiftUI's own placement, and the fixes that looked
-   obvious didn't move it. **Recommended: a time-boxed prototype, as in 77.** Try, in
-   order: (a) for under-toolbar, an explicit toolbar background over the window
-   (`toolbarBackgroundVisibility(.visible, for: .windowToolbar)`) so the band is drawn
-   the same way whatever the inspector does; (b) for full height, moving `.inspector`
-   outside the `NavigationSplitView`, bound to "Artifacts tab and shown". (b) is the
-   larger change, because the coordinator's state would have to move up to the window.
-   Keep whichever is consistent across every case under *Verification*. If neither is,
-   file Feedback with a minimal repro, write that up here, and close #9 as upstream.
-   **Alternative:** go straight to Feedback without trying either.
+   obvious didn't move it. **Recommended: a time-boxed prototype, as in 77.** Try an
+   explicit toolbar background over the window
+   (`toolbarBackgroundVisibility(.visible, for: .windowToolbar)`), so the band is drawn
+   the same way whatever the inspector does. Keep it if it is consistent across every
+   case under *Verification*. If not, file Feedback with a minimal repro that says our
+   placement is the documented one, write that up here, and close #9 as upstream.
+   Moving `.inspector` outside the split view is ruled out by fork 1. **Alternative:** go
+   straight to Feedback.
 
 ## Out of scope
 
