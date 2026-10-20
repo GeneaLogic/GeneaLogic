@@ -9,7 +9,7 @@
 /// as `String?` so that a location can be recorded without a normalized form.
 /// Flagged for Opus review — `normalized` might evolve into a structured type
 /// (e.g. a Wikidata QID or a lat/lon pair) in a later phase.
-public struct Location: Codable, Sendable, Equatable {
+public struct Location: Codable, Sendable, Hashable {
     /// The place name exactly as it appears in the source record.
     public var asRecorded: String
 

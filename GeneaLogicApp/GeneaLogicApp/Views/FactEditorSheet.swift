@@ -26,6 +26,8 @@ struct FactEditorSheet: View {
 
     let personID: PersonID
     let mode: Mode
+    /// Where an edit's fact ended up, so its row can take focus back (79b).
+    let report: EditReport<PersonFact>?
 
     /// What the sheet is doing, and (when editing) the record + store it targets.
     enum Mode {
@@ -84,9 +86,10 @@ struct FactEditorSheet: View {
         let label: String
     }
 
-    init(personID: PersonID, mode: Mode) {
+    init(personID: PersonID, mode: Mode, report: EditReport<PersonFact>? = nil) {
         self.personID = personID
         self.mode = mode
+        self.report = report
         switch mode {
         case .add:
             _factType = State(initialValue: .birth)
@@ -431,17 +434,27 @@ struct FactEditorSheet: View {
                     $0.facts.append(fact)
                 }
             }
-        case .editPerson(let index, _):
+        // An edit finds its fact by value, starting at its index, in the record the write
+        // reads: a list that shifted since edits this fact or nothing (79b).
+        case .editPerson(let index, let existing):
             model.updatePerson(of: personID, actionName: "Edit Fact") { person in
-                guard index < person.facts.count else { return }
-                person.facts[index] = fact
+                guard let position = person.facts.position(of: existing, near: index)
+                else { return }
+                person.facts[position] = fact
+            } committed: { [report] after in
+                report?.committed(fact, after?.facts)
             }
-        case .editCouple(let rid, let index, _, _):
+            report?.saved(fact)
+        case .editCouple(let rid, let index, let existing, _):
             model.updateRelationship(of: rid, actionName: "Edit Relationship Fact") {
                 relationship in
-                guard index < relationship.facts.count else { return }
-                relationship.facts[index] = fact
+                guard let position = relationship.facts.position(of: existing, near: index)
+                else { return }
+                relationship.facts[position] = fact
+            } committed: { [report] after in
+                report?.committed(fact, after?.facts)
             }
+            report?.saved(fact)
         }
         dismiss()
     }
@@ -486,6 +499,8 @@ struct FactEditorSheet: View {
 struct FactEditorRequest: Identifiable {
     let id = UUID()
     let mode: FactEditorSheet.Mode
+    /// Where an edit's fact ends up, when the row it edits had keyboard focus (79b).
+    var report: EditReport<PersonFact>? = nil
 }
 
 /// How a couple fact's spouse is chosen in `FactEditorSheet` (slice 43c). A couple fact

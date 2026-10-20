@@ -162,14 +162,16 @@ extension ArchiveModel {
     /// engine path; the app only ever mutates `facts` through this closure (never the
     /// endpoints).
     ///
-    /// The `mutate` closure edits `facts` by array index and must bounds-check against
-    /// the record it's handed — an index captured at row-render time can go stale before
-    /// the write commits (a concurrent undo), so the guard lives *inside* the closure.
+    /// `edit` finds the fact it changes in the record it's handed, by value, with the
+    /// row's index only as a hint (79b) — the list can shift between drawing the row and
+    /// the write committing (a concurrent undo), so the lookup lives *inside* the closure.
     /// `edit` is `@Sendable`, and the before-snapshot is taken on the write queue,
-    /// both for the reasons spelled out on `updateMetadata`.
+    /// both for the reasons spelled out on `updateMetadata`. `committed` gets the
+    /// relationship as the write left it; see `updateMetadata`.
     func updateRelationship(
         of id: RelationshipID, actionName: String = "Edit Relationship",
-        _ edit: @escaping @Sendable (inout Relationship) -> Void
+        _ edit: @escaping @Sendable (inout Relationship) -> Void,
+        committed: (@MainActor (Relationship?) -> Void)? = nil
     ) {
         guard archive?.relationship(withID: id) != nil else {
             actionError =
@@ -187,6 +189,7 @@ extension ArchiveModel {
                     of: id, to: before, redoingTo: after, actionName: actionName)
             }
             bumpAndRefresh()
+            committed?(after)
         }
     }
 

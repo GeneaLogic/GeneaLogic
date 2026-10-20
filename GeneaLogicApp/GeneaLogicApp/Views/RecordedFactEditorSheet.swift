@@ -10,8 +10,9 @@ import SwiftUI
 /// both sets of parents) can finally say *whose* recorded birth is whose (§10.6).
 ///
 /// The mention is addressed by its **`localRef`** (stable within the artifact, unlike an
-/// array index), the fact by its index within that mention. Every commit writes through
-/// `ArchiveModel.updateMetadata`, so it's **undoable** (⌘Z) like any other evidence edit.
+/// array index), the fact by its value, starting at its index (79b). Every commit writes
+/// through `ArchiveModel.updateMetadata`, so it's **undoable** (⌘Z) like any other
+/// evidence edit.
 ///
 /// Type is restricted to ``FactType/recordedCases`` (person + couple facts, minus the
 /// parent-child qualifiers, which describe a concluded *edge*, not an observation about
@@ -32,8 +33,11 @@ struct RecordedFactEditorSheet: View {
     /// several mentions).
     let mentionName: String
     let mode: Mode
+    /// Where an edit's fact ended up, so its row can take focus back (79b).
+    let report: EditReport<RecordedFact>?
 
-    /// Add a new fact, or edit the one at `index` within the mention's `facts`.
+    /// Add a new fact, or edit `existing`, found by value starting at `index` within the
+    /// mention's `facts` (79b).
     enum Mode {
         case add
         case edit(index: Int, existing: RecordedFact)
@@ -47,11 +51,15 @@ struct RecordedFactEditorSheet: View {
     /// (the honest default — see `RecordedFact.informationQuality`), never "undetermined".
     @State private var quality: InformationQuality?
 
-    init(artifactID: ArtifactID, mentionRef: String, mentionName: String, mode: Mode) {
+    init(
+        artifactID: ArtifactID, mentionRef: String, mentionName: String, mode: Mode,
+        report: EditReport<RecordedFact>? = nil
+    ) {
         self.artifactID = artifactID
         self.mentionRef = mentionRef
         self.mentionName = mentionName
         self.mode = mode
+        self.report = report
         switch mode {
         case .add:
             _factType = State(initialValue: .birth)
@@ -166,9 +174,9 @@ struct RecordedFactEditorSheet: View {
             informationQuality: quality)
         let actionName = isEditing ? "Edit Recorded Fact" : "Add Recorded Fact"
         model.updateMetadata(of: artifactID, actionName: actionName) { record in
-            // Address the mention by its stable `localRef`; the fact by index within it.
-            // Both bounds are checked *inside* the closure against the record the engine
-            // loaded, since a captured index can go stale before the write commits.
+            // Address the mention by its stable `localRef`; the fact by value, starting
+            // at its index. Both are found *inside* the closure, in the record the engine
+            // loaded, since a captured index can go stale before the write commits (79b).
             guard
                 let position = record.personsMentioned.firstIndex(where: {
                     $0.localRef == mentionRef
@@ -177,13 +185,18 @@ struct RecordedFactEditorSheet: View {
             switch mode {
             case .add:
                 record.personsMentioned[position].facts.append(fact)
-            case .edit(let index, _):
-                guard record.personsMentioned[position].facts.indices.contains(index) else {
-                    return
-                }
-                record.personsMentioned[position].facts[index] = fact
+            case .edit(let index, let existing):
+                guard
+                    let target = record.personsMentioned[position].facts.position(
+                        of: existing, near: index)
+                else { return }
+                record.personsMentioned[position].facts[target] = fact
             }
+        } committed: { [report, mentionRef] after in
+            report?.committed(
+                fact, after?.personsMentioned.first { $0.localRef == mentionRef }?.facts)
         }
+        if isEditing { report?.saved(fact) }
         dismiss()
     }
 }

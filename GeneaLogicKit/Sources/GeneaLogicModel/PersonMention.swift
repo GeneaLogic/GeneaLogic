@@ -17,7 +17,7 @@
 /// says there. Same shape, different layer, different answer.)
 ///
 /// Documented in `Artifact.personsMentioned[].facts[]` (ARCHITECTURE.md §4.2, §10.6).
-public struct RecordedFact: Codable, Sendable, Equatable {
+public struct RecordedFact: Codable, Sendable, Hashable {
     /// What kind of fact the document records (GEDCOM X-aligned open vocabulary).
     /// See ``FactType/recordedCases`` for the types that make sense here.
     public var type: FactType

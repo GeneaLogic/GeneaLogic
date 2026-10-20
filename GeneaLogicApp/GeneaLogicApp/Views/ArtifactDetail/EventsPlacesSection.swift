@@ -52,41 +52,48 @@ struct EventsPlacesSection: View {
                     .foregroundStyle(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 2) {
-                    ForEach(Array(events.enumerated()), id: \.offset) { index, event in
+                    ForEach(events.keyedRows()) { row in
+                        let event = row.element
                         AssertionRow(
                             title: event.type.isEmpty ? "Event" : event.type,
                             subtitle: eventSubtitle(event),
                             icon: "calendar"
-                        ) { deleteEvent(index) }
+                        ) { deleteEvent(event, near: row.index) }
                     }
-                    ForEach(Array(locations.enumerated()), id: \.offset) { index, location in
+                    ForEach(locations.keyedRows()) { row in
+                        let location = row.element
                         AssertionRow(
                             title: location.asRecorded,
                             subtitle: location.normalized,
                             icon: "mappin.and.ellipse"
-                        ) { deletePlace(index) }
+                        ) { deletePlace(location, near: row.index) }
                     }
                 }
+                // Rows are keyed by value, and two artifacts can record an equal event:
+                // a row's state belongs to this artifact's list (79b).
+                .id(artifactID)
             }
         }
         .padding(.top, 8)
     }
 
-    /// Removes the event at `index` (undoable, like every `updateMetadata` write).
-    /// The index addresses the loaded `events`, which matches stored order; the
-    /// bounds check guards against a stale index after a concurrent reload.
-    private func deleteEvent(_ index: Int) {
+    /// Removes `event` (undoable, like every `updateMetadata` write). `index` is where
+    /// the row was drawn, a hint checked against the value in the record the write
+    /// reads, so a list that shifted since removes this event or nothing (79b).
+    private func deleteEvent(_ event: Event, near index: Int) {
         model.updateMetadata(of: artifactID, actionName: "Remove Event") {
-            guard $0.events.indices.contains(index) else { return }
-            $0.events.remove(at: index)
+            guard let position = $0.events.position(of: event, near: index) else { return }
+            $0.events.remove(at: position)
         }
     }
 
-    /// Removes the place at `index` (undoable). See `deleteEvent` on indexing.
-    private func deletePlace(_ index: Int) {
+    /// Removes `location` (undoable). See `deleteEvent` on addressing.
+    private func deletePlace(_ location: Location, near index: Int) {
         model.updateMetadata(of: artifactID, actionName: "Remove Place") {
-            guard $0.locations.indices.contains(index) else { return }
-            $0.locations.remove(at: index)
+            guard let position = $0.locations.position(of: location, near: index) else {
+                return
+            }
+            $0.locations.remove(at: position)
         }
     }
 

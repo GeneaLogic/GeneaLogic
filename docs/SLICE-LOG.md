@@ -4303,6 +4303,27 @@ been two slices.
   redraw with their section. Nothing was measured; the boundaries are right by
   construction.
 
+- **79b — row identity** (app, plus `Hashable` on five model types; no format change).
+  **The decision:** a row in an editable list is identified by its value plus its
+  occurrence among equal values (a mention by `localRef`), not its position, and a
+  write finds its element the same way: the row's index is a hint, checked against the
+  value in the record the write reads. In-memory ids were the ROADMAP's plan, and were
+  dropped: every write runs on a freshly decoded record, so an id on the loaded copy can
+  neither address a write nor survive the reload after it. **Invariants:** no editable
+  `ForEach` is keyed by offset; a write that no longer finds its element does nothing,
+  rather than acting on whatever moved into its slot. **The cost, paid back:** an edited
+  row is a new view, so keyboard focus had nowhere to return. The model's edit verbs now
+  take a `committed` callback with the record as the write left it; the editor finds its
+  row there, and focus moves once the reload shows it and the sheet has closed, in either
+  order. **Gotcha (review):** the first cut guessed the target from whichever reload came
+  next, but a reload can land before a write waiting on the lock, and a write that found
+  nothing triggers none. **Gotcha:** the app target is main-actor by default, and the
+  write closures run off it (slice 52), so the helpers they call are `nonisolated`. The
+  Facts tiebreak was comparing id strings (`person#10` before `person#2`); ties now keep
+  store order. **Gotcha (hand-test):** a key is only unique within its record (every
+  artifact's second mention is `p2`), and the detail views outlive a selection change, so
+  each list is `.id`'d by its record or a row's state follows it to the next one.
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the

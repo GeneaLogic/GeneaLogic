@@ -19,7 +19,7 @@
 
 /// A name associated with a concluded person.
 /// Documented in `Person.names[]` (ARCHITECTURE.md §4.3).
-public struct PersonName: Codable, Sendable, Equatable {
+public struct PersonName: Codable, Sendable, Hashable {
     /// The type of this name (birth, married, alias, etc.).
     public var type: NameType
 
@@ -141,7 +141,7 @@ public struct PersonName: Codable, Sendable, Equatable {
 ///
 /// NOTE (date/place): Both are `String?` per the pattern used throughout (partial dates,
 /// unresolved place strings). See overall date-strategy note in `GeneaLogicJSON.swift`.
-public struct PersonFact: Codable, Sendable, Equatable {
+public struct PersonFact: Codable, Sendable, Hashable {
     /// GEDCOM X fact type (open vocabulary), e.g. `.birth`, `.death`, `.residence`.
     public var type: FactType
 

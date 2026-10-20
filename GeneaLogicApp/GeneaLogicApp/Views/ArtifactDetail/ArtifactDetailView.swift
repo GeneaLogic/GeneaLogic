@@ -14,6 +14,11 @@ struct ArtifactDetailView: View {
     /// so a section opens one through a single binding and a menu command through the
     /// same state.
     @State private var sheet: ArtifactSheet?
+    /// The requests presented and not yet dismissed, kept past `sheet` moving on so each
+    /// one's `onDismiss` runs when its own dismissal finishes. A list rather than the
+    /// latest one: a request that replaces another without passing through `nil` must not
+    /// take over, or run early, the hook of the one it replaced.
+    @State private var presentedSheets: [ArtifactSheet] = []
 
     /// The full record for read-only display, loaded from the index (the browse
     /// summary lacks notes/language/original format and the events/locations the
@@ -111,7 +116,15 @@ struct ArtifactDetailView: View {
         }
         // Presented at the top level (not inside the inspector) so the menu commands —
         // Artifact ▸ Edit Transcript… among them — work even with the inspector hidden.
-        .sheet(item: $sheet) { request in
+        .sheet(
+            item: $sheet,
+            onDismiss: {
+                // Every request but the one now up has gone.
+                let gone = presentedSheets.filter { $0.id != sheet?.id }
+                presentedSheets.removeAll { $0.id != sheet?.id }
+                for request in gone { request.onDismiss?() }
+            }
+        ) { request in
             ArtifactSheetContent(
                 request: request, artifactID: artifact.uid,
                 mentions: detail?.personsMentioned ?? [],
@@ -141,6 +154,7 @@ struct ArtifactDetailView: View {
         .onAppear { model.inspectorVisible = inspectorShown }
         .onChange(of: inspectorShown) { _, shown in model.inspectorVisible = shown }
         .onChange(of: selectedFileID) { _, id in model.selectedFile = id }
+        .onChange(of: sheet?.id) { if let sheet { presentedSheets.append(sheet) } }
         .onChange(of: model.pendingInspectorToggle) { _, requested in
             if requested {
                 inspectorShown.toggle()
@@ -224,8 +238,10 @@ struct ArtifactSheet: Identifiable {
         case mention(PersonMentionEditorSheet.Mode)
         /// Add or edit a `RecordedFact` on one mention. The mention is addressed by its
         /// record-local `localRef`; its name rides along for the editor's heading.
+        /// `report` tells the row where an edit's fact ended up, for its focus return (79b).
         case mentionFact(
-            mentionRef: String, mentionName: String, mode: RecordedFactEditorSheet.Mode)
+            mentionRef: String, mentionName: String, mode: RecordedFactEditorSheet.Mode,
+            report: EditReport<RecordedFact>? = nil)
         /// Resolve a mention to a person. `replacing` is the dangling link this
         /// resolution replaces (slice 44g), or `nil` for a first-time resolve — carried
         /// through so the sheet can unlink the stale citation and create the new one as
@@ -237,6 +253,9 @@ struct ArtifactSheet: Identifiable {
 
     let id = UUID()
     let kind: Kind
+    /// Called once the sheet has finished closing, so a row can take focus back without
+    /// the dismissal overriding it (79b).
+    var onDismiss: (() -> Void)?
 
     init(_ kind: Kind) {
         self.kind = kind
@@ -269,9 +288,10 @@ private struct ArtifactSheetContent: View {
             PersonMentionEditorSheet(
                 artifactID: artifactID, mode: mode, mentions: mentions,
                 statedRelationships: statedRelationships)
-        case .mentionFact(let ref, let name, let mode):
+        case .mentionFact(let ref, let name, let mode, let report):
             RecordedFactEditorSheet(
-                artifactID: artifactID, mentionRef: ref, mentionName: name, mode: mode)
+                artifactID: artifactID, mentionRef: ref, mentionName: name, mode: mode,
+                report: report)
         case .resolve(let mention, let replacing):
             ResolveMentionSheet(artifactID: artifactID, mention: mention, replacing: replacing)
         case .transcript:
