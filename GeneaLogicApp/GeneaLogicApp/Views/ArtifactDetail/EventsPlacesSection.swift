@@ -69,6 +69,9 @@ struct EventsPlacesSection: View {
                         ) { deletePlace(location, near: row.index) }
                     }
                 }
+                // Rows are keyed by value, and two artifacts can record an equal event:
+                // a row's state belongs to this artifact's list (79b).
+                .id(artifactID)
             }
         }
         .padding(.top, 8)

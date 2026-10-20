@@ -71,6 +71,11 @@ struct PersonsMentionedSection: View {
                             sheet: $sheet)
                     }
                 }
+                // A `localRef` is only unique within its record: the second mention is
+                // `p2` on every artifact. Without this, selecting another artifact keeps
+                // these row views, and a row's state (an expanded Why?) shows on that
+                // artifact's mention in the same place (79b's hand-test).
+                .id(artifactID)
             }
             SuggestedRelationships(artifactID: artifactID, items: relationshipSuggestions)
         }

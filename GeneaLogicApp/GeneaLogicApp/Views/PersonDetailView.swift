@@ -70,6 +70,11 @@ struct PersonDetailView: View {
             relatives = loadRelatives(from: relationships)
             relationshipSuggestions = model.suggestedRelationships(for: personID)
         }
+        // A focus return belongs to the person whose row was edited, not the next one.
+        .onChange(of: personID) {
+            nameFocusReturn = nil
+            factFocusReturn = nil
+        }
         .sheet(
             item: $nameEditorRequest,
             onDismiss: { RowFocusReturn.sheetClosed($nameFocusReturn) }
@@ -181,7 +186,11 @@ struct PersonDetailView: View {
                     }
                 }
                 .returnsRowFocus(
-                    $nameFocusReturn, rowIDs: rows.map { AnyHashable($0.id) }, focus: $focusedRow)
+                    $nameFocusReturn, rowIDs: rows.map { AnyHashable($0.id) }, focus: $focusedRow
+                )
+                // Rows are keyed by value, and two people can share an equal name: a row's
+                // state belongs to this person's list (79b).
+                .id(personID)
             }
         }
     }
@@ -232,7 +241,9 @@ struct PersonDetailView: View {
                     }
                 }
                 .returnsRowFocus(
-                    $factFocusReturn, rowIDs: rows.map { AnyHashable($0.id) }, focus: $focusedRow)
+                    $factFocusReturn, rowIDs: rows.map { AnyHashable($0.id) }, focus: $focusedRow
+                )
+                .id(personID)
             }
         }
     }

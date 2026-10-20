@@ -4320,7 +4320,9 @@ been two slices.
   nothing triggers none. **Gotcha:** the app target is main-actor by default, and the
   write closures run off it (slice 52), so the helpers they call are `nonisolated`. The
   Facts tiebreak was comparing id strings (`person#10` before `person#2`); ties now keep
-  store order.
+  store order. **Gotcha (hand-test):** a key is only unique within its record (every
+  artifact's second mention is `p2`), and the detail views outlive a selection change, so
+  each list is `.id`'d by its record or a row's state follows it to the next one.
 
 ## Carryovers and parked work
 
