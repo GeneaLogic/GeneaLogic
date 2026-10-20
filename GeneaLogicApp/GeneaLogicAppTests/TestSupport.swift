@@ -118,6 +118,42 @@ enum AppTestSupport {
         await Self.wait(for: released)
     }
 
+    /// Polls `condition` until it holds or `timeout` of *running* time is spent,
+    /// and returns whether it held.
+    ///
+    /// **Only the time this loop was actually running counts** (#33). A gap
+    /// between two polls longer than `longestCountedGap` means the main actor,
+    /// or the whole test process, wasn't scheduling us. That isn't the thing
+    /// being waited on being slow: whatever it is ends on the main actor too,
+    /// so it was stalled for the same stretch. On a loaded CI runner the
+    /// suite once went ~7 seconds with nothing completing, not even tests
+    /// that only needed the main actor. Every wall-clock deadline running at
+    /// the time expired together, and about 25 unrelated tests failed at once.
+    ///
+    /// A real hang still fails: each poll counts up to the cap, so the budget
+    /// runs out however slowly the loop turns.
+    @MainActor
+    static func poll(
+        every interval: Duration = .milliseconds(2),
+        for timeout: Duration = .seconds(10),
+        until condition: () -> Bool
+    ) async -> Bool {
+        let clock = ContinuousClock()
+        var spent = Duration.zero
+        var last = clock.now
+        while !condition() && spent < timeout {
+            try? await Task.sleep(for: interval)
+            let now = clock.now
+            spent += min(now - last, longestCountedGap)
+            last = now
+        }
+        return condition()
+    }
+
+    /// The longest gap between polls that `poll` counts in full. Polls are
+    /// milliseconds apart, so anything past this is the process not running.
+    static let longestCountedGap: Duration = .milliseconds(100)
+
     /// `DispatchSemaphore.wait()` is unavailable from an async context — it blocks a
     /// cooperative-pool thread, which Swift 6 makes an error rather than a warning. The
     /// block moves to a global queue; the async side suspends instead of occupying one.
@@ -209,13 +245,13 @@ extension ArchiveModel {
     /// So the deadline is now generous *and* loud. A timeout that reports itself
     /// cannot read as a hang, which was the original argument for keeping it
     /// short, so the trade that argument was making no longer applies.
+    ///
+    /// **And it counts running time, not wall time** (#33): see
+    /// `AppTestSupport.poll`.
     @MainActor
     func settle(timeout: Duration = .seconds(10)) async {
-        let deadline = ContinuousClock.now + timeout
-        while hasMutationsInFlight && ContinuousClock.now < deadline {
-            try? await Task.sleep(for: .milliseconds(2))
-        }
-        if hasMutationsInFlight {
+        let settled = await AppTestSupport.poll(for: timeout) { !hasMutationsInFlight }
+        if !settled {
             Issue.record(
                 """
                 A mutation did not finish within \(timeout), so this test is about to \
