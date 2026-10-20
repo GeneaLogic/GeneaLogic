@@ -8,16 +8,10 @@ import SwiftUI
 /// new artifact instead is the toolbar `+` (Add Media); the two are distinct verbs
 /// multiplexed over one importer via `ArchiveModel.ImportMode`.
 struct FilesSection: View {
+    @Environment(ArchiveModel.self) private var model
+    let artifactID: ArtifactID
     let files: [FileEntry]
     @Binding var selectedFileID: FileID?
-    let onAttachOrScan: () -> Void
-    let onPopOut: (FileID) -> Void
-    let onOpenExternally: (FileID) -> Void
-    let onSaveCopy: (FileID) -> Void
-    let onScanMetadata: (FileID) -> Void
-    let onSetRole: (FileID, FileRole) -> Void
-    let onReplace: (FileID) -> Void
-    let onDelete: (FileID) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -30,7 +24,7 @@ struct FilesSection: View {
                 // items — exactly like the toolbar `+`, instead of a SwiftUI menu that
                 // then pops a second, disconnected AppKit menu (a slice 32 follow-up).
                 Button {
-                    onAttachOrScan()
+                    model.beginAttachOrScan(to: artifactID)
                 } label: {
                     AddAffordanceLabel(
                         title: "Attach File…", systemImage: "paperclip", opensMenu: true)
@@ -51,16 +45,9 @@ struct FilesSection: View {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(files, id: \.uid) { entry in
                         FileRow(
-                            entry: entry,
+                            artifactID: artifactID, entry: entry,
                             isSelected: entry.uid == selectedFileID,
-                            onSelect: { selectedFileID = entry.uid },
-                            onPopOut: { onPopOut(entry.uid) },
-                            onOpenExternally: { onOpenExternally(entry.uid) },
-                            onSaveCopy: { onSaveCopy(entry.uid) },
-                            onScanMetadata: { onScanMetadata(entry.uid) },
-                            onSetRole: { onSetRole(entry.uid, $0) },
-                            onReplace: { onReplace(entry.uid) },
-                            onDelete: { onDelete(entry.uid) })
+                            selectedFileID: $selectedFileID)
                     }
                 }
             }
@@ -75,17 +62,16 @@ struct FilesSection: View {
 /// covers export (Open in Default App, Save a Copy…, separate window) and editing
 /// (Replace…/Delete). Delete is destructive but **undoable** (the engine stages the
 /// bytes), so it confirms once rather than blocking.
+///
+/// Takes `isSelected` to read and the selection binding only to write, so selecting a
+/// file redraws the two rows whose highlight changes and no others.
 private struct FileRow: View {
+    @Environment(ArchiveModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
+    let artifactID: ArtifactID
     let entry: FileEntry
     let isSelected: Bool
-    let onSelect: () -> Void
-    let onPopOut: () -> Void
-    let onOpenExternally: () -> Void
-    let onSaveCopy: () -> Void
-    let onScanMetadata: () -> Void
-    let onSetRole: (FileRole) -> Void
-    let onReplace: () -> Void
-    let onDelete: () -> Void
+    @Binding var selectedFileID: FileID?
 
     @State private var confirmingDelete = false
     @State private var isHovering = false
@@ -95,7 +81,9 @@ private struct FileRow: View {
             // The whole left region is one plain Button, so clicking anywhere on the
             // row's text/icon selects it for preview (not just the empty margins).
             // `textSelection` is intentionally omitted — it would swallow the click.
-            Button(action: onSelect) {
+            Button {
+                selectedFileID = entry.uid
+            } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "doc")
                         .imageScale(.large)
@@ -119,11 +107,13 @@ private struct FileRow: View {
 
             Menu {
                 Button("Open in Default App", systemImage: "arrow.up.forward.app") {
-                    onOpenExternally()
+                    fileActions.openExternally(entry)
                 }
-                Button("Save a Copy…", systemImage: "square.and.arrow.down") { onSaveCopy() }
+                Button("Save a Copy…", systemImage: "square.and.arrow.down") {
+                    fileActions.saveCopy(entry)
+                }
                 Button("Open in Separate Window", systemImage: "macwindow.on.rectangle") {
-                    onPopOut()
+                    fileActions.popOut(entry)
                 }
                 Divider()
                 // Change the file's archival role after the fact (slice 32). A
@@ -134,10 +124,13 @@ private struct FileRow: View {
                     }
                 }
                 Button("Scan for Metadata", systemImage: "doc.text.magnifyingglass") {
-                    onScanMetadata()
+                    model.scanFileForMetadata(
+                        entry.uid, in: artifactID, originalName: entry.originalName)
                 }
                 Divider()
-                Button("Replace…", systemImage: "arrow.triangle.2.circlepath") { onReplace() }
+                Button("Replace…", systemImage: "arrow.triangle.2.circlepath") {
+                    model.beginReplace(fileID: entry.uid, artifactID: artifactID)
+                }
                 Button("Delete", systemImage: "trash", role: .destructive) {
                     confirmingDelete = true
                 }
@@ -162,7 +155,9 @@ private struct FileRow: View {
             "Delete “\(entry.originalName)”?", isPresented: $confirmingDelete,
             titleVisibility: .visible
         ) {
-            Button("Delete File", role: .destructive) { onDelete() }
+            Button("Delete File", role: .destructive) {
+                model.detachFile(entry.uid, from: artifactID)
+            }
         } message: {
             Text(
                 "This moves the file to the Trash. Undo with ⌘Z, or restore it later from "
@@ -172,9 +167,15 @@ private struct FileRow: View {
 
     /// Bridges the file's current role to the Role picker: reads `entry.role`
     /// (always fresh — the row rebuilds from the reloaded record after a change)
-    /// and routes a new selection through the undoable `onSetRole`.
+    /// and routes a new selection through the undoable `setFileRole`.
     private var roleBinding: Binding<FileRole> {
-        Binding(get: { entry.role }, set: { onSetRole($0) })
+        Binding(
+            get: { entry.role },
+            set: { model.setFileRole(entry.uid, in: artifactID, to: $0) })
+    }
+
+    private var fileActions: ArtifactFileActions {
+        ArtifactFileActions(model: model, artifactID: artifactID, openWindow: openWindow)
     }
 
     private var subtitle: String {

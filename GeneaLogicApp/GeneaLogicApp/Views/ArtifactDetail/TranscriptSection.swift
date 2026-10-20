@@ -7,7 +7,7 @@ import SwiftUI
 /// (long transcripts) is shown separately in the Files list, not here.
 struct TranscriptSection: View {
     let transcript: String?
-    let onEdit: () -> Void
+    @Binding var sheet: ArtifactSheet?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -16,7 +16,7 @@ struct TranscriptSection: View {
                     .font(.headline)
                 Spacer()
                 Button {
-                    onEdit()
+                    sheet = ArtifactSheet(.transcript)
                 } label: {
                     AddAffordanceLabel(
                         title: hasText ? "Edit Transcript…" : "Add Transcript…",

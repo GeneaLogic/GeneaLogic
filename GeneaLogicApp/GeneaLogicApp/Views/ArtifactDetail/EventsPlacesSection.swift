@@ -11,12 +11,11 @@ import SwiftUI
 /// Rich editing of an existing event is deferred to the Phase 3 conclusions UI;
 /// here the verbs are add and remove.
 struct EventsPlacesSection: View {
+    @Environment(ArchiveModel.self) private var model
+    let artifactID: ArtifactID
     let events: [Event]
     let locations: [Location]
-    let onAddEvent: () -> Void
-    let onAddPlace: () -> Void
-    let onDeleteEvent: (Int) -> Void
-    let onDeletePlace: (Int) -> Void
+    @Binding var sheet: ArtifactSheet?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -25,8 +24,12 @@ struct EventsPlacesSection: View {
                     .font(.headline)
                 Spacer()
                 Menu {
-                    Button("Add Event…", systemImage: "calendar") { onAddEvent() }
-                    Button("Add Place…", systemImage: "mappin.and.ellipse") { onAddPlace() }
+                    Button("Add Event…", systemImage: "calendar") {
+                        sheet = ArtifactSheet(.assertion(.blankEvent))
+                    }
+                    Button("Add Place…", systemImage: "mappin.and.ellipse") {
+                        sheet = ArtifactSheet(.assertion(.blankPlace))
+                    }
                 } label: {
                     AddAffordanceLabel(title: "Add…", systemImage: "plus", opensMenu: true)
                 }
@@ -54,19 +57,37 @@ struct EventsPlacesSection: View {
                             title: event.type.isEmpty ? "Event" : event.type,
                             subtitle: eventSubtitle(event),
                             icon: "calendar"
-                        ) { onDeleteEvent(index) }
+                        ) { deleteEvent(index) }
                     }
                     ForEach(Array(locations.enumerated()), id: \.offset) { index, location in
                         AssertionRow(
                             title: location.asRecorded,
                             subtitle: location.normalized,
                             icon: "mappin.and.ellipse"
-                        ) { onDeletePlace(index) }
+                        ) { deletePlace(index) }
                     }
                 }
             }
         }
         .padding(.top, 8)
+    }
+
+    /// Removes the event at `index` (undoable, like every `updateMetadata` write).
+    /// The index addresses the loaded `events`, which matches stored order; the
+    /// bounds check guards against a stale index after a concurrent reload.
+    private func deleteEvent(_ index: Int) {
+        model.updateMetadata(of: artifactID, actionName: "Remove Event") {
+            guard $0.events.indices.contains(index) else { return }
+            $0.events.remove(at: index)
+        }
+    }
+
+    /// Removes the place at `index` (undoable). See `deleteEvent` on indexing.
+    private func deletePlace(_ index: Int) {
+        model.updateMetadata(of: artifactID, actionName: "Remove Place") {
+            guard $0.locations.indices.contains(index) else { return }
+            $0.locations.remove(at: index)
+        }
     }
 
     /// "about 1920 · Cook County, Illinois", either part omitted when absent. The date
