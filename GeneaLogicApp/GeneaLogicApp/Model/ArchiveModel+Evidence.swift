@@ -37,6 +37,8 @@ extension ArchiveModel {
         archive?.links(for: id) ?? []
     }
 
+    // MARK: - Mention suggestions, and resolving a mention (45d)
+
     /// The ranked candidates for one mention at the usual floor — the resolve sheet's
     /// in-place suggestions (§6.3's inspector-primary direction).
     ///
@@ -298,7 +300,7 @@ extension ArchiveModel {
     private func registerLinkRedelete(of id: EvidenceLinkID, actionName: String) {
         registerUndoStep(actionName: actionName) { model in
             let removed = PendingLink()
-            // Counterpart first — see *Undo across the actor hop* above.
+            // Counterpart first — see *Undo across the actor hop* in `ArchiveModel.swift`.
             model.registerLinkRestore(pending: removed, actionName: actionName)
             model.mutate(unopened: "Open an archive before undoing.") { archive in
                 try archive.unlink(id)
@@ -339,7 +341,7 @@ extension ArchiveModel {
 
     /// Restores `link` and registers the unlink that reverses it.
     private func restoreLink(_ link: EvidenceLink, actionName: String) {
-        // Counterpart first — see *Undo across the actor hop* above.
+        // Counterpart first — see *Undo across the actor hop* in `ArchiveModel.swift`.
         registerLinkRedelete(of: link.uid, actionName: actionName)
         mutate(unopened: "Open an archive before undoing.") { archive in
             try archive.restoreLink(link)

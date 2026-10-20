@@ -236,6 +236,8 @@ extension ArchiveModel {
         }
     }
 
+    // MARK: - Verify Integrity, dangling references, rebuild
+
     /// Runs the engine's `verifyIntegrity()` — SHA-256-checks every tracked file
     /// against the manifest and sweeps for stray files (§3, §6.3). `nil` only if
     /// no archive is open (the menu command is disabled in that case). Read-only:
@@ -439,6 +441,28 @@ extension ArchiveModel {
     func rebaseline() {
         mutate(unopened: "Open an archive before rebaselining.") { archive in
             try archive.rebaseline()
+        } commit: { [self] _ in
+            bumpAndRefresh()
+        }
+    }
+
+    /// **Stops waiting for one named file** the manifest expects and that is
+    /// never going to arrive (slice 50d's `abandonDelivery(path:)`, surfaced per
+    /// row from the integrity panel).
+    ///
+    /// **Per row, not per archive**, which is the whole difference from
+    /// `rebaseline()` above: this decides one path, on the row that names it,
+    /// and leaves every other finding exactly as it was. It is also recoverable
+    /// — nothing is deleted, and a version that turns up later is adopted
+    /// normally — which is why it is offered inline where "Accept Current
+    /// Contents" is deliberately a footer button behind a confirmation.
+    ///
+    /// The engine refuses anything that is not actually awaited, so a row that
+    /// has resolved itself between the sweep and the click reports rather than
+    /// laundering damage.
+    func abandonDelivery(path: String) {
+        mutate(unopened: "Open an archive before abandoning a delivery.") { archive in
+            try archive.abandonDelivery(path: path)
         } commit: { [self] _ in
             bumpAndRefresh()
         }

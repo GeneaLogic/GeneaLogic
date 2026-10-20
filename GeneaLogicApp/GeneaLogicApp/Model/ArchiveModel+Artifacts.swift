@@ -4,6 +4,8 @@ import GeneaLogicExtract
 import GeneaLogicModel
 
 extension ArchiveModel {
+    // MARK: - Browsing, sorting and filtering
+
     /// Whether any filter is active — a non-blank search **or** a selected tag.
     var isFiltering: Bool {
         !searchText.trimmed.isEmpty || !selectedTags.isEmpty
@@ -180,6 +182,8 @@ extension ArchiveModel {
         applyFilters()
     }
 
+    // MARK: - Artifacts and files (read, edit, delete — undoable)
+
     /// Fetches the full `Artifact` record behind a browse summary, for editing.
     /// The browse list carries only the derived `ArtifactSummary`; the editor
     /// needs the whole record (notes, language, events, …). `nil` if the archive
@@ -340,7 +344,7 @@ extension ArchiveModel {
         of id: ArtifactID, to target: Artifact, redoingTo redoTarget: Artifact, actionName: String
     ) {
         registerUndoStep(actionName: actionName) { model in
-            // Counterpart first — see *Undo across the actor hop* above.
+            // Counterpart first — see *Undo across the actor hop* in `ArchiveModel.swift`.
             model.registerArtifactRestore(
                 of: id, to: redoTarget, redoingTo: target, actionName: actionName)
             model.mutate(unopened: "Open an archive before editing.") { archive in
@@ -400,7 +404,7 @@ extension ArchiveModel {
         _ fileID: FileID, in artifactID: ArtifactID, to role: FileRole, redoingTo redoRole: FileRole
     ) {
         registerUndoStep(actionName: "Change File Role") { model in
-            // Counterpart first — see *Undo across the actor hop* above.
+            // Counterpart first — see *Undo across the actor hop* in `ArchiveModel.swift`.
             model.registerFileRoleRestore(fileID, in: artifactID, to: redoRole, redoingTo: role)
             model.mutate(unopened: "Open an archive before changing a file’s role.") { archive in
                 _ = try archive.setFileRole(fileID, in: artifactID, to: role)
@@ -463,7 +467,7 @@ extension ArchiveModel {
     /// one implementation rather than two that must agree.
     private func revertFile(_ change: FileChange, actionName: String) {
         let inverse = PendingFileChange()
-        // Counterpart first — see *Undo across the actor hop* above.
+        // Counterpart first — see *Undo across the actor hop* in `ArchiveModel.swift`.
         registerFileRevert(pending: inverse, actionName: actionName)
         mutate(unopened: "Open an archive before undoing.") { archive in
             try archive.revert(change)
@@ -543,7 +547,7 @@ extension ArchiveModel {
     private func restoreArtifact(
         _ deletion: ArtifactDeletion, of id: ArtifactID, actionName: String
     ) {
-        // Counterpart first — see *Undo across the actor hop* above.
+        // Counterpart first — see *Undo across the actor hop* in `ArchiveModel.swift`.
         registerArtifactRedelete(of: id, actionName: actionName)
         mutate(unopened: "Open an archive before undoing.") { archive in
             try archive.restoreArtifact(deletion)
@@ -591,6 +595,8 @@ extension ArchiveModel {
             }
         }
     }
+
+    // MARK: - Ingest and attach
 
     /// Ingests `urls` (from `.fileImporter` or drag-and-drop) into the open
     /// archive: each becomes a new artifact with the source file attached as its

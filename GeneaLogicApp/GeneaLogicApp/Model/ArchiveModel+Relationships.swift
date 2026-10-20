@@ -118,7 +118,7 @@ extension ArchiveModel {
 
     /// Restores `relationship` and registers the redelete that reverses it.
     private func restoreRelationship(_ relationship: Relationship, actionName: String) {
-        // Counterpart first — see *Undo across the actor hop* above.
+        // Counterpart first — see *Undo across the actor hop* in `ArchiveModel.swift`.
         registerRelationshipRedelete(of: relationship.uid, actionName: actionName)
         mutate(unopened: "Open an archive before undoing.") { archive in
             try archive.restoreRelationship(relationship)
@@ -138,7 +138,7 @@ extension ArchiveModel {
     func registerRelationshipRedelete(of id: RelationshipID, actionName: String) {
         registerUndoStep(actionName: actionName) { model in
             let removed = PendingRelationship()
-            // Counterpart first — see *Undo across the actor hop* above.
+            // Counterpart first — see *Undo across the actor hop* in `ArchiveModel.swift`.
             model.registerRelationshipRestore(pending: removed, actionName: actionName)
             model.mutate(unopened: "Open an archive before undoing.") { archive in
                 try archive.removeRelationship(id)
@@ -200,7 +200,7 @@ extension ArchiveModel {
         actionName: String
     ) {
         registerUndoStep(actionName: actionName) { model in
-            // Counterpart first — see *Undo across the actor hop* above.
+            // Counterpart first — see *Undo across the actor hop* in `ArchiveModel.swift`.
             model.registerRelationshipEdit(
                 of: id, to: redoTarget, redoingTo: target, actionName: actionName)
             model.mutate(unopened: "Open an archive before undoing.") { archive in

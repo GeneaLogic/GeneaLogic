@@ -4,15 +4,13 @@ import GeneaLogicExtract
 import GeneaLogicModel
 
 extension ArchiveModel {
-    // MARK: - People (conclusions, Phase 3)
+    // MARK: - People (conclusions, Phase 3): browse, read, reload
 
     /// Whether the people list is filtered — a non-blank people search.
     var isFilteringPeople: Bool { !personSearchText.trimmed.isEmpty }
 
     /// What the People tab shows: the full list, or the current search results.
     var displayedPersons: [PersonSummary] { isFilteringPeople ? personFilterResults : persons }
-
-    // MARK: - People (read + reload)
 
     /// The full `Person` record behind a browse summary, for the detail pane.
     /// `nil` if the archive isn't open or the id is unknown. The People analog of
@@ -155,7 +153,7 @@ extension ArchiveModel {
         of id: PersonID, to target: Person, redoingTo redoTarget: Person, actionName: String
     ) {
         registerUndoStep(actionName: actionName) { model in
-            // Counterpart first — see *Undo across the actor hop* above.
+            // Counterpart first — see *Undo across the actor hop* in `ArchiveModel.swift`.
             model.registerPersonEdit(
                 of: id, to: redoTarget, redoingTo: target, actionName: actionName)
             model.mutate(unopened: "Open an archive before undoing.") { archive in
@@ -192,7 +190,7 @@ extension ArchiveModel {
 
     /// Restores `person` and registers the redelete that reverses it.
     private func restorePerson(_ person: Person, actionName: String) {
-        // Counterpart first — see *Undo across the actor hop* above.
+        // Counterpart first — see *Undo across the actor hop* in `ArchiveModel.swift`.
         registerPersonRedelete(of: person.uid, actionName: actionName)
         mutate(unopened: "Open an archive before undoing.") { archive in
             try archive.restorePerson(person)
@@ -215,7 +213,7 @@ extension ArchiveModel {
     func registerPersonRedelete(of id: PersonID, actionName: String) {
         registerUndoStep(actionName: actionName) { model in
             let removed = PendingPerson()
-            // Counterpart first — see *Undo across the actor hop* above.
+            // Counterpart first — see *Undo across the actor hop* in `ArchiveModel.swift`.
             model.registerPersonRestore(pending: removed, actionName: actionName)
             model.mutate(unopened: "Open an archive before undoing.") { archive in
                 try archive.removePerson(id)
@@ -297,7 +295,7 @@ extension ArchiveModel {
     /// Reverts `decision` and registers the re-merge that reverses it — the body
     /// behind both registration variants.
     private func revertMerge(_ decision: MergeDecision, actionName: String) {
-        // Counterpart first — see *Undo across the actor hop* above.
+        // Counterpart first — see *Undo across the actor hop* in `ArchiveModel.swift`.
         registerMergeRedo(
             absorbed: decision.absorbed.uid, survivor: decision.survivor.uid,
             actionName: actionName)

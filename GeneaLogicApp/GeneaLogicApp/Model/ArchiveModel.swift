@@ -207,7 +207,8 @@ final class ArchiveModel {
     var incomingChangeStallThreshold: Duration = .seconds(600)
 
     /// When the current in-flight period began. `nil` means nothing is arriving,
-    /// and doubles as the gate on the poll's extra sweep above.
+    /// and doubles as the gate on the poll's extra sweep
+    /// (`refreshIfChangedExternally`).
     var deliveryInFlightSince: ContinuousClock.Instant?
 
     /// When `outstandingArrivals` last changed — the only progress this app can
@@ -743,8 +744,8 @@ final class ArchiveModel {
 
     // MARK: - Undo across the actor hop (slice 52)
     //
-    // Every `registerUndo` block below follows one rule, and it is the rule that
-    // makes undo survive the hop:
+    // Every `registerUndo` block in the domain files follows one rule, and it is
+    // the rule that makes undo survive the hop:
     //
     //     **Register the counterpart first, synchronously. Then mutate.**
     //
@@ -768,7 +769,7 @@ final class ArchiveModel {
 
     // MARK: - Undo grouping (slice 52, and its review)
 
-    /// **Every undo registration in this file goes through here.**
+    /// **Every undo registration in the model goes through here.**
     ///
     /// Chiefly so there is one place to reason about registration, which is what
     /// the async hop made subtle — and one place to have got the grouping

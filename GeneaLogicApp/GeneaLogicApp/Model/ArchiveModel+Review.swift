@@ -408,7 +408,7 @@ extension ArchiveModel {
     /// Undo for a dismissal: remove the record, which returns the pair to the queue.
     private func registerDismissalRemoval(_ dismissal: Dismissal, actionName: String) {
         registerUndoStep(actionName: actionName) { model in
-            // Counterpart first — see *Undo across the actor hop* above.
+            // Counterpart first — see *Undo across the actor hop* in `ArchiveModel.swift`.
             model.registerDismissalRestore(dismissal, actionName: actionName)
             model.mutate(unopened: "Open an archive before undoing.") { archive in
                 try archive.removeDismissal(dismissal.uid)
@@ -427,7 +427,7 @@ extension ArchiveModel {
 
     func registerDismissalRestore(_ dismissal: Dismissal, actionName: String) {
         registerUndoStep(actionName: actionName) { model in
-            // Counterpart first — see *Undo across the actor hop* above.
+            // Counterpart first — see *Undo across the actor hop* in `ArchiveModel.swift`.
             model.registerDismissalRemoval(dismissal, actionName: actionName)
             model.mutate(unopened: "Open an archive before undoing.") { archive in
                 try archive.restoreDismissal(dismissal)

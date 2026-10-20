@@ -30,6 +30,8 @@ extension ArchiveModel {
     /// Requests an inspector-visibility toggle from the menu bar.
     func requestInspectorToggle() { pendingInspectorToggle = true }
 
+    // MARK: - Adding media: the file importer and Continuity Camera
+
     /// Presents the importer in add-media mode (⌘I / + button): picked files
     /// become new artifacts.
     func beginAddMedia() {
@@ -168,17 +170,6 @@ extension ArchiveModel {
         rmdir(url.deletingLastPathComponent().path)
     }
 
-    /// Presents the integrity-report sheet (File ▸ Verify Integrity…). The sheet
-    /// runs the verification itself, off this synchronous call.
-    func beginVerifyIntegrity() {
-        isShowingIntegrityReport = true
-    }
-
-    /// Presents the trash sheet (File ▸ Show Trash…).
-    func beginShowTrash() {
-        isShowingTrash = true
-    }
-
     /// Presents the importer in attach mode: picked files are attached to the
     /// artifact `id` under the default role (the per-artifact "Attach File…"
     /// action in the detail view). The role is corrected afterward via the
@@ -208,6 +199,21 @@ extension ArchiveModel {
             if let url = urls.first { replaceFile(fileID, in: artifactID, with: url) }
         }
     }
+
+    // MARK: - Sheets
+
+    /// Presents the integrity-report sheet (File ▸ Verify Integrity…). The sheet
+    /// runs the verification itself, off this synchronous call.
+    func beginVerifyIntegrity() {
+        isShowingIntegrityReport = true
+    }
+
+    /// Presents the trash sheet (File ▸ Show Trash…).
+    func beginShowTrash() {
+        isShowingTrash = true
+    }
+
+    // MARK: - Navigation
 
     /// Requests a cross-tab jump to the People tab with `id` selected (the resolved-
     /// mention chip's tap). Sets the one-shot `pendingPersonNavigation` intent the
