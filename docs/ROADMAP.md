@@ -163,7 +163,7 @@ weighed on its own.
 | Slice | Contents |
 | --- | --- |
 | [**77**](slices/77-does-documentgroup-fit-the-engine.md) | Prototype: no-go on `DocumentGroup` |
-| **78** | Split `ArchiveModel.swift` by domain ([#19](https://github.com/GeneaLogic/GeneaLogic/issues/19)). Code moves into files, and model logic is separated from macOS-only UI. No new observable sub-models unless the scale slice's measurements call for them |
+| [**78**](slices/78-split-archivemodel-by-domain.md) | Split `ArchiveModel.swift` by domain ([#19](https://github.com/GeneaLogic/GeneaLogic/issues/19)). Code moves into files, and model logic is separated from macOS-only UI. No new observable sub-models unless the scale slice's measurements call for them |
 | **79** | Split `ArtifactDetailView.swift` ([#20](https://github.com/GeneaLogic/GeneaLogic/issues/20)) into `View` types that each take only the data they read, not computed `some View` sections |
 | **79b** | Row identity: editable lists are identified by `\.offset`, so a mid-list delete hands state to the wrong row. Mentions use `localRef`. Events, places, names and recorded facts get in-memory ids (not a format change) |
 | **80** | [#9](https://github.com/GeneaLogic/GeneaLogic/issues/9) (inspector and toolbar layering) |
