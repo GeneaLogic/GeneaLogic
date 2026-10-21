@@ -4324,19 +4324,23 @@ been two slices.
   artifact's second mention is `p2`), and the detail views outlive a selection change, so
   each list is `.id`'d by its record or a row's state follows it to the next one.
 
-- **80 — inspector and toolbar layering** (app only, one modifier; no format change).
-  **The decision:** the artifact inspector sits under the toolbar, as in Preview and Pages,
-  because it describes the artifact in the detail column. Xcode's runs full height because
-  it serves the whole window. **The finding:** the inspector never moved. In both of #9's
-  screenshots "Details" is at the same height. What changed was whether SwiftUI drew the
-  toolbar's scroll edge over it: never when the detail appeared with the inspector already
-  shown, sometimes after a hide and show. `scrollEdgeEffectStyle(.hard, for: .top)` on the
-  inspector's scroll view draws it every time. **Gotchas:** the obvious fixes don't touch
-  this. Presenting after appearance (at once or 50 ms later), wrapping the detail in a
-  `NavigationStack`, and `toolbarBackgroundVisibility(.visible, for: .windowToolbar)` all
-  left it full height with no edge. Screenshots can't measure it: the band and the
-  inspector differ by a few levels of grey in dark mode, so the visible signal is the hairline
-  divider. **Untested on macOS 26.**
+- **80 — inspector and toolbar layering** (app only; no format change). **The decision:**
+  the artifact inspector looks the same every time, with content clipped at the
+  toolbar's lower edge under a divider. That is closer to Preview and Pages, whose
+  inspector text never shows under the toolbar. **The finding: a SwiftUI bug**, shown
+  in a minimal app with none of our code. By default SwiftUI never puts an inspector
+  under the toolbar's edge: scrolled text shows sharp, with any placement or modifier
+  order. With `inspectorColumnWidth`, an animated re-show blurs it, but the first
+  appearance never does, and that difference is #9. **The workaround:** a
+  `.frame(minWidth:idealWidth:maxWidth:)` on the content in place of
+  `inspectorColumnWidth`, and `scrollEdgeEffectStyle(.hard, for: .top)`. It costs
+  the ideal width: the column ignores it and opens at about 280 pt, not 340. #9 stays
+  open for Apple. **Gotchas:** screenshots can't show it, since the toolbar band and
+  the inspector differ by a few levels of grey. The test that does: scroll the
+  inspector and see whether its text is sharp, clipped or blurred under the toolbar.
+  None of these reached the first appearance: presenting late, a `NavigationStack`,
+  toolbar items moved or removed, `toolbarBackgroundVisibility`, an in-code re-show
+  without animation, and AppKit's `allowsFullHeightLayout` (kept off, ignored).
 
 ## Carryovers and parked work
 

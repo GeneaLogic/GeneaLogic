@@ -77,7 +77,14 @@ struct ArtifactDetailView: View {
                 files: files, links: links, relationshipSuggestions: relationshipSuggestions,
                 selectedFileID: $selectedFileID, sheet: $sheet
             )
-            .inspectorColumnWidth(min: 280, ideal: 340, max: 480)
+            // **A frame, not `inspectorColumnWidth`** (slice 80). With
+            // `inspectorColumnWidth`, SwiftUI draws the toolbar's edge over the
+            // inspector after a hide and show but not when it first appears (#9), so
+            // the same inspector looked two different ways. Without it, SwiftUI draws
+            // it the same way every time. The frame keeps the 280 pt floor the field
+            // rows need. The column ignores the ideal width, so it opens at about 280,
+            // not 340.
+            .frame(minWidth: 280, idealWidth: 340, maxWidth: 480)
         }
         .toolbar {
             ToolbarItem {

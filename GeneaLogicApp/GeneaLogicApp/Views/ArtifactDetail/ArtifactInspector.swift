@@ -65,12 +65,13 @@ struct ArtifactInspector: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        // **The inspector sits under the toolbar, like Preview's and Pages'** (slice 80):
-        // it describes the artifact in the detail column, so it belongs at that
-        // column's level. The inspector always runs full height; what made it look
-        // in front of or behind the toolbar was whether SwiftUI drew the toolbar's
-        // edge over it, and that depended on how the inspector came to be shown (#9).
-        // A hard top edge draws the band and its divider every time.
+        // **Content stops at the toolbar's lower edge, as in Preview and Pages** (slice
+        // 80): the inspector describes the artifact in the detail column, so it sits
+        // at that column's level. SwiftUI always runs the column full height behind
+        // the toolbar (AppKit's `allowsFullHeightLayout` is ignored), and by default
+        // scrolled text shows sharply under the toolbar. A hard top edge clips it
+        // there, with a divider, every time. See `ArtifactDetailView` for why the
+        // width is a frame.
         .scrollEdgeEffectStyle(.hard, for: .top)
     }
 }

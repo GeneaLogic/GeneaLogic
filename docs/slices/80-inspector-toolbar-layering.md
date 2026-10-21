@@ -48,17 +48,37 @@ and the inspector starts below it, as in Preview.
    Moving `.inspector` outside the split view is ruled out by fork 1. **Alternative:** go
    straight to Feedback.
 
-   **Outcome:** the toolbar background changed nothing. Comparing #9's screenshots
-   showed why: the inspector is full height in both, and only the toolbar's scroll edge
-   over it differs. So the fix is a hard top scroll edge on the inspector's scroll view
-   (`scrollEdgeEffectStyle(.hard, for: .top)`), drawn the same way in every case
-   checked: relaunch, hide/show, tab switch. See SLICE-LOG.
+   **Outcome: a SwiftUI bug, worked around.** The toolbar background changed nothing.
+   A minimal SwiftUI app with none of our code showed the cause, using one check:
+   scroll the inspector and see whether its text shows sharp or blurred under the
+   toolbar.
+
+   - **By default the inspector never goes under the toolbar's edge.** Text shows sharp,
+     with the inspector on the detail or on the split view, in either modifier order.
+   - **`inspectorColumnWidth` changes that only on an animated re-show.** Text then
+     blurs (the toolbar's edge), but never on first appearance. An in-code re-show with
+     animation reproduces it, one without animation doesn't, and a very fast one left
+     the inspector hidden while its state said shown. That is #9.
+   - **Nothing reaches the first appearance.** That covers presenting late, a
+     `NavigationStack`, toolbar items inside the inspector or removed altogether, and
+     turning off AppKit's `allowsFullHeightLayout` on the inspector's split view item:
+     SwiftUI keeps the setting off but ignores it.
+
+   **Chosen: consistency.** `inspectorColumnWidth` is replaced by a frame on the
+   inspector's content (`minWidth: 280, idealWidth: 340, maxWidth: 480`), and a hard
+   top scroll edge (`scrollEdgeEffectStyle(.hard, for: .top)`) clips content at the
+   toolbar's lower edge, with a divider. It looks the same at launch and after a
+   re-show, which is closer to Preview and Pages, where inspector text never shows
+   under the toolbar. **The cost:** the column ignores the ideal width, so it opens at
+   about 280 pt rather than 340. **Not fixed:** the column still runs full height
+   behind the toolbar. #9 stays open for Apple's fix, with a Feedback report built from
+   the minimal app.
 
 ## Out of scope
 
-- **An empty glass capsule** sat in the toolbar beside **+** once, at 900×450, with the
-  inspector shown. It may be the same layout bug. If it outlives this slice, it goes to
-  the 81+ audit.
+- **An empty glass capsule** sometimes sits in the toolbar beside the inspector button
+  after a re-show. The minimal app shows it too, so it's SwiftUI's. It goes in the same
+  Feedback report, not the 81+ audit.
 - **The window's default size** (900×450). It's already an 81+ candidate.
 
 ## Verification
@@ -71,7 +91,9 @@ sits the same way in each case:
 2. Hide and show the inspector from the toolbar, and from View ▸ Show Inspector.
 3. Switch to People and back.
 4. Quit and relaunch with the inspector shown (scene restoration).
-5. A short window (inspector scrolls) and a tall one (it doesn't).
-6. Open a sheet (Edit Transcript…), close it.
+5. A short window (inspector scrolls) and a tall one (it doesn't). Scroll the
+   inspector: its text is clipped at the toolbar's lower edge every time.
+6. Drag the inspector narrower: it stops at about 280 pt, before the field rows cramp.
+7. Open a sheet (Edit Transcript…), close it.
 
 `xcodebuild test` stays green; nothing in the engine changes, so no Linux run.
