@@ -62,6 +62,17 @@ struct ArtifactDetailView: View {
     /// to visible so a fresh window shows the metadata beside the document.
     @SceneStorage("inspectorShown") private var inspectorShown: Bool = true
 
+    /// The inspector's width, as the user last left it (slice 80). SwiftUI rebuilds the
+    /// column on every hide and show, and on every tab switch (this view is recreated),
+    /// and a rebuilt column opens at its `ideal` width. So the width is recorded here
+    /// and handed back as `ideal`. Per-window and restored across relaunch, like
+    /// `inspectorShown`.
+    @SceneStorage("inspectorWidth") private var inspectorWidth: Double = Self.inspectorWidths.ideal
+
+    /// The inspector column's range. `ideal` is only the first-launch width; after that
+    /// the column opens at `inspectorWidth`.
+    private static let inspectorWidths = (min: 280.0, ideal: 340.0, max: 480.0)
+
     var body: some View {
         ArtifactDocumentPane(
             artifactID: artifact.uid, title: artifact.title, files: files,
@@ -77,7 +88,19 @@ struct ArtifactDetailView: View {
                 files: files, links: links, relationshipSuggestions: relationshipSuggestions,
                 selectedFileID: $selectedFileID, sheet: $sheet
             )
-            .inspectorColumnWidth(min: 280, ideal: 340, max: 480)
+            // Only widths inside the column's range are kept, so a width read
+            // while the column animates in or out can't be saved.
+            .onGeometryChange(for: Double.self) { $0.size.width } action: { width in
+                let range = Self.inspectorWidths
+                if width >= range.min && width <= range.max { inspectorWidth = width }
+            }
+            // **Keep this, even though it is half of #9's trigger** (slice 80). It is
+            // the only API that sets the column's resize range: a content frame in its
+            // place (tried) left the column a few points of play and ignored the ideal
+            // width. #9 is worked around in `ArtifactInspector` instead.
+            .inspectorColumnWidth(
+                min: Self.inspectorWidths.min, ideal: inspectorWidth,
+                max: Self.inspectorWidths.max)
         }
         .toolbar {
             ToolbarItem {

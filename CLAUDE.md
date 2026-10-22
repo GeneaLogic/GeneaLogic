@@ -141,7 +141,9 @@ skill, which wraps this.
   hand-test against), `render-sample-pages.swift` (the sample's page images; macOS), `linux-test.sh`, `update-sqlite.sh`, `kill-test.sh` (`kill -9` a `genea` mid-write, then
   check every open — slice 65's out-of-process half), `stage-50c-handtest.sh` (the four
   conflicted-copy shapes 50c's app hand-test starts from), `scrub-check.sh` (no real
-  family name in the tree; the denylist is private, outside the repo).
+  family name in the tree; the denylist is private, outside the repo),
+  `inspector-edge-repro/` (the SwiftUI bug behind slice 80's inspector workaround; its
+  README says when the workaround can go).
 
 ## How work is scoped
 
