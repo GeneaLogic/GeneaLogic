@@ -64,15 +64,21 @@ and the inspector starts below it, as in Preview.
      turning off AppKit's `allowsFullHeightLayout` on the inspector's split view item:
      SwiftUI keeps the setting off but ignores it.
 
-   **Chosen: consistency.** `inspectorColumnWidth` is replaced by a frame on the
-   inspector's content (`minWidth: 280, idealWidth: 340, maxWidth: 480`), and a hard
-   top scroll edge (`scrollEdgeEffectStyle(.hard, for: .top)`) clips content at the
-   toolbar's lower edge, with a divider. It looks the same at launch and after a
-   re-show, which is closer to Preview and Pages, where inspector text never shows
-   under the toolbar. **The cost:** the column ignores the ideal width, so it opens at
-   about 280 pt rather than 340. **Not fixed:** the column still runs full height
-   behind the toolbar. #9 stays open for Apple's fix, with a Feedback report built from
-   the minimal app.
+   **Chosen: content never goes under the toolbar.** The inspector's scroll view sits
+   in a container that respects the top safe area and clips
+   (`VStack { … }.clipped()`), with the scroll view's own top edge effect hidden. So
+   nothing is drawn under the toolbar for the bug to show sharp or blurred, and content
+   stops at the toolbar's lower edge, as in Preview and Pages. `inspectorColumnWidth`
+   stays, because it is the only thing that sets the column's resize range: without it
+   the range shrank to a few points. Two rejected steps on the way:
+   - **A hard top edge** (`scrollEdgeEffectStyle(.hard)`) drew a divider the rest of the
+     toolbar doesn't have.
+   - **A frame in place of `inspectorColumnWidth`** lost both the ideal width and the
+     resize range.
+
+   **Not fixed:** the column still runs full height behind the toolbar, and the empty
+   band over it may differ slightly in tint after a re-show. #9 stays open for Apple's
+   fix, with a Feedback report built from the minimal app.
 
 ## Out of scope
 
@@ -92,8 +98,8 @@ sits the same way in each case:
 3. Switch to People and back.
 4. Quit and relaunch with the inspector shown (scene restoration).
 5. A short window (inspector scrolls) and a tall one (it doesn't). Scroll the
-   inspector: its text is clipped at the toolbar's lower edge every time.
-6. Drag the inspector narrower: it stops at about 280 pt, before the field rows cramp.
+   inspector: its text stops at the toolbar's lower edge every time, with no divider.
+6. Drag the inspector's edge: it resizes between 280 and 480 pt.
 7. Open a sheet (Edit Transcript…), close it.
 
 `xcodebuild test` stays green; nothing in the engine changes, so no Linux run.

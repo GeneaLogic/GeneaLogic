@@ -25,6 +25,20 @@ struct ArtifactInspector: View {
     @Binding var sheet: ArtifactSheet?
 
     var body: some View {
+        // **Content stops at the toolbar's lower edge, as in Preview and Pages** (slice
+        // 80). SwiftUI runs the inspector column full height behind the toolbar, and
+        // whether it then draws the toolbar's edge over scrolled content depends on
+        // how the inspector came to be shown (#9): sharp text under the toolbar at
+        // first, blurred after a hide and show. So the content never goes there. The
+        // container respects the top safe area and clips, and the scroll view's own
+        // edge effect is off, so nothing is drawn under the toolbar to differ.
+        VStack(spacing: 0) {
+            content.scrollEdgeEffectHidden(true, for: .top)
+        }
+        .clipped()
+    }
+
+    private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Details")
@@ -65,14 +79,6 @@ struct ArtifactInspector: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        // **Content stops at the toolbar's lower edge, as in Preview and Pages** (slice
-        // 80): the inspector describes the artifact in the detail column, so it sits
-        // at that column's level. SwiftUI always runs the column full height behind
-        // the toolbar (AppKit's `allowsFullHeightLayout` is ignored), and by default
-        // scrolled text shows sharply under the toolbar. A hard top edge clips it
-        // there, with a divider, every time. See `ArtifactDetailView` for why the
-        // width is a frame.
-        .scrollEdgeEffectStyle(.hard, for: .top)
     }
 }
 

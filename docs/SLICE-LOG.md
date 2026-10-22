@@ -4325,22 +4325,23 @@ been two slices.
   each list is `.id`'d by its record or a row's state follows it to the next one.
 
 - **80 — inspector and toolbar layering** (app only; no format change). **The decision:**
-  the artifact inspector looks the same every time, with content clipped at the
-  toolbar's lower edge under a divider. That is closer to Preview and Pages, whose
-  inspector text never shows under the toolbar. **The finding: a SwiftUI bug**, shown
-  in a minimal app with none of our code. By default SwiftUI never puts an inspector
-  under the toolbar's edge: scrolled text shows sharp, with any placement or modifier
-  order. With `inspectorColumnWidth`, an animated re-show blurs it, but the first
-  appearance never does, and that difference is #9. **The workaround:** a
-  `.frame(minWidth:idealWidth:maxWidth:)` on the content in place of
-  `inspectorColumnWidth`, and `scrollEdgeEffectStyle(.hard, for: .top)`. It costs
-  the ideal width: the column ignores it and opens at about 280 pt, not 340. #9 stays
-  open for Apple. **Gotchas:** screenshots can't show it, since the toolbar band and
-  the inspector differ by a few levels of grey. The test that does: scroll the
-  inspector and see whether its text is sharp, clipped or blurred under the toolbar.
-  None of these reached the first appearance: presenting late, a `NavigationStack`,
-  toolbar items moved or removed, `toolbarBackgroundVisibility`, an in-code re-show
-  without animation, and AppKit's `allowsFullHeightLayout` (kept off, ignored).
+  inspector content never goes under the toolbar. It stops at the toolbar's lower edge,
+  as in Preview and Pages, the same way every time. **The finding: a SwiftUI bug**,
+  shown in a minimal app with none of our code. By default SwiftUI never puts an
+  inspector under the toolbar's edge: scrolled text shows sharp, with any placement or
+  modifier order. With `inspectorColumnWidth`, an animated re-show blurs it, but the
+  first appearance never does, and that difference is #9. **The workaround:** the scroll
+  view sits in a container that respects the top safe area and clips, with its top edge
+  effect hidden, so there is nothing under the toolbar to differ. #9 stays open for Apple.
+  **Rejected:** a hard scroll edge (it draws a divider the rest of the toolbar doesn't
+  have), and dropping `inspectorColumnWidth` (the resize range shrinks to a few points:
+  it is the only API that sets it). **Gotchas:** screenshots can't show it, since the
+  toolbar band and the inspector differ by a few levels of grey. The test that does:
+  scroll the inspector and see whether its text is sharp, clipped or blurred under the
+  toolbar. None of these reached the first appearance: presenting late, a
+  `NavigationStack`, toolbar items moved or removed, `toolbarBackgroundVisibility`, an
+  in-code re-show without animation, and AppKit's `allowsFullHeightLayout` (kept off,
+  ignored).
 
 ## Carryovers and parked work
 
