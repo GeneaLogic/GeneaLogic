@@ -88,6 +88,15 @@ and the inspector starts below it, as in Preview.
    `scripts/inspector-edge-repro/`. Its README says how to tell when the workaround can
    go.
 
+## The inspector's width is remembered
+
+*(Added after the hand-test, on the user's call: found there, same view.)* The column
+reopened at its ideal width after a hide and show, a tab switch or a relaunch, because
+SwiftUI rebuilds it each time and nothing recorded the width the user dragged to. The
+width is now kept per window in `@SceneStorage`, like the inspector's visibility, and
+passed to `inspectorColumnWidth` as `ideal`. It is clamped to 280–480 pt, so a width
+read mid-animation can't be saved.
+
 ## Out of scope
 
 - **An empty glass capsule** sometimes sits in the toolbar beside the inspector button
@@ -107,7 +116,8 @@ sits the same way in each case:
 4. Quit and relaunch with the inspector shown (scene restoration).
 5. A short window (inspector scrolls) and a tall one (it doesn't). Scroll the
    inspector: its text stops at the toolbar's lower edge every time, with no divider.
-6. Drag the inspector's edge: it resizes between 280 and 480 pt.
+6. Drag the inspector's edge: it resizes between 280 and 480 pt, and keeps that width
+   through a hide and show, a tab switch and a relaunch.
 7. Open a sheet (Edit Transcript…), close it.
 
 `xcodebuild test` stays green; nothing in the engine changes, so no Linux run.

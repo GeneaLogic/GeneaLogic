@@ -4337,7 +4337,9 @@ been two slices.
   toolbar to differ. **Rejected:** a hard scroll edge (it draws a divider the rest of
   the toolbar doesn't have); dropping `inspectorColumnWidth` (the resize range shrinks
   to a few points: it is the only API that sets it); `VStack { … }.clipped()` (it cuts
-  every edge). **Gotchas:** screenshots can't show it, since the
+  every edge). **Added from the hand-test:** the width is remembered per window
+  (`@SceneStorage`, fed back as `ideal`), because SwiftUI rebuilds the column at
+  `ideal` on every show and tab switch. **Gotchas:** screenshots can't show it, since the
   toolbar band and the inspector differ by a few levels of grey. The test that does:
   scroll the inspector and see whether its text is sharp, clipped or blurred under the
   toolbar. None of these reached the first appearance: presenting late, a
