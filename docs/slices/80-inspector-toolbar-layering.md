@@ -44,7 +44,7 @@ and the inspector starts below it, as in Preview.
    (`toolbarBackgroundVisibility(.visible, for: .windowToolbar)`), so the band is drawn
    the same way whatever the inspector does. Keep it if it is consistent across every
    case under *Verification*. If not, file Feedback with a minimal repro that says our
-   placement is the documented one, write that up here, and close #9 as upstream.
+   placement is the documented one, and write that up here.
    Moving `.inspector` outside the split view is ruled out by fork 1. **Alternative:** go
    straight to Feedback.
 
@@ -53,8 +53,9 @@ and the inspector starts below it, as in Preview.
    scroll the inspector and see whether its text shows sharp or blurred under the
    toolbar.
 
-   - **By default the inspector never goes under the toolbar's edge.** Text shows sharp,
-     with the inspector on the detail or on the split view, in either modifier order.
+   - **The column always runs full height, behind the toolbar, and by default the
+     toolbar's edge effect never covers it.** Scrolled text shows sharp, with the
+     inspector on the detail or on the split view, in either modifier order.
    - **`inspectorColumnWidth` changes that only on an animated re-show.** Text then
      blurs (the toolbar's edge), but never on first appearance. An in-code re-show with
      animation reproduces it, one without animation doesn't, and a very fast one left
@@ -64,21 +65,28 @@ and the inspector starts below it, as in Preview.
      turning off AppKit's `allowsFullHeightLayout` on the inspector's split view item:
      SwiftUI keeps the setting off but ignores it.
 
-   **Chosen: content never goes under the toolbar.** The inspector's scroll view sits
-   in a container that respects the top safe area and clips
-   (`VStack { … }.clipped()`), with the scroll view's own top edge effect hidden. So
+   **Chosen: content never goes under the toolbar.** The scroll view's frame stops at
+   the toolbar's lower edge but its content draws past it. A mask sized to that frame,
+   reaching past the bottom edge only (`.mask { Rectangle().ignoresSafeArea(.container,
+   edges: .bottom) }`), cuts the top overflow, and the top edge effect is hidden. So
    nothing is drawn under the toolbar for the bug to show sharp or blurred, and content
-   stops at the toolbar's lower edge, as in Preview and Pages. `inspectorColumnWidth`
-   stays, because it is the only thing that sets the column's resize range: without it
-   the range shrank to a few points. Two rejected steps on the way:
+   stops at the toolbar's lower edge, as in Preview and Pages. The bottom is unchanged:
+   a bottom banner shrinks the whole split view, so content never ran under it.
+   `inspectorColumnWidth` stays, because it is the only thing that sets the column's
+   resize range: without it the range shrank to a few points. Three rejected steps on
+   the way:
    - **A hard top edge** (`scrollEdgeEffectStyle(.hard)`) drew a divider the rest of the
      toolbar doesn't have.
    - **A frame in place of `inspectorColumnWidth`** lost both the ideal width and the
      resize range.
+   - **`VStack { … }.clipped()`** worked, but clipped every edge where only the top
+     was meant. Tests showed `.clipped()` did the work: the `VStack` alone left text
+     under the toolbar.
 
    **Not fixed:** the column still runs full height behind the toolbar, and the empty
-   band over it may differ slightly in tint after a re-show. #9 stays open for Apple's
-   fix, with a Feedback report built from the minimal app.
+   band over it may differ slightly in tint after a re-show. The minimal app is
+   `scripts/inspector-edge-repro/`. Its README says how to tell when the workaround can
+   go.
 
 ## Out of scope
 

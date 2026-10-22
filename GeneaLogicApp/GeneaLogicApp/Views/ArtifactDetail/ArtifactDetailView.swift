@@ -77,6 +77,10 @@ struct ArtifactDetailView: View {
                 files: files, links: links, relationshipSuggestions: relationshipSuggestions,
                 selectedFileID: $selectedFileID, sheet: $sheet
             )
+            // **Keep this, even though it is half of #9's trigger** (slice 80). It is
+            // the only API that sets the column's resize range: a content frame in its
+            // place (tried) left the column a few points of play and ignored the ideal
+            // width. #9 is worked around in `ArtifactInspector` instead.
             .inspectorColumnWidth(min: 280, ideal: 340, max: 480)
         }
         .toolbar {
