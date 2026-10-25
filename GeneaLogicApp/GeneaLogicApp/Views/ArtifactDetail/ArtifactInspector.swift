@@ -25,6 +25,27 @@ struct ArtifactInspector: View {
     @Binding var sheet: ArtifactSheet?
 
     var body: some View {
+        // **Content stops at the toolbar's lower edge, as in Preview and Pages** (slice
+        // 80). SwiftUI lays the inspector column out full height, behind the toolbar,
+        // and lets the scroll view draw up into it. Whether the toolbar's edge effect
+        // then covers that content depends on how the inspector came to be shown (#9):
+        // sharp text under the toolbar at first, blurred after a hide and show. So the
+        // content never goes there. The scroll view's frame stops at the toolbar's
+        // lower edge even though it draws past it, so clipping to the frame cuts the
+        // overflow (the sides and bottom never draw past it), and the content shape
+        // keeps controls hidden under the toolbar from taking clicks.
+        //
+        // **The three lines are one workaround, removed together** when the repro in
+        // `scripts/inspector-edge-repro/` shows Apple has fixed #9. With the clip gone,
+        // the hidden edge effect would leave content under the toolbar with no backing
+        // at all.
+        content
+            .scrollEdgeEffectHidden(true, for: .top)
+            .clipped()
+            .contentShape(Rectangle())
+    }
+
+    private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Details")
