@@ -91,11 +91,10 @@ import Testing
             // the suites run in parallel — a *timing* flake, not a behaviour
             // change, is the kind most likely to be re-diagnosed as a real bug.
             try await Self.untilBlocked(archive)
-            let deadline = ContinuousClock.now + .seconds(10)
-            while !model.isWaitingOnAnotherProcess && ContinuousClock.now < deadline {
-                try? await Task.sleep(for: .milliseconds(20))
+            let shown = await AppTestSupport.poll(every: .milliseconds(20)) {
+                model.isWaitingOnAnotherProcess
             }
-            #expect(model.isWaitingOnAnotherProcess)
+            #expect(shown)
         }
 
         await model.settle()
@@ -191,10 +190,9 @@ import Testing
     /// Reads `isWaitingForAnotherProcess`, which takes none of the archive's
     /// locks, so it answers while the write is blocked.
     private static func untilBlocked(_ archive: Archive) async throws {
-        let deadline = ContinuousClock.now + .seconds(10)
-        while !archive.isWaitingForAnotherProcess && ContinuousClock.now < deadline {
-            try? await Task.sleep(for: .milliseconds(20))
+        let blocked = await AppTestSupport.poll(every: .milliseconds(20)) {
+            archive.isWaitingForAnotherProcess
         }
-        try #require(archive.isWaitingForAnotherProcess, "the write never reached the lock")
+        try #require(blocked, "the write never reached the lock")
     }
 }
