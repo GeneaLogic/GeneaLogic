@@ -31,13 +31,18 @@ struct ArtifactInspector: View {
         // then covers that content depends on how the inspector came to be shown (#9):
         // sharp text under the toolbar at first, blurred after a hide and show. So the
         // content never goes there. The scroll view's frame stops at the toolbar's
-        // lower edge even though it draws past it, so a mask sized to the frame cuts
-        // the overflow. The mask reaches past the bottom edge, so only the top is cut.
-        // The edge effect is hidden because it would otherwise draw over the cut.
-        // Checked against a minimal repro: `scripts/inspector-edge-repro/`.
+        // lower edge even though it draws past it, so clipping to the frame cuts the
+        // overflow (the sides and bottom never draw past it), and the content shape
+        // keeps controls hidden under the toolbar from taking clicks.
+        //
+        // **The three lines are one workaround, removed together** when the repro in
+        // `scripts/inspector-edge-repro/` shows Apple has fixed #9. With the clip gone,
+        // the hidden edge effect would leave content under the toolbar with no backing
+        // at all.
         content
             .scrollEdgeEffectHidden(true, for: .top)
-            .mask { Rectangle().ignoresSafeArea(.container, edges: .bottom) }
+            .clipped()
+            .contentShape(Rectangle())
     }
 
     private var content: some View {

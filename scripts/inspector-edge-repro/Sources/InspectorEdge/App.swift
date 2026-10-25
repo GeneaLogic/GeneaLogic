@@ -20,7 +20,8 @@ struct InspectorRows: View {
         if workaround {
             rows
                 .scrollEdgeEffectHidden(true, for: .top)
-                .mask { Rectangle().ignoresSafeArea(.container, edges: .bottom) }
+                .clipped()
+                .contentShape(Rectangle())
         } else {
             rows
         }

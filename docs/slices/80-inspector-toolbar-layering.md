@@ -66,22 +66,21 @@ and the inspector starts below it, as in Preview.
      SwiftUI keeps the setting off but ignores it.
 
    **Chosen: content never goes under the toolbar.** The scroll view's frame stops at
-   the toolbar's lower edge but its content draws past it. A mask sized to that frame,
-   reaching past the bottom edge only (`.mask { Rectangle().ignoresSafeArea(.container,
-   edges: .bottom) }`), cuts the top overflow, and the top edge effect is hidden. So
-   nothing is drawn under the toolbar for the bug to show sharp or blurred, and content
-   stops at the toolbar's lower edge, as in Preview and Pages. The bottom is unchanged:
-   a bottom banner shrinks the whole split view, so content never ran under it.
-   `inspectorColumnWidth` stays, because it is the only thing that sets the column's
-   resize range: without it the range shrank to a few points. Three rejected steps on
-   the way:
+   the toolbar's lower edge but its content draws past it, so clipping to the frame cuts
+   the overflow (`.clipped()`, with `.contentShape(Rectangle())` so hidden controls take
+   no clicks), and the top edge effect is hidden. Nothing is drawn under the toolbar for
+   the bug to show sharp or blurred, and content stops at the toolbar's lower edge, as
+   in Preview and Pages. The sides and bottom never draw past the frame: a bottom banner
+   shrinks the whole split view. `inspectorColumnWidth` stays, because it is the only
+   thing that sets the column's resize range: without it the range shrank to a few
+   points. Rejected on the way:
    - **A hard top edge** (`scrollEdgeEffectStyle(.hard)`) drew a divider the rest of the
      toolbar doesn't have.
    - **A frame in place of `inspectorColumnWidth`** lost both the ideal width and the
      resize range.
-   - **`VStack { … }.clipped()`** worked, but clipped every edge where only the top
-     was meant. Tests showed `.clipped()` did the work: the `VStack` alone left text
-     under the toolbar.
+   - **`VStack { … }.clipped()`**, then **a mask reaching past the bottom edge**: the
+     first read as clipping every edge, the second rendered offscreen. Tests showed a
+     clip on the scroll view itself does the same job.
 
    **Not fixed:** the column still runs full height behind the toolbar, and the empty
    band over it may differ slightly in tint after a re-show. The minimal app is
@@ -94,8 +93,11 @@ and the inspector starts below it, as in Preview.
 reopened at its ideal width after a hide and show, a tab switch or a relaunch, because
 SwiftUI rebuilds it each time and nothing recorded the width the user dragged to. The
 width is now kept per window in `@SceneStorage`, like the inspector's visibility, and
-passed to `inspectorColumnWidth` as `ideal`. It is clamped to 280–480 pt, so a width
-read mid-animation can't be saved.
+passed to `inspectorColumnWidth` as `ideal`. It is saved once it settles (half a second
+without change), when the inspector hides, or when the view goes away; never while the
+inspector is hiding, and never outside 280–480 pt. Saving on every frame would re-render
+the whole detail view and rewrite `ideal` mid-drag. A width SwiftUI imposes and holds,
+such as one narrowed by a narrower window, is saved too: nothing tells it from a drag.
 
 ## Out of scope
 

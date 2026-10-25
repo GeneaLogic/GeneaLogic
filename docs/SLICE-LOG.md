@@ -4325,27 +4325,22 @@ been two slices.
   each list is `.id`'d by its record or a row's state follows it to the next one.
 
 - **80 — inspector and toolbar layering** (app only; no format change). **The decision:**
-  inspector content never goes under the toolbar. It stops at the toolbar's lower edge,
-  as in Preview and Pages, the same way every time. **The finding: a SwiftUI bug**,
-  shown in a minimal app with none of our code (`scripts/inspector-edge-repro/`). The
-  column always runs full height behind the toolbar, and by default the toolbar's edge
-  effect never covers it: scrolled text shows sharp, with any placement or modifier
-  order. With `inspectorColumnWidth`, an animated re-show brings the edge effect (the
-  text blurs), but the first appearance never does, and that difference is #9. **The
-  workaround:** a mask sized to the scroll view's frame cuts content at the toolbar's
-  lower edge, top only, with the top edge effect hidden, so nothing is drawn under the
-  toolbar to differ. **Rejected:** a hard scroll edge (it draws a divider the rest of
-  the toolbar doesn't have); dropping `inspectorColumnWidth` (the resize range shrinks
-  to a few points: it is the only API that sets it); `VStack { … }.clipped()` (it cuts
-  every edge). **Added from the hand-test:** the width is remembered per window
-  (`@SceneStorage`, fed back as `ideal`), because SwiftUI rebuilds the column at
-  `ideal` on every show and tab switch. **Gotchas:** screenshots can't show it, since the
-  toolbar band and the inspector differ by a few levels of grey. The test that does:
-  scroll the inspector and see whether its text is sharp, clipped or blurred under the
-  toolbar. None of these reached the first appearance: presenting late, a
-  `NavigationStack`, toolbar items moved or removed, `toolbarBackgroundVisibility`, an
-  in-code re-show without animation, and AppKit's `allowsFullHeightLayout` (kept off,
-  ignored).
+  inspector content never goes under the toolbar: it stops at the toolbar's lower edge,
+  as in Preview and Pages, the same way every time. **The finding: a SwiftUI bug**
+  (repro in `scripts/inspector-edge-repro/`). The column always runs full height behind
+  the toolbar, and by default the toolbar's edge effect never covers it. With
+  `inspectorColumnWidth`, an animated re-show brings the edge effect, but the first
+  appearance never does: that difference is #9. **The workaround:** clip the scroll
+  view to its frame, which stops at the toolbar, give it a matching content shape, and
+  hide the top edge effect. The three go together. `inspectorColumnWidth` stays: it is
+  the only API that sets the resize range. **From the hand-test:** the width is saved
+  per window in `@SceneStorage` once it settles, and fed back as `ideal`, because
+  SwiftUI rebuilds the column at `ideal` on every show and tab switch. **Gotchas:**
+  screenshots can't show the bug (a few levels of grey); scrolling the inspector and
+  seeing whether text is sharp, clipped or blurred under the toolbar can. Nothing
+  reached the first appearance: presenting late, a `NavigationStack`, moving or removing
+  toolbar items, `toolbarBackgroundVisibility`, an in-code re-show without animation,
+  or AppKit's `allowsFullHeightLayout` (kept off, ignored).
 
 ## Carryovers and parked work
 
