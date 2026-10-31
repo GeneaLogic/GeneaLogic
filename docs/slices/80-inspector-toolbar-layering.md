@@ -85,7 +85,7 @@ and the inspector starts below it, as in Preview.
    **Not fixed:** the column still runs full height behind the toolbar, and the empty
    band over it may differ slightly in tint after a re-show. The minimal app is
    `scripts/inspector-edge-repro/`. Its README says how to tell when the workaround can
-   go.
+   go. So #9 stays open, parked, for Apple's fix (FB25320177).
 
 ## The inspector's width is remembered
 
