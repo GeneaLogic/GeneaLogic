@@ -102,8 +102,9 @@ such as one narrowed by a narrower window, is saved too: nothing tells it from a
 ## Out of scope
 
 - **An empty glass capsule** sometimes sits in the toolbar beside the inspector button
-  after a re-show. The minimal app shows it too, so it's SwiftUI's. It goes in the same
-  Feedback report, not the 81+ audit.
+  after a re-show. *(Later, by hand:)* it is the toolbar's overflow button, shown
+  briefly when the inspector opens in a narrow window, and stuck once. Seen only in the
+  minimal app, never in GeneaLogic, so left alone and not reported.
 - **The window's default size** (900×450). It's already an 81+ candidate.
 
 ## Verification
