@@ -49,8 +49,19 @@ struct ContentView: View {
     }
 }
 
+// A bare executable isn't a regular app, so `swift run` can leave the window behind
+// the terminal, or never show it. Not part of the bug.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate()
+    }
+}
+
 @main
 struct InspectorEdgeApp: App {
+    @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
+
     var body: some Scene {
         WindowGroup { ContentView().frame(minWidth: 900, minHeight: 500) }
     }
