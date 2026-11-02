@@ -85,7 +85,7 @@ and the inspector starts below it, as in Preview.
    **Not fixed:** the column still runs full height behind the toolbar, and the empty
    band over it may differ slightly in tint after a re-show. The minimal app is
    `scripts/inspector-edge-repro/`. Its README says how to tell when the workaround can
-   go.
+   go. So #9 stays open, parked, for Apple's fix (FB25320177).
 
 ## The inspector's width is remembered
 
@@ -102,8 +102,9 @@ such as one narrowed by a narrower window, is saved too: nothing tells it from a
 ## Out of scope
 
 - **An empty glass capsule** sometimes sits in the toolbar beside the inspector button
-  after a re-show. The minimal app shows it too, so it's SwiftUI's. It goes in the same
-  Feedback report, not the 81+ audit.
+  after a re-show. *(Later, by hand:)* it is the toolbar's overflow button, shown
+  briefly when the inspector opens in a narrow window, and stuck once. Seen only in the
+  minimal app, never in GeneaLogic, so left alone and not reported.
 - **The window's default size** (900×450). It's already an 81+ candidate.
 
 ## Verification

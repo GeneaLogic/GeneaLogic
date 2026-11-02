@@ -4333,7 +4333,8 @@ been two slices.
   appearance never does: that difference is #9. **The workaround:** clip the scroll
   view to its frame, which stops at the toolbar, give it a matching content shape, and
   hide the top edge effect. The three go together. `inspectorColumnWidth` stays: it is
-  the only API that sets the resize range. **From the hand-test:** the width is saved
+  the only API that sets the resize range. #9 stays open, parked, for Apple's fix
+  (FB25320177). **From the hand-test:** the width is saved
   per window in `@SceneStorage` once it settles, and fed back as `ideal`, because
   SwiftUI rebuilds the column at `ideal` on every show and tab switch. **Gotchas:**
   screenshots can't show the bug (a few levels of grey); scrolling the inspector and

@@ -17,7 +17,7 @@ the workaround in `ArtifactInspector`.
 **When to drop the workaround:** when a plain run looks the same before and after a
 hide and show. Drop all three lines together (`scrollEdgeEffectHidden`, `clipped`,
 `contentShape`): the hidden edge effect without the clip leaves content under the
-toolbar with no backing at all. This repro is what Apple's Feedback report is built
-from, and its FB number belongs on #9.
+toolbar with no backing at all. This repro is what Apple's Feedback report
+(FB25320177) is built from. #9 stays open, parked, until Apple fixes it.
 
 Not built by CI. macOS 26 or later.
