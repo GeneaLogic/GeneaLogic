@@ -14,7 +14,7 @@ design, plan, history — lives in `docs/` and is read on demand.
 | What did slice N specify? | `docs/slices/<n>-*.md` — one file per slice, written **before** it is built ([index](docs/slices/README.md)) |
 | What did slice N decide, and what bit us? | [`docs/SLICE-LOG.md`](docs/SLICE-LOG.md) |
 | What does the on-disk format say? | `GeneaLogicKit/schema/genealogic-archive-1.0.md` — **and its byte-identical copy** in `GeneaLogicKit/Sources/GeneaLogicArchive/Resources/` (`SchemaSpecTests` enforces both) |
-| What UI debt was triaged? | [`docs/UI-AUDIT.md`](docs/UI-AUDIT.md) (F1–F14, all worked) |
+| What UI debt was triaged? | [`docs/UI-AUDIT.md`](docs/UI-AUDIT.md) (F1–F14, all worked); [`docs/slices/workstream-5-ui-audit.md`](docs/slices/workstream-5-ui-audit.md) (G1–G24) |
 
 **Read ARCHITECTURE and ROADMAP before making design decisions.** Don't restate status
 here — a second copy of "where we are" only ever goes stale.

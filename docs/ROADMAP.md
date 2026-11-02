@@ -167,7 +167,7 @@ weighed on its own.
 | [**79**](slices/79-split-artifactdetailview.md) | Split `ArtifactDetailView.swift` ([#20](https://github.com/GeneaLogic/GeneaLogic/issues/20)) into `View` types that each take only the data they read, not computed `some View` sections |
 | [**79b**](slices/79b-row-identity.md) | Row identity: editable lists were identified by `\.offset`, so a mid-list delete handed state to the wrong row. A row is now identified by its value (a mention by `localRef`), a write finds its element by value, and focus comes back to an edited row. Not a format change |
 | [**80**](slices/80-inspector-toolbar-layering.md) | Works around [#9](https://github.com/GeneaLogic/GeneaLogic/issues/9) (inspector and toolbar layering), a SwiftUI bug reported as FB25320177. #9 stays open, parked, for Apple's fix |
-| **81+** | **The audit:** a second [UI audit](UI-AUDIT.md) (G1…), from the user's notes, a run-through of the sample archive, Apple's HIG and SwiftUI guidance. Candidates so far: default and minimum window size (it opens at 900×450), the extension in the window title, File ▸ Open Recent from the system's recent-items list instead of `ArchiveBookmarks`, window tabs (switched off because they crash), Quick Look on Space, Help and About, copy and paste, context menus that match the menu bar, menu items disabled when they can't act (Artifact ▸ Edit Transcript… while another sheet is up: 79 ignores the command, but the item still looks live), full keyboard access and VoiceOver, live undo action names, the archive's own undo stack (77 showed it works, and it fixes slice 52's grouping), and an archive reopening the way it was left (tab, selections, the inspector's visibility and width, the window frame): all of it is `@SceneStorage` today, which only a relaunch restores. It belongs on the machine, keyed by the archive, not in the archive |
+| [**81–89**](slices/workstream-5-ui-audit.md) | **The audit:** a second UI audit (G1–G24) from the user's notes, a run-through of the sample archive, Apple's HIG and SwiftUI guidance. Its ladder: small ones (81); the menu bar as the command map (82–83); the tab switcher (84); window and document lifecycle (85); a visible trash (86); copy and Quick Look (87); the document icon (88); accessibility (89) |
 
 The rest of `0.1` is outside the Mac pass, and can go before or between its slices: making
 GeneaLogicKit a SwiftPM URL dependency and quieting its cold build ([#17](https://github.com/GeneaLogic/GeneaLogic/issues/17), [#18](https://github.com/GeneaLogic/GeneaLogic/issues/18), one slice), and
@@ -241,6 +241,9 @@ Starting list, with what each depends on:
     tool identifier.
 - **App Intents** (Shortcuts, Siri, Spotlight), after the `ArchiveModel` split. The typed
   ids map onto App Intents entities.
+- **From the UI audit, early in `0.2`:** the archive's own undo stack, then multiple
+  selection in the sidebars, then drag and drop ([#16](https://github.com/GeneaLogic/GeneaLogic/issues/16)), which builds on it. **Before
+  `1.0`:** a user guide as a Help Book (in Tips) and on genealogic.app.
 - **The open feature requests**, milestoned at triage (workstream 4): app features in `0.2`,
   format additions in `0.3`.
 
