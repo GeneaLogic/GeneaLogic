@@ -13,38 +13,37 @@ identity, data flow, localization); a sheet was opened where the run-through rea
 not every sheet in turn.
 
 Tags as in the first audit — **[HIG]**, **[Idiom]**, **[UX]** — plus **[A11y]**. P1–P3 is
-impact. *Bucket* is the consequence rule: **now** (a slice in `0.1`), **batch** (a small
-ones slice), **park** (with what un-parks it). Each finding becomes an issue once agreed;
-status lives there, not here.
+impact. The ladder below says which milestone each lands in. Each finding is filed as an
+issue; status lives there, not here.
 
 ## Findings
 
-| # | Finding | Tags | P | Size | Source |
-| --- | --- | --- | --- | --- | --- |
-| G1 | The menu bar is not the command map | HIG | P1 | large | notes, code |
-| G2 | No View-menu commands or shortcuts for the four tabs | HIG UX | P2 | small | notes |
-| G3 | No Show/Hide Sidebar in the View menu | HIG | P2 | trivial | run |
-| G4 | The tab switcher moves between tabs and with the inspector | HIG UX | P2 | medium | notes, run |
-| G5 | Sidebars select one item at a time | HIG UX | P2 | large | notes |
-| G6 | Copy does nothing for a selected artifact or person | HIG | P2 | medium | candidate, code |
-| G7 | The archive's trash is easy to forget, so deletes still confirm | HIG UX | P2 | medium | notes, run |
-| G8 | No Help content | HIG | P2 | large | notes, candidate |
-| G9 | The window opens at 900×450 | HIG | P2 | small | candidate, run |
-| G10 | An archive doesn't reopen the way it was left | HIG UX | P2 | medium | candidate |
-| G11 | Open Recent is the app's own list, not the system's | HIG | P3 | medium | candidate |
-| G12 | Window tabs are switched off because they crash | HIG | P3 | medium | candidate |
-| G13 | Undo is the window's, and its names don't follow the action | HIG Idiom | P2 | large | candidate |
-| G14 | `.genea` archives have the system's generic document icon | HIG | P3 | small | notes |
-| G15 | Toolbar: which frequent commands belong there | HIG UX | P3 | small | notes |
-| G16 | No Quick Look on Space | HIG | P3 | small | candidate |
-| G17 | The About window is the default one | HIG | P3 | small | candidate |
-| G18 | VoiceOver and full keyboard access, unaudited since F6/F11 | A11y | P2 | medium | candidate |
-| G19 | An edit that finds nothing to write to is dropped silently | UX | P3 | small | 79b |
-| G20 | `IntegrityReportSheet` and `PersonDetailView` are ~1,000 lines each | Idiom | P3 | medium | 79 |
-| G21 | The window title's path menu shows the `.genea` extension | HIG | P3 | trivial | candidate |
-| G22 | Five soft-deprecated modifier forms | Idiom | P3 | trivial | code |
-| G23 | Nothing is localizable: no string catalog, labels passed as `String` | Idiom | P3 | large | code |
-| G24 | The welcome window can't be reached while an archive is open | UX | P3 | small | run |
+| # | Finding | Tags | P | Size | Source | Issue |
+| --- | --- | --- | --- | --- | --- | --- |
+| G1 | The menu bar is not the command map | HIG | P1 | large | notes, code | [#38](https://github.com/GeneaLogic/GeneaLogic/issues/38) |
+| G2 | No View-menu commands or shortcuts for the four tabs | HIG UX | P2 | small | notes | [#38](https://github.com/GeneaLogic/GeneaLogic/issues/38) |
+| G3 | No Show/Hide Sidebar in the View menu | HIG | P2 | trivial | run | [#37](https://github.com/GeneaLogic/GeneaLogic/issues/37) |
+| G4 | The tab switcher moves between tabs and with the inspector | HIG UX | P2 | medium | notes, run | [#39](https://github.com/GeneaLogic/GeneaLogic/issues/39) |
+| G5 | Sidebars select one item at a time | HIG UX | P2 | large | notes | [#47](https://github.com/GeneaLogic/GeneaLogic/issues/47) |
+| G6 | Copy does nothing for a selected artifact or person | HIG | P2 | medium | candidate, code | [#43](https://github.com/GeneaLogic/GeneaLogic/issues/43) |
+| G7 | The archive's trash is easy to forget, so deletes still confirm | HIG UX | P2 | medium | notes, run | [#42](https://github.com/GeneaLogic/GeneaLogic/issues/42) |
+| G8 | No Help content | HIG | P2 | large | notes, candidate | [#37](https://github.com/GeneaLogic/GeneaLogic/issues/37), [#50](https://github.com/GeneaLogic/GeneaLogic/issues/50) |
+| G9 | The window opens at 900×450 | HIG | P2 | small | candidate, run | [#37](https://github.com/GeneaLogic/GeneaLogic/issues/37) |
+| G10 | An archive doesn't reopen the way it was left | HIG UX | P2 | medium | candidate | [#40](https://github.com/GeneaLogic/GeneaLogic/issues/40) |
+| G11 | Open Recent is the app's own list, not the system's | HIG | P3 | medium | candidate | [#40](https://github.com/GeneaLogic/GeneaLogic/issues/40) |
+| G12 | Window tabs are switched off because they crash | HIG | P3 | medium | candidate | [#41](https://github.com/GeneaLogic/GeneaLogic/issues/41) |
+| G13 | Undo is the window's, and its names don't follow the action | HIG Idiom | P2 | large | candidate | [#46](https://github.com/GeneaLogic/GeneaLogic/issues/46) |
+| G14 | `.genea` archives have the system's generic document icon | HIG | P3 | small | notes | [#44](https://github.com/GeneaLogic/GeneaLogic/issues/44) |
+| G15 | Toolbar: which frequent commands belong there | HIG UX | P3 | small | notes | [#38](https://github.com/GeneaLogic/GeneaLogic/issues/38) |
+| G16 | No Quick Look on Space | HIG | P3 | small | candidate | [#43](https://github.com/GeneaLogic/GeneaLogic/issues/43) |
+| G17 | The About window is the default one | HIG | P3 | small | candidate | [#37](https://github.com/GeneaLogic/GeneaLogic/issues/37) |
+| G18 | VoiceOver and full keyboard access, unaudited since F6/F11 | A11y | P2 | medium | candidate | [#45](https://github.com/GeneaLogic/GeneaLogic/issues/45) |
+| G19 | An edit that finds nothing to write to is dropped silently | UX | P3 | small | 79b | [#48](https://github.com/GeneaLogic/GeneaLogic/issues/48) |
+| G20 | `IntegrityReportSheet` and `PersonDetailView` are ~1,000 lines each | Idiom | P3 | medium | 79 | [#49](https://github.com/GeneaLogic/GeneaLogic/issues/49) |
+| G21 | The window title's path menu shows the `.genea` extension | HIG | P3 | trivial | candidate | [#37](https://github.com/GeneaLogic/GeneaLogic/issues/37) |
+| G22 | Five soft-deprecated modifier forms | Idiom | P3 | trivial | code | [#37](https://github.com/GeneaLogic/GeneaLogic/issues/37) |
+| G23 | Nothing is localizable: no string catalog, labels passed as `String` | Idiom | P3 | large | code | [#51](https://github.com/GeneaLogic/GeneaLogic/issues/51) |
+| G24 | The welcome window can't be reached while an archive is open | UX | P3 | small | run | [#40](https://github.com/GeneaLogic/GeneaLogic/issues/40) |
 
 ### G1. The menu bar is not the command map
 
