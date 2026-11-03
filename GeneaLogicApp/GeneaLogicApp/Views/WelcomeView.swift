@@ -86,9 +86,10 @@ struct WelcomeView: View {
     /// Creates a new `.genea` package at a user-chosen location, then opens it in
     /// this window by writing the bound `url`.
     private func createArchive() {
-        guard let created = ArchiveLauncher.savePanelURL() else { return }
+        guard let location = ArchiveLauncher.newArchiveLocation() else { return }
+        let created = location.url
         do {
-            _ = try Archive.create(at: created)
+            try ArchiveLauncher.create(at: location)
             ArchiveAccessStore.shared.acquire(created)
             url = created.canonicalArchiveURL
         } catch {

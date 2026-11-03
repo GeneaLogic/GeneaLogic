@@ -93,7 +93,7 @@ private struct FileSelectorStrip: View {
     @Binding var selectedFileID: FileID?
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal) {
             HStack(spacing: 8) {
                 ForEach(files, id: \.uid) { entry in
                     FileChip(
@@ -104,6 +104,7 @@ private struct FileSelectorStrip: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
+        .scrollIndicators(.hidden)
     }
 }
 
@@ -164,10 +165,10 @@ private struct FileChip: View {
                 isSelected ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.05),
                 in: RoundedRectangle(cornerRadius: Layout.rowCornerRadius)
             )
-            .overlay(
+            .overlay {
                 RoundedRectangle(cornerRadius: Layout.rowCornerRadius)
                     .stroke(isSelected ? Color.accentColor.opacity(0.5) : .clear, lineWidth: 1)
-            )
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

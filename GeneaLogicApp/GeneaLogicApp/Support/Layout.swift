@@ -74,6 +74,16 @@ enum Layout {
     /// on top of trailing-edge controls (a row's trash button) when it appears.
     static let scrollIndicatorGutter: CGFloat = 14
 
+    /// An archive window (slice 81, G9). The minimum width holds the sidebar's 220, the
+    /// inspector's 280 and a usable detail column; the minimum height holds a content
+    /// sheet at its ideal height below the toolbar.
+    enum ArchiveWindow {
+        static let defaultWidth: CGFloat = 1100
+        static let defaultHeight: CGFloat = 720
+        static let minWidth: CGFloat = 800
+        static let minHeight: CGFloat = 520
+    }
+
     /// Floor for a popped-out file-preview window.
     enum PreviewWindow {
         static let minWidth: CGFloat = 480

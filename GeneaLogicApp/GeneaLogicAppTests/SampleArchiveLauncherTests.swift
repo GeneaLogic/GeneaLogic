@@ -23,6 +23,14 @@ import Testing
         #expect(archive.artifacts().count == 9)
     }
 
+    /// No save panel chose for it, so its extension is hidden, as a panel's would be
+    /// (slice 81).
+    @Test func theSampleHidesItsExtension() throws {
+        let url = try SampleArchiveLauncher.prepare(at: location())
+
+        #expect(try url.resourceValues(forKeys: [.hasHiddenExtensionKey]).hasHiddenExtension == true)
+    }
+
     /// An edit to the sample survives the next click; the button never rebuilds it.
     @Test func aLaterOpenKeepsTheEdits() throws {
         let url = try SampleArchiveLauncher.prepare(at: location())

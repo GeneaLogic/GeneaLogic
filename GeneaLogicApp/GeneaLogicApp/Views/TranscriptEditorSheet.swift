@@ -40,10 +40,10 @@ struct TranscriptEditorSheet: View {
             TextEditor(text: $text)
                 .font(.body)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay(
+                .overlay {
                     RoundedRectangle(cornerRadius: Layout.rowCornerRadius)
                         .stroke(.secondary.opacity(0.3))
-                )
+                }
 
             HStack {
                 Spacer()

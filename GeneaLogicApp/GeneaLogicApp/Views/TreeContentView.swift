@@ -245,21 +245,21 @@ private struct TreePersonCard: View {
             // An **opaque** base under the tint: the cards sit over the connector
             // canvas, so a translucent fill would let a couple bar or drop line show
             // through the card it passes behind.
-            .background(
+            .background {
                 RoundedRectangle(cornerRadius: Layout.rowCornerRadius)
                     .fill(Color(nsColor: .controlBackgroundColor))
-                    .overlay(
+                    .overlay {
                         RoundedRectangle(cornerRadius: Layout.rowCornerRadius)
                             .fill(tint)
-                    )
-            )
-            .overlay(
+                    }
+            }
+            .overlay {
                 RoundedRectangle(cornerRadius: Layout.rowCornerRadius)
                     .stroke(
                         isFocus ? Color.accentColor : Color.secondary.opacity(0.35),
                         lineWidth: isFocus ? 2 : 1
                     )
-            )
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

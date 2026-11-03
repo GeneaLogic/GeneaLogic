@@ -8,6 +8,7 @@ import SwiftUI
 /// whichever archive window is key, via `@FocusedValue`.
 struct ArchiveCommands: Commands {
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openURL) private var openURL
     @FocusedValue(\.archiveModel) private var activeModel
     /// The persisted recents, read here so File ▸ Open Recent updates live as
     /// archives are opened (the store is `@Observable`).
@@ -43,6 +44,19 @@ struct ArchiveCommands: Commands {
 
         viewMenuAdditions
         artifactMenu
+        helpMenu
+    }
+
+    // MARK: - Help menu
+
+    /// Until the user guide exists (#50), Help points at the project page, whose README
+    /// is the guide for now, and at the issue templates (slice 81, G8). Not "GeneaLogic
+    /// Help": that name promises a guide. The menu's search field is the system's.
+    private var helpMenu: some Commands {
+        CommandGroup(replacing: .help) {
+            Button("GeneaLogic on GitHub") { openURL(ProjectLinks.home) }
+            Button("Report an Issue…") { openURL(ProjectLinks.newIssue) }
+        }
     }
 
     // MARK: - View menu (inspector toggle + sort)
@@ -184,9 +198,10 @@ struct ArchiveCommands: Commands {
     /// Create-on-disk, then open a window for the new archive. The window opens
     /// the just-created package itself (uniform with every other open path).
     private func newArchive() {
-        guard let url = ArchiveLauncher.savePanelURL() else { return }
+        guard let location = ArchiveLauncher.newArchiveLocation() else { return }
+        let url = location.url
         do {
-            _ = try Archive.create(at: url)
+            try ArchiveLauncher.create(at: location)
             // Create/acquire on the original scoped URL; canonicalize only the window
             // value (canonicalizing before acquire would strip the security scope).
             ArchiveAccessStore.shared.acquire(url)

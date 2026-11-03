@@ -83,6 +83,7 @@ struct ArchiveContainerView: View {
     var body: some View {
         @Bindable var model = model
         content(model)
+            .frame(minWidth: Layout.ArchiveWindow.minWidth, minHeight: Layout.ArchiveWindow.minHeight)
             .environment(model)
             .focusedSceneValue(\.archiveModel, model)
             .navigationTitle(url.deletingPathExtension().lastPathComponent)
