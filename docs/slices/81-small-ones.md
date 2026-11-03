@@ -111,3 +111,10 @@ except one (below).
   The panel's URL always has the extension, so the hand-written append is gone.
 - The tests clean up their temporary folders, and pin that showing the extension
   clears a flag that is set.
+
+**From the hand-test:** the About credits got non-breaking spaces in the licence names,
+links on the library names, and the project link moved under the synopsis, so the text
+fits without scrolling. Sidebar visibility is per window, the same on every tab, as in
+Finder, Mail and Xcode.
+
+**Shipped 2026-11-02** (merged); **hand-test passed**.
