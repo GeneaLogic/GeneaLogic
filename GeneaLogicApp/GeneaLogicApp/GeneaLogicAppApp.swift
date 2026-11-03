@@ -28,7 +28,13 @@ struct GeneaLogicAppApp: App {
         // moved/deleted shows a clear "can no longer reach this archive" state.
         // (ARCHITECTURE.md §7.)
         .restorationBehavior(.automatic)
+        // A new window, archive or welcome, opens at this size; a restored one keeps
+        // its own. The minimum is `ArchiveContainerView`'s (slice 81, G9).
+        .defaultSize(width: Layout.ArchiveWindow.defaultWidth, height: Layout.ArchiveWindow.defaultHeight)
         .commands {
+            // View ▸ Show/Hide Sidebar (⌃⌘S). On Tree, which has no split view, the
+            // responder chain disables it.
+            SidebarCommands()
             ArchiveCommands()
         }
 

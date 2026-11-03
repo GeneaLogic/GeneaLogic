@@ -4343,6 +4343,19 @@ been two slices.
   toolbar items, `toolbarBackgroundVisibility`, an in-code re-show without animation,
   or AppKit's `allowsFullHeightLayout` (kept off, ignored).
 
+- **81 — small ones** (app only; no format change; #37). G3, G9, G17, G21, G22 and G8's
+  `0.1` part from the second UI audit. **The invariants:** an archive the app creates has
+  its extension hidden unless the save panel said to show it. The panel takes the type,
+  not a typed name, so it decides, as in `NSDocument` apps: hidden by default, shown
+  only if the user types `.genea`. Modern panels show no Hide Extension checkbox. An
+  existing archive's flag is the user's and is never touched. Credits set no text
+  colour, so they read in dark mode, and a test pins that. **Gotchas:** the path menu
+  follows the file's hidden-extension flag, not the window title, which already
+  stripped it. The audit missed a seventh soft-deprecated call site, on the file chips.
+  `Credits.rtf` rather than HTML, because HTML imports as black text.
+  `ScrollView(showsIndicators: false)` is `.never` on macOS, which overrides Scroll bars:
+  Always (measured). It became `.hidden`, which follows that setting.
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the

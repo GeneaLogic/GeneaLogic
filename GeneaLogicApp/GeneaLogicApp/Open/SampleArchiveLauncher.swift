@@ -23,6 +23,11 @@ nonisolated enum SampleArchiveLauncher {
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         do {
             try SampleArchive.build(at: url)
+            // No save panel chose for it, so it gets the default one would have:
+            // hidden (slice 81, G21). Only when built: an existing sample's flag is
+            // left as it is, like any archive's, so one built before 81 keeps its
+            // extension until it is deleted and rebuilt.
+            ArchiveLauncher.setExtensionHidden(true, at: url)
         } catch SampleArchiveError.alreadyExists {
             // Built on an earlier click, or by another window during this one; either way,
             // what is there is the sample.

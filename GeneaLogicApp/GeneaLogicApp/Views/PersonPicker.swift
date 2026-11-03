@@ -52,9 +52,9 @@ struct PersonSearchField: View {
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 10)
-        .overlay(
+        .overlay {
             RoundedRectangle(cornerRadius: Layout.rowCornerRadius)
                 .stroke(.separator, lineWidth: 0.5)
-        )
+        }
     }
 }
