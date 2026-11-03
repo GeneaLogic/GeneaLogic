@@ -4,35 +4,80 @@ import GeneaLogicExtract
 import GeneaLogicModel
 
 extension ArchiveModel {
-    // MARK: - Menu-command routing (UI audit F6)
+    // MARK: - Commands (slice 82)
 
-    /// An artifact-scoped verb the menu bar wants run against `selectedArtifact`.
-    /// The detail view observes it and drives its own sheet state. Attach and
-    /// Delete are routed separately (`beginAttachOrScan` / `pendingArtifactDeletion`).
-    enum ArtifactCommand { case addEvent, addPlace, addPerson, editTranscript }
-
-    /// A per-file verb the menu bar wants run against `selectedFile`. The detail
-    /// view (which owns the file selection and the preview/export handlers)
-    /// observes and dispatches it.
-    enum FileCommand {
-        case openSeparateWindow, openInDefaultApp, saveCopy, replace, delete
+    /// A command waiting for the view that owns it. The fresh `id` makes every request a
+    /// new value, so asking for the same command twice runs it twice.
+    struct PendingCommand: Equatable {
+        let id = UUID()
+        let command: ArchiveCommand
+        let subject: CommandSubject
     }
 
-    /// Requests an artifact-scoped command from the menu bar.
-    func requestArtifactCommand(_ command: ArtifactCommand) { pendingArtifactCommand = command }
+    /// Everything command availability depends on, read from this window's state.
+    var commandContext: CommandContext {
+        CommandContext(
+            hasArchive: archive != nil, activeTab: activeTab,
+            selectedArtifact: selectedArtifact, selectedFile: selectedFile,
+            selectedPerson: selectedPerson, personCount: persons.count,
+            isPresentingModal: isPresentingModal, inspectorVisible: inspectorVisible)
+    }
 
-    /// Requests a per-file command from the menu bar.
-    func requestFileCommand(_ command: FileCommand) { pendingFileCommand = command }
+    /// Whether a sheet, dialog, alert or panel is up in this window: the ones this model
+    /// drives, and the ones views report (`reportsModal`).
+    var isPresentingModal: Bool {
+        !presentedModals.isEmpty || isImporterPresented || isShowingIntegrityReport
+            || isShowingTrash || isCreatingPerson || isShowingError || isShowingInfo
+    }
 
-    /// Requests confirm-and-delete of the selected artifact from the menu bar.
-    func requestDeleteSelectedArtifact() { pendingArtifactDeletion = true }
+    /// Runs `command` on `subject`, if it can run now. Commands the model can run itself
+    /// run here; one that opens a sheet a view owns is left for that view as
+    /// `pendingCommand`.
+    func perform(_ command: ArchiveCommand, on subject: CommandSubject = .archive) {
+        guard commandContext.canPerform(command, on: subject) else { return }
+        switch command {
+        case .addArtifact:
+            pendingTab = .artifacts
+            beginAddMedia()
+        case .newPerson:
+            pendingTab = .people
+            isCreatingPerson = true
+        case .verifyIntegrity: beginVerifyIntegrity()
+        case .showTrash: beginShowTrash()
+        case .showTab(let tab): pendingTab = tab
+        // Straight to the file importer, *not* the Continuity connected menu: an AppKit
+        // `popUpContextMenu` invoked from a menu-bar command has no anchor view and
+        // floats as a disconnected menu. The in-pane Attach File… keeps the scan options
+        // (`beginAttachOrScan`), where the connected menu anchors correctly.
+        case .attachFile:
+            if case .artifact(let id) = subject { beginAttach(to: id) }
+        default:
+            pendingCommand = PendingCommand(command: command, subject: subject)
+        }
+    }
 
-    /// Requests an inspector-visibility toggle from the menu bar.
-    func requestInspectorToggle() { pendingInspectorToggle = true }
+    /// Takes the pending command if `handles` says the calling view runs it, clearing it
+    /// so it runs once. A view calls this from its `onChange(of: pendingCommand)`.
+    func claimPendingCommand(
+        _ handles: (ArchiveCommand) -> Bool
+    ) -> (command: ArchiveCommand, subject: CommandSubject)? {
+        guard let pending = pendingCommand, handles(pending.command) else { return nil }
+        pendingCommand = nil
+        return (pending.command, pending.subject)
+    }
+
+    /// Records whether the modal `token` stands for is up (`reportsModal`).
+    func setModal(_ token: UUID, presented: Bool) {
+        if presented {
+            presentedModals.insert(token)
+        } else {
+            presentedModals.remove(token)
+        }
+    }
 
     // MARK: - Adding media: the file importer and Continuity Camera
 
-    /// Presents the importer in add-media mode (⌘I / + button): picked files
+    /// Presents the importer in add-media mode (⇧⌘I / + button): picked files
     /// become new artifacts.
     func beginAddMedia() {
         importMode = .addMedia

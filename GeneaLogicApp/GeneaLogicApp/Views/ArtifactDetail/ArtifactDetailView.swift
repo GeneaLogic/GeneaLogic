@@ -39,8 +39,8 @@ struct ArtifactDetailView: View {
     /// `nil` shows no pane. Cleared when the artifact changes or the file goes away.
     @State private var selectedFileID: FileID?
 
-    /// The file the Artifact ▸ Selected File ▸ Delete File… menu command is awaiting
-    /// confirmation for (the per-row ⋯ ▸ Delete has its own confirm).
+    /// The file a Delete File… is awaiting confirmation for, from the Artifact ▸ Selected
+    /// File menu or a file row's ⋯ menu.
     @State private var confirmingFileDelete: FileEntry?
 
     /// The evidence links whose evidence side is this artifact — which person-mentions
@@ -156,6 +156,7 @@ struct ArtifactDetailView: View {
             )
             .environment(model)
         }
+        .reportsModal(sheet != nil)
         .confirmationDialog(
             confirmingFileDelete.map { "Delete “\($0.originalName)”?" } ?? "",
             isPresented: Binding(
@@ -167,69 +168,84 @@ struct ArtifactDetailView: View {
                 model.detachFile(entry.uid, from: artifact.uid)
             }
         } message: { _ in
-            // Same wording as the per-row ⋯ ▸ Delete confirm (`FileRow`).
             Text(
                 "This moves the file to the Trash. Undo with ⌘Z, or restore it later from "
                     + "File ▸ Show Trash.")
         }
+        .reportsModal(confirmingFileDelete != nil)
         // Mirror the inspector's (view-owned) visibility down so the View menu can
-        // label its toggle, and act on the menu's toggle/command intents (F6).
+        // label its toggle, and run the commands this view owns (F6, slice 82).
         .onAppear { model.inspectorVisible = inspectorShown }
         .onChange(of: inspectorShown) { _, shown in model.inspectorVisible = shown }
         .onChange(of: selectedFileID) { _, id in model.selectedFile = id }
         .onChange(of: sheet?.id) { if let sheet { presentedSheets.append(sheet) } }
-        .onChange(of: model.pendingInspectorToggle) { _, requested in
-            if requested {
-                inspectorShown.toggle()
-                model.inspectorVisible = inspectorShown
-                model.pendingInspectorToggle = false
-            }
-        }
-        .onChange(of: model.pendingArtifactCommand) { _, command in
-            guard let command else { return }
-            performArtifactCommand(command)
-            model.pendingArtifactCommand = nil
-        }
-        .onChange(of: model.pendingFileCommand) { _, command in
-            guard let command else { return }
-            performFileCommand(command)
-            model.pendingFileCommand = nil
+        .onChange(of: model.pendingCommand) {
+            guard let (command, subject) = model.claimPendingCommand(Self.runs) else { return }
+            perform(command, on: subject)
         }
         // No `.navigationTitle` here: the window is titled by its *archive*
         // (set on `ArchiveContainerView`, alongside the `.genea` proxy icon). The
         // artifact's name is the heading above the document, in `DocumentHeader`.
     }
 
-    /// Runs an artifact-scoped menu command by opening the same sheet the in-pane
-    /// add affordances open.
-    ///
-    /// **Refused while a sheet is up.** The menu bar stays live over a sheet, and
-    /// replacing the request would dismiss the open editor and drop what was typed in
-    /// it. (Before 79 each sheet had its own state, and SwiftUI would not stack a second
-    /// one; this keeps that outcome on purpose rather than by accident.)
-    private func performArtifactCommand(_ command: ArchiveModel.ArtifactCommand) {
-        guard sheet == nil else { return }
-        switch command {
-        case .addEvent: sheet = ArtifactSheet(.assertion(.blankEvent))
-        case .addPlace: sheet = ArtifactSheet(.assertion(.blankPlace))
-        case .addPerson: sheet = ArtifactSheet(.mention(.add))
-        case .editTranscript: sheet = ArtifactSheet(.transcript)
+    /// The commands this view runs: the ones that open its sheets, the file verbs, and
+    /// the inspector toggle.
+    private static func runs(_ command: ArchiveCommand) -> Bool {
+        switch command.subjectKind {
+        case .artifact: command != .deleteArtifact
+        case .file: true
+        case .archive: command == .toggleInspector
+        case .person: false
         }
     }
 
-    /// Runs a per-file menu command against the selected file, reusing the same
-    /// actions the per-row ⋯ menu uses. No-op if the selection has gone away.
-    private func performFileCommand(_ command: ArchiveModel.FileCommand) {
-        guard let selectedFileID, let entry = files.first(where: { $0.uid == selectedFileID })
-        else { return }
+    /// Runs a command this view owns, from the menu bar or an in-pane button. Ignores
+    /// one addressed to an artifact other than this one.
+    ///
+    /// **A sheet is never replaced**: that would dismiss the open editor and drop what
+    /// was typed in it. The commands are off while one is up
+    /// (`CommandContext.isPresentingModal`); the guard covers a request queued just
+    /// before one opened.
+    private func perform(_ command: ArchiveCommand, on subject: CommandSubject) {
+        switch subject {
+        case .archive:
+            if command == .toggleInspector {
+                inspectorShown.toggle()
+                model.inspectorVisible = inspectorShown
+            }
+        case .artifact(let id):
+            guard id == artifact.uid, sheet == nil else { return }
+            switch command {
+            case .addEvent: sheet = ArtifactSheet(.assertion(.blankEvent))
+            case .addPlace: sheet = ArtifactSheet(.assertion(.blankPlace))
+            case .addMention: sheet = ArtifactSheet(.mention(.add))
+            case .editTranscript: sheet = ArtifactSheet(.transcript)
+            default: break
+            }
+        case .file(let fileID, let id):
+            guard id == artifact.uid, let entry = files.first(where: { $0.uid == fileID })
+            else { return }
+            performFileCommand(command, on: entry)
+        case .person:
+            break
+        }
+    }
+
+    /// Runs a file verb on `entry`, for the Selected File menu and the file row's ⋯ menu
+    /// alike.
+    private func performFileCommand(_ command: ArchiveCommand, on entry: FileEntry) {
         let actions = ArtifactFileActions(
             model: model, artifactID: artifact.uid, openWindow: openWindow)
         switch command {
-        case .openSeparateWindow: actions.popOut(entry)
-        case .openInDefaultApp: actions.openExternally(entry)
-        case .saveCopy: actions.saveCopy(entry)
-        case .replace: model.beginReplace(fileID: entry.uid, artifactID: artifact.uid)
-        case .delete: confirmingFileDelete = entry
+        case .openFileInWindow: actions.popOut(entry)
+        case .openFileInDefaultApp: actions.openExternally(entry)
+        case .saveFileCopy: actions.saveCopy(entry)
+        case .scanFileForMetadata:
+            model.scanFileForMetadata(
+                entry.uid, in: artifact.uid, originalName: entry.originalName)
+        case .replaceFile: model.beginReplace(fileID: entry.uid, artifactID: artifact.uid)
+        case .deleteFile: confirmingFileDelete = entry
+        default: break
         }
     }
 

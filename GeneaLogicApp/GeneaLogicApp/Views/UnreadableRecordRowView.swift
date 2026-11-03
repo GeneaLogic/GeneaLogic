@@ -138,6 +138,7 @@ struct UnreadableRecordRowView: View {
         } message: {
             Text(Self.deleteMessage(named: row.displayLabel(named: plan?.recordLabel), kind: row.kind))
         }
+        .reportsModal(isConfirmingRestore || isConfirmingDelete)
     }
 
     // MARK: - Wording shared with the Verify Integrity panel (58d, fork h)

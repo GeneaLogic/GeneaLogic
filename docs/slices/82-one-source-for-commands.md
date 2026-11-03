@@ -114,3 +114,20 @@ is no selection for them to act on. 83 gives them context menus from the same so
   if the menu takes it, the field gets it back).
 - The artifact row, person row and file ⋯ menus read the same titles as the menu bar.
 - ⌘F reaches the sidebar search on Artifacts and People.
+
+**Settled in the build:**
+
+- **⌘F, measured:** the Edit menu had no Find, and `.searchable` takes no key. Edit ▸
+  Find… is a command, on Artifacts and People, focusing the search field
+  (`searchFocused`).
+- **⌘⌫ in a text field** goes back to the field (`deleteToBeginningOfLine:`) when it was
+  typed, not chosen from the menu.
+- **One shortcut, one live item.** A command's key is attached only while its tab shows,
+  so Delete Artifact… and Delete Person… never both answer ⌘⌫.
+- **Add Person… stays the in-pane label** under *Persons Mentioned* (`paneTitle`):
+  "Add Person Mentioned…" doesn't fit the inspector at 280 pt, and the heading already
+  says it.
+- **The in-pane Attach File… keeps its scan options;** the menu bar's goes straight to
+  the importer, because the connected menu can't anchor to a menu item (as before).
+- The ⋯ menu's verbs now follow the Selected File order, and its Delete File… uses the
+  detail's confirm, so there is one.

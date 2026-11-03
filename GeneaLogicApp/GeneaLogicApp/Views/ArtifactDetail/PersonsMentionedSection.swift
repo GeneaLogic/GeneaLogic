@@ -37,9 +37,11 @@ struct PersonsMentionedSection: View {
                 // A direct-action button (opens the assertion sheet) — no chevron,
                 // unlike the menu-popping Events/Files affordances (F8).
                 Button {
-                    sheet = ArtifactSheet(.mention(.add))
+                    model.perform(.addMention, on: .artifact(artifactID))
                 } label: {
-                    AddAffordanceLabel(title: "Add Person…", systemImage: "person.badge.plus")
+                    AddAffordanceLabel(
+                        title: ArchiveCommand.addMention.paneTitle,
+                        systemImage: ArchiveCommand.addMention.systemImage)
                 }
                 .buttonStyle(.plain)
             }

@@ -36,6 +36,7 @@ struct ReviewFactsDetailView: View {
             FactEditorSheet(personID: item.person.uid, mode: request.mode)
                 .environment(model)
         }
+        .reportsModal(factEditorRequest != nil)
     }
 
     private var header: some View {

@@ -229,7 +229,8 @@ private struct OpenArchiveView: View {
     /// this window's responder chain (hosted zero-size below) and handed to the
     /// model so the toolbar/detail scan actions can reach it.
     @State private var scanner = ContinuityCameraScanner()
-    @State private var isCreatingPerson = false
+    /// Whether the sidebar's search field has focus, for Edit ▸ Find… (slice 82).
+    @FocusState private var isSearchFocused: Bool
     /// Per-window, per-session dismissal of the damage banner (slice 56). Not
     /// persisted on purpose: one click must not silence damage that is still
     /// there, so it comes back on the next open. The pinned placeholder rows
@@ -237,6 +238,7 @@ private struct OpenArchiveView: View {
     @State private var isDamageBannerDismissed = false
 
     var body: some View {
+        @Bindable var model = model
         content
             // "Another process is writing" (slice 52). A bottom inset rather than
             // an alert or a sheet because it must not interrupt: the window stays
@@ -325,7 +327,7 @@ private struct OpenArchiveView: View {
             }
             // Same env-injection caution as the container's sheets: the presented
             // content is a new hierarchy, so inject the model on the sheet explicitly.
-            .sheet(isPresented: $isCreatingPerson) {
+            .sheet(isPresented: $model.isCreatingPerson) {
                 NewPersonSheet()
                     .environment(model)
             }
@@ -335,6 +337,7 @@ private struct OpenArchiveView: View {
                 // Seed the menu-bar's artifact-selection mirror (only meaningful on
                 // the Artifacts tab), so the Artifact menu is correctly enabled.
                 model.selectedArtifact = tab == .artifacts ? selectedArtifact?.uid : nil
+                model.selectedPerson = tab == .people ? selectedPerson?.uid : nil
                 if tab == .review {
                     model.refreshReviewWorklist()
                     model.refreshDuplicateCandidates()
@@ -345,6 +348,7 @@ private struct OpenArchiveView: View {
                 // Re-seed / clear the mirror as the tab changes so the Artifact menu
                 // never acts on a stale selection from another section.
                 model.selectedArtifact = newTab == .artifacts ? selectedArtifact?.uid : nil
+                model.selectedPerson = newTab == .people ? selectedPerson?.uid : nil
                 model.selectedFile = nil
                 // Re-run the matcher on entering Review. Suggestions are computed, never
                 // stored, so this is what keeps the queue honest after work done in
@@ -364,6 +368,22 @@ private struct OpenArchiveView: View {
                 guard tab == .artifacts else { return }
                 model.selectedArtifact = resolvedID
                 model.selectedFile = nil
+            }
+            // The same for the Person menu (slice 82).
+            .onChange(of: selectedPerson?.uid) { _, resolvedID in
+                guard tab == .people else { return }
+                model.selectedPerson = resolvedID
+            }
+            // Edit ▸ Find… (slice 82).
+            .onChange(of: model.pendingCommand) {
+                if model.claimPendingCommand({ $0 == .find }) != nil { isSearchFocused = true }
+            }
+            // View ▸ ⌘1–⌘4, and a create that switches to its own tab first (slice 82).
+            .onChange(of: model.pendingTab) { _, target in
+                if let target {
+                    tab = target
+                    model.pendingTab = nil
+                }
             }
             // Auto-select a freshly-created artifact / person (slice 29 + its People
             // analog): the model publishes a one-shot intent; move the scene-stored
@@ -441,6 +461,7 @@ private struct OpenArchiveView: View {
                 onDelete: { model.deleteArtifact($0) }
             )
             .searchable(text: $model.searchText, placement: .sidebar, prompt: "Search artifacts")
+            .searchFocused($isSearchFocused)
             // Re-query through the engine on each keystroke (title + inline transcript
             // + notes), AND-combined with the tag filter; empty → the full list.
             .onChange(of: model.searchText) { model.applyFilters() }
@@ -459,6 +480,7 @@ private struct OpenArchiveView: View {
                 onDelete: { model.deletePerson($0) }
             )
             .searchable(text: $model.personSearchText, placement: .sidebar, prompt: "Search people")
+            .searchFocused($isSearchFocused)
             .onChange(of: model.personSearchText) { model.applyPersonFilter() }
         case .review:
             // Deliberately not `.searchable`: the worklist is the archive's whole backlog
@@ -519,7 +541,7 @@ private struct OpenArchiveView: View {
             // scan items, so this button pops that menu.
             Button("Add", systemImage: "plus") { model.beginAddOrScan() }
         case .people:
-            Button("New Person", systemImage: "plus") { isCreatingPerson = true }
+            Button("New Person", systemImage: "plus") { model.perform(.newPerson) }
         case .tree, .review:
             // Nothing is *added* in Review — every row is a mention that already exists,
             // and the only thing it can mint (a person) belongs to the row's own

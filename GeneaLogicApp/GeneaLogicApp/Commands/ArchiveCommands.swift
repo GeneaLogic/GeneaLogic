@@ -2,10 +2,11 @@ import AppKit
 import GeneaLogicArchive
 import SwiftUI
 
-/// The File-menu commands. New/Open present AppKit panels and then open a window
-/// for the result, so they work with **no window present** (no `ensureWindow`
-/// dance — that was slice 3's workaround, now unnecessary). Add Media targets
-/// whichever archive window is key, via `@FocusedValue`.
+/// The menu bar. New/Open present AppKit panels and then open a window for the
+/// result, so they work with **no window present** (no `ensureWindow` dance — that
+/// was slice 3's workaround, now unnecessary). Every archive verb is an
+/// `ArchiveCommand` on whichever archive window is key, via `@FocusedValue`, and is
+/// spelled there, not here (slice 82).
 struct ArchiveCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openURL) private var openURL
@@ -26,25 +27,30 @@ struct ArchiveCommands: Commands {
         }
 
         CommandGroup(after: .newItem) {
-            // ⌘I stays Add Artifact; the inspector toggle takes ⌘⌥I in the View menu
-            // (Finder/Calendar/Pages precedent). "Add Artifact" (was "Add Media") names
-            // it distinctly from attaching files to an existing artifact.
-            // Adding an artifact is an Artifacts-tab action — gated to it so it can't
-            // silently create + select an artifact on a tab the user isn't looking at.
-            Button("Add Artifact…") { activeModel?.beginAddMedia() }
-                .keyboardShortcut("i", modifiers: [.command])
-                .disabled(!isArtifactsTab)
+            Divider()
+            item(.addArtifact)
+            item(.newPerson)
+            Divider()
+            item(.verifyIntegrity)
+            item(.showTrash)
+        }
 
-            Button("Verify Integrity…") { activeModel?.beginVerifyIntegrity() }
-                .disabled(activeModel?.archive == nil)
-
-            Button("Show Trash…") { activeModel?.beginShowTrash() }
-                .disabled(activeModel?.archive == nil)
+        // The window has no Find of its own: the Edit menu's Find submenu comes with a
+        // text view, and the sidebar's `.searchable` field takes no key (measured).
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            item(.find)
         }
 
         viewMenuAdditions
         artifactMenu
+        personMenu
         helpMenu
+    }
+
+    /// The menu-bar item for `command`, on the key window's model.
+    private func item(_ command: ArchiveCommand) -> CommandMenuItem {
+        CommandMenuItem(command: command, model: activeModel)
     }
 
     // MARK: - Help menu
@@ -59,103 +65,82 @@ struct ArchiveCommands: Commands {
         }
     }
 
-    // MARK: - View menu (inspector toggle + sort)
+    // MARK: - View menu (tabs, inspector toggle, sort)
 
-    /// Adds the inspector toggle and Sort By submenu to the standard **View** menu
-    /// (after its Show Sidebar item). Sort binds straight to the focused model's
-    /// `sortKey`/`sortAscending`; the inspector toggle is a one-shot intent the
-    /// detail view acts on (it owns the inspector's `@SceneStorage` visibility).
+    /// The four tabs on ⌘1–⌘4 (G2) above the standard **View** menu's Show Sidebar, then
+    /// the inspector toggle and Sort By after it.
     private var viewMenuAdditions: some Commands {
-        CommandGroup(after: .sidebar) {
-            Button(inspectorLabel) { activeModel?.requestInspectorToggle() }
-                .keyboardShortcut("i", modifiers: [.command, .option])
-                .disabled(!hasArtifactContext)
-
-            Menu("Sort By") {
-                // Same two pickers as the sidebar Sort menu (shared `SortPickers`).
-                SortPickers(key: sortKeyBinding, ascending: sortAscendingBinding)
+        Group {
+            CommandGroup(before: .sidebar) {
+                ForEach(ArchiveTab.allCases) { tab in
+                    TabMenuItem(tab: tab, model: activeModel)
+                }
+                Divider()
             }
-            // Sort drives the Artifacts browse list only, so gate it to that tab
-            // (the People list sorts independently by name).
-            .disabled(!isArtifactsTab)
+
+            CommandGroup(after: .sidebar) {
+                item(.toggleInspector)
+
+                Menu("Sort By") {
+                    // Same two pickers as the sidebar Sort menu (shared `SortPickers`).
+                    SortPickers(key: sortKeyBinding, ascending: sortAscendingBinding)
+                }
+                // Sort drives the Artifacts browse list only, so gate it to that tab
+                // (the People list sorts independently by name).
+                .disabled(!isArtifactsTab)
+            }
         }
     }
 
     // MARK: - Artifact menu
 
-    /// A new top-level **Artifact** menu gathering the artifact-scoped verbs that
-    /// previously lived only as in-pane buttons. Each verb is a one-shot intent the
-    /// detail view performs against the mirrored selection (Attach and Delete route
-    /// through their own model entry points). The whole group disables with no
-    /// selection; the Selected File submenu disables with no file selected.
+    /// The verbs on the selected artifact (F6, slice 82). Each item is off with no
+    /// selection, off the Artifacts tab, and while a sheet is up.
     private var artifactMenu: some Commands {
         CommandMenu("Artifact") {
-            Group {
-                Button("Add Event…") { activeModel?.requestArtifactCommand(.addEvent) }
-                Button("Add Place…") { activeModel?.requestArtifactCommand(.addPlace) }
-                Button("Add Person…") { activeModel?.requestArtifactCommand(.addPerson) }
-                Button("Edit Transcript…") { activeModel?.requestArtifactCommand(.editTranscript) }
-                // Straight to the file importer (like File ▸ Add Artifact…), *not* the
-                // Continuity connected-menu path: an AppKit `popUpContextMenu` invoked from
-                // a menu-bar command has no anchor view and floats as a disconnected menu.
-                // Continuity scanning stays on the in-pane paperclip / toolbar +, where the
-                // connected menu anchors correctly.
-                Button("Attach File…") {
-                    if let id = activeModel?.selectedArtifact { activeModel?.beginAttach(to: id) }
-                }
-            }
-            .disabled(!hasArtifactContext)
+            item(.addEvent)
+            item(.addPlace)
+            item(.addMention)
+            item(.editTranscript)
+            item(.attachFile)
 
             Menu("Selected File") {
-                // Disable each item (not just the `Menu`): AppKit grays a submenu's
-                // *title* only when all its child items are individually disabled, so a
-                // `.disabled` on the `Menu` alone leaves "Selected File" looking active.
-                Group {
-                    Button("Open in Separate Window") {
-                        activeModel?.requestFileCommand(.openSeparateWindow)
-                    }
-                    Button("Open in Default App") {
-                        activeModel?.requestFileCommand(.openInDefaultApp)
-                    }
-                    Button("Save a Copy…") { activeModel?.requestFileCommand(.saveCopy) }
-                    Divider()
-                    Button("Replace…") { activeModel?.requestFileCommand(.replace) }
-                    Button("Delete File…", role: .destructive) {
-                        activeModel?.requestFileCommand(.delete)
-                    }
-                }
-                .disabled(activeModel?.selectedFile == nil || !hasArtifactContext)
+                // AppKit greys a submenu's *title* only when every child is disabled,
+                // which each item is, on its own, with no file selected.
+                item(.openFileInWindow)
+                item(.openFileInDefaultApp)
+                item(.saveFileCopy)
+                item(.scanFileForMetadata)
+                Divider()
+                item(.replaceFile)
+                item(.deleteFile)
             }
 
             Divider()
-
-            // ⌘⌫ mirrors Finder's Move to Trash — and our delete is trash-backed
-            // (slice 20), so it's literally that. The list raises the same confirm
-            // its own ⌫ / context-menu delete uses.
-            Button("Delete Artifact…", role: .destructive) {
-                activeModel?.requestDeleteSelectedArtifact()
-            }
-            .keyboardShortcut(.delete, modifiers: [.command])
-            .disabled(!hasArtifactContext)
+            item(.deleteArtifact)
         }
     }
 
-    /// Whether an artifact-scoped command should be enabled: an artifact is selected
-    /// **and** the Artifacts tab is the one showing (so a stale selection under the
-    /// People/Tree tab doesn't leave the Artifact menu live).
-    private var hasArtifactContext: Bool {
-        activeModel?.selectedArtifact != nil && activeModel?.activeTab == .artifacts
+    // MARK: - Person menu
+
+    /// The verbs on the selected person (slice 82), the People tab's counterpart of the
+    /// Artifact menu, as Mail has a menu for each of Message and Mailbox.
+    private var personMenu: some Commands {
+        CommandMenu("Person") {
+            item(.addName)
+            item(.addFact)
+            item(.addRelationship)
+            Divider()
+            item(.mergePerson)
+            Divider()
+            item(.deletePerson)
+        }
     }
 
-    /// Whether an Artifacts-tab command that doesn't need a selection (Add Artifact,
-    /// Sort By) should be enabled: an archive is open **and** that tab is showing.
+    /// Whether an Artifacts-tab command that doesn't need a selection (Sort By) should be
+    /// enabled: an archive is open **and** that tab is showing.
     private var isArtifactsTab: Bool {
         activeModel?.archive != nil && activeModel?.activeTab == .artifacts
-    }
-
-    /// The View-menu toggle's label, reflecting the focused window's inspector state.
-    private var inspectorLabel: String {
-        (activeModel?.inspectorVisible ?? true) ? "Hide Inspector" : "Show Inspector"
     }
 
     private var sortKeyBinding: Binding<ArchiveModel.ArtifactSortKey> {
@@ -220,5 +205,24 @@ struct ArchiveCommands: Commands {
         alert.messageText = message
         alert.informativeText = (error as? ArchiveError)?.description ?? String(describing: error)
         alert.runModal()
+    }
+}
+
+/// A View-menu tab item: a checkmark on the tab that is showing, and ⌘1–⌘4 (G2).
+private struct TabMenuItem: View {
+    let tab: ArchiveTab
+    let model: ArchiveModel?
+
+    var body: some View {
+        let command = ArchiveCommand.showTab(tab)
+        let context = model?.commandContext ?? CommandContext()
+        Toggle(
+            command.title,
+            isOn: Binding(
+                get: { context.hasArchive && context.activeTab == tab },
+                set: { _ in model?.perform(command) })
+        )
+        .keyboardShortcut(command.shortcut)
+        .disabled(!context.isAvailable(command))
     }
 }

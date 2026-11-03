@@ -27,11 +27,11 @@ struct ArtifactListView: View {
         // menu path still works when the filtered list is empty (the `List` unmounts
         // then, but the sidebar and a valid selection can persist).
         listContent
-            .onChange(of: model.pendingArtifactDeletion) { _, requested in
-                if requested {
-                    confirmDeleteSelection()
-                    model.pendingArtifactDeletion = false
-                }
+            .onChange(of: model.pendingCommand) {
+                guard let (_, subject) = model.claimPendingCommand({ $0 == .deleteArtifact }),
+                    case .artifact(let id) = subject
+                else { return }
+                confirmDelete(id)
             }
             // **Release the filter, don't just mask it.** When the debt reaches zero the
             // banner disappears, taking the only control that turns the filter off with
@@ -51,6 +51,7 @@ struct ArtifactListView: View {
             } message: { artifact in
                 Text(deleteMessage(for: artifact))
             }
+            .reportsModal(pendingDelete != nil)
     }
 
     /// Placeholders for artifacts whose `record.json` couldn't be read (slice 56).
@@ -104,17 +105,15 @@ struct ArtifactListView: View {
                         ArtifactRow(summary: artifact)
                             .tag(artifact.uid)
                             .contextMenu {
-                                Button(
-                                    "Delete Artifact…", systemImage: "trash", role: .destructive
-                                ) {
-                                    pendingDelete = artifact
-                                }
+                                CommandButton(.deleteArtifact, on: .artifact(artifact.uid))
                             }
                     }
                 }
                 // ⌫ deletes the selected artifact (baseline Mac expectation) — it raises
                 // the same confirm as the context menu, not a silent delete.
-                .onDeleteCommand { confirmDeleteSelection() }
+                .onDeleteCommand {
+                    if let selection { model.perform(.deleteArtifact, on: .artifact(selection)) }
+                }
             }
         }
     }
@@ -196,12 +195,11 @@ struct ArtifactListView: View {
         .help("Artifacts whose source has not been characterised yet.")
     }
 
-    /// Raises the delete confirm for the currently selected artifact (⌫ / menu).
+    /// Raises the delete confirm for `id` (⌫, the menu, a row's context menu).
     /// Resolves against the full artifact list so an active filter narrowing the
-    /// sidebar doesn't lose the target. No-op when nothing is selected.
-    private func confirmDeleteSelection() {
-        guard let selection, let summary = model.artifacts.first(where: { $0.uid == selection })
-        else { return }
+    /// sidebar doesn't lose the target.
+    private func confirmDelete(_ id: ArtifactID) {
+        guard let summary = model.artifacts.first(where: { $0.uid == id }) else { return }
         pendingDelete = summary
     }
 
