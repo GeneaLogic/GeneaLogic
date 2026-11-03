@@ -142,8 +142,9 @@ is no selection for them to act on. 83 gives them context menus from the same so
   while AppKit has a sheet, panel or modal window on the key window. Reported ones grey
   the items; the Tree's focus popover now reports. One wrapper that presents and reports
   was considered, but needs an overload per presentation form, and the backstop covers
-  any form. A Continuity scan shows nothing modal on the Mac; its scan arrives through
-  its own callback, so an importer opened meanwhile loses nothing.
+  any form. A Continuity scan's waiting UI is AppKit's: the backstop catches it if it
+  is attached to the window, and if not, the scan still arrives through its own
+  callback, so an importer opened meanwhile loses nothing (not measured; hand-test).
 - **Find… shows a hidden sidebar first** (the split view's visibility is now bound).
 - **In-pane affordances ask the rule too** (`CommandAffordance`), and the transcript and
   empty-pane Attach File… take their titles from the source. They are not greyed under a
