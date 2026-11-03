@@ -215,12 +215,18 @@ private struct TabMenuItem: View {
 
     var body: some View {
         let command = ArchiveCommand.showTab(tab)
-        let context = model?.commandContext ?? CommandContext()
+        let context = model?.commandContext(for: command) ?? CommandContext()
         Toggle(
             command.title,
             isOn: Binding(
                 get: { context.hasArchive && context.activeTab == tab },
-                set: { _ in model?.perform(command) })
+                set: { _ in
+                    if NSApp.keyWindowIsUnderModal {
+                        NSSound.beep()
+                    } else {
+                        model?.perform(command)
+                    }
+                })
         )
         .keyboardShortcut(command.shortcut)
         .disabled(!context.isAvailable(command))

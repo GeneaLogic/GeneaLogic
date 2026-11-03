@@ -4371,6 +4371,9 @@ been two slices.
   is optional, and made every global command look unavailable; it is `.archive`. The
   Edit menu had no Find and `.searchable` takes no ⌘F (measured), so Find… is a command.
   A menu key equivalent beats the text field, so ⌘⌫ typed in a field is sent back to it.
+  Reporting modals by hand drifts (review found an unreported popover), so a menu
+  command also refuses while AppKit has a sheet on the key window. A long `+` chain of
+  `map`s in a test timed out the type checker on CI only.
 
 ## Carryovers and parked work
 

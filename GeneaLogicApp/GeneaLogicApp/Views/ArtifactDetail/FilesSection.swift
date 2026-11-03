@@ -25,14 +25,9 @@ struct FilesSection: View {
                 // then pops a second, disconnected AppKit menu (a slice 32 follow-up).
                 // Not `model.perform(.attachFile)`: the menu bar's version goes straight to
                 // the importer, because the connected menu can't anchor to a menu item.
-                Button {
-                    model.beginAttachOrScan(to: artifactID)
-                } label: {
-                    AddAffordanceLabel(
-                        title: ArchiveCommand.attachFile.title,
-                        systemImage: ArchiveCommand.attachFile.systemImage, opensMenu: true)
-                }
-                .buttonStyle(.plain)
+                CommandAffordance(
+                    command: .attachFile, subject: .artifact(artifactID), opensMenu: true,
+                    action: { model.beginAttachOrScan(to: artifactID) })
             }
 
             if files.isEmpty {

@@ -231,6 +231,9 @@ private struct OpenArchiveView: View {
     @State private var scanner = ContinuityCameraScanner()
     /// Whether the sidebar's search field has focus, for Edit ▸ Find… (slice 82).
     @FocusState private var isSearchFocused: Bool
+    /// Whether the sidebar is showing, bound so Edit ▸ Find… can show a hidden one: its
+    /// search field can't take focus while it is hidden. Per window, like the toggle.
+    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     /// Per-window, per-session dismissal of the damage banner (slice 56). Not
     /// persisted on purpose: one click must not silence damage that is still
     /// there, so it comes back on the next open. The pinned placeholder rows
@@ -374,9 +377,19 @@ private struct OpenArchiveView: View {
                 guard tab == .people else { return }
                 model.selectedPerson = resolvedID
             }
-            // Edit ▸ Find… (slice 82).
+            // Edit ▸ Find… (slice 82). A hidden sidebar is shown first, and the field
+            // focused once the column is back.
             .onChange(of: model.pendingCommand) {
-                if model.claimPendingCommand({ $0 == .find }) != nil { isSearchFocused = true }
+                guard model.claimPendingCommand({ $0 == .find }) != nil else { return }
+                if columnVisibility == .detailOnly {
+                    columnVisibility = .all
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(300))
+                        isSearchFocused = true
+                    }
+                } else {
+                    isSearchFocused = true
+                }
             }
             // View ▸ ⌘1–⌘4, and a create that switches to its own tab first (slice 82).
             .onChange(of: model.pendingTab) { _, target in
@@ -432,7 +445,7 @@ private struct OpenArchiveView: View {
         if tab == .tree {
             NavigationStack { TreeTab(focus: $personSelection) }
         } else {
-            NavigationSplitView {
+            NavigationSplitView(columnVisibility: $columnVisibility) {
                 // The column width is the same for both sections, so set it once here
                 // rather than per branch inside `sidebar`.
                 sidebar

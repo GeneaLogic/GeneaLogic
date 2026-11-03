@@ -22,9 +22,10 @@ the detail view refuses it silently. And there is no key for the four tabs (G2).
   selected artifact, selected file, selected person, person count, and whether a sheet,
   dialog or panel is up in the window. The menu bar, the context menus and the in-pane
   buttons all ask it. This is what turns off Edit Transcript… while an editor is up.
-- **A sheet being up is reported, not guessed.** A `.archiveSheet` modifier wraps the
-  window's sheets and confirmation dialogs, and counts them in the model. The importer
-  already sets a flag in the model.
+- **A sheet being up is reported, not guessed.** Each view's sheets, dialogs and
+  popovers report themselves (`reportsModal`) and the model counts them, with its own
+  flags (importer, Verify, Trash, New Person, alerts). AppKit's view of the key window
+  is the backstop (below).
 - **Running a command:** commands the model can run itself (Add Artifact…, Show Trash…)
   run there. Commands that open a sheet a view owns go through one `pendingCommand`
   intent, which replaces today's four (`pendingArtifactCommand`, `pendingFileCommand`,
@@ -131,3 +132,25 @@ is no selection for them to act on. 83 gives them context menus from the same so
   the importer, because the connected menu can't anchor to a menu item (as before).
 - The ⋯ menu's verbs now follow the Selected File order, and its Delete File… uses the
   detail's confirm, so there is one.
+
+**Revised on `/code-review`:**
+
+- **The menu bar acts on the selection when chosen**, not when the menu was last drawn.
+- **⌘⌫ goes back to a field only when that key was typed into an editable one**: not a
+  Return in Help's search, and not a selectable label.
+- **A modal nobody reported can't be covered.** A menu command beeps instead of running
+  while AppKit has a sheet, panel or modal window on the key window. Reported ones grey
+  the items; the Tree's focus popover now reports. One wrapper that presents and reports
+  was considered, but needs an overload per presentation form, and the backstop covers
+  any form. A Continuity scan shows nothing modal on the Mac; its scan arrives through
+  its own callback, so an importer opened meanwhile loses nothing.
+- **Find… shows a hidden sidebar first** (the split view's visibility is now bound).
+- **In-pane affordances ask the rule too** (`CommandAffordance`), and the transcript and
+  empty-pane Attach File… take their titles from the source. They are not greyed under a
+  sheet, which can't be clicked through anyway.
+- **Each view reads only its command's part of the context** (`commandContext(for:)`), so
+  selecting a file doesn't redraw every person command. A test pins that it decides as
+  the whole context does.
+- **The tab commands are one case each**, so `allCases` is the compiler's.
+- **CI:** the test's reserved-key list, as one `+` chain, timed out the type checker on
+  the runner (not locally). It is built in typed parts.

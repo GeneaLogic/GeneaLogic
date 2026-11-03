@@ -14,8 +14,9 @@ enum ArchiveCommand: Hashable, CaseIterable {
     case addArtifact, newPerson, verifyIntegrity, showTrash
     // Edit
     case find
-    // View
-    case showTab(ArchiveTab), toggleInspector
+    // View. One case per tab rather than `showTab(ArchiveTab)`, so `allCases` is the
+    // compiler's and a new command can't be missed by the tests that sweep it.
+    case showArtifacts, showPeople, showTree, showReview, toggleInspector
     // Artifact
     case addEvent, addPlace, addMention, editTranscript, attachFile, deleteArtifact
     // Artifact ▸ Selected File
@@ -24,23 +25,34 @@ enum ArchiveCommand: Hashable, CaseIterable {
     // Person
     case addName, addFact, addRelationship, mergePerson, deletePerson
 
-    static let allCases: [ArchiveCommand] =
-        [.addArtifact, .newPerson, .verifyIntegrity, .showTrash, .find]
-        + ArchiveTab.allCases.map(ArchiveCommand.showTab) + [.toggleInspector]
-        + [.addEvent, .addPlace, .addMention, .editTranscript, .attachFile, .deleteArtifact]
-        + [
-            .openFileInWindow, .openFileInDefaultApp, .saveFileCopy, .scanFileForMetadata,
-            .replaceFile, .deleteFile,
-        ]
-        + [.addName, .addFact, .addRelationship, .mergePerson, .deletePerson]
+    /// The command that shows `tab` (View ▸ ⌘1–⌘4).
+    nonisolated static func showTab(_ tab: ArchiveTab) -> ArchiveCommand {
+        switch tab {
+        case .artifacts: .showArtifacts
+        case .people: .showPeople
+        case .tree: .showTree
+        case .review: .showReview
+        }
+    }
+
+    /// The tab this command shows, if it is one of View's tab commands.
+    var shownTab: ArchiveTab? {
+        switch self {
+        case .showArtifacts: .artifacts
+        case .showPeople: .people
+        case .showTree: .tree
+        case .showReview: .review
+        default: nil
+        }
+    }
 
     /// What a command acts on.
     enum SubjectKind { case archive, artifact, file, person }
 
     var subjectKind: SubjectKind {
         switch self {
-        case .addArtifact, .newPerson, .verifyIntegrity, .showTrash, .find, .showTab,
-            .toggleInspector:
+        case .addArtifact, .newPerson, .verifyIntegrity, .showTrash, .find, .showArtifacts,
+            .showPeople, .showTree, .showReview, .toggleInspector:
             .archive
         case .addEvent, .addPlace, .addMention, .editTranscript, .attachFile, .deleteArtifact:
             .artifact
@@ -71,7 +83,7 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .verifyIntegrity: "Verify Integrity…"
         case .showTrash: "Show Trash…"
         case .find: "Find…"
-        case .showTab(let tab): tab.label
+        case .showArtifacts, .showPeople, .showTree, .showReview: shownTab?.label ?? ""
         case .toggleInspector: "Hide Inspector"
         case .addEvent: "Add Event…"
         case .addPlace: "Add Place…"
@@ -108,6 +120,12 @@ enum ArchiveCommand: Hashable, CaseIterable {
         self == .addMention ? "Add Person…" : title
     }
 
+    /// The in-pane title while there is nothing yet to act on: the transcript's button
+    /// adds one until there is one to edit.
+    var emptyPaneTitle: String {
+        self == .editTranscript ? "Add Transcript…" : paneTitle
+    }
+
     var systemImage: String {
         switch self {
         case .addArtifact: "plus"
@@ -115,7 +133,7 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .verifyIntegrity: "checkmark.shield"
         case .showTrash: "trash"
         case .find: "magnifyingglass"
-        case .showTab: "square.grid.2x2"
+        case .showArtifacts, .showPeople, .showTree, .showReview: "square.grid.2x2"
         case .toggleInspector: "info.circle"
         case .addEvent: "calendar"
         case .addPlace: "mappin.and.ellipse"
@@ -151,7 +169,8 @@ enum ArchiveCommand: Hashable, CaseIterable {
         // Provisional, to revisit in the hand-test (fork 3).
         case .newPerson: KeyboardShortcut("n", modifiers: [.command, .shift])
         case .find: KeyboardShortcut("f", modifiers: [.command])
-        case .showTab(let tab): KeyboardShortcut(tab.shortcutKey, modifiers: [.command])
+        case .showArtifacts, .showPeople, .showTree, .showReview:
+            shownTab.map { KeyboardShortcut($0.shortcutKey, modifiers: [.command]) }
         // Finder, Calendar and Pages put the inspector on ⌥⌘I.
         case .toggleInspector: KeyboardShortcut("i", modifiers: [.command, .option])
         // Finder's Move to Trash, and both deletes go to the archive's trash or undo.

@@ -15,7 +15,6 @@ struct EventsPlacesSection: View {
     let artifactID: ArtifactID
     let events: [Event]
     let locations: [Location]
-    @Binding var sheet: ArtifactSheet?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {

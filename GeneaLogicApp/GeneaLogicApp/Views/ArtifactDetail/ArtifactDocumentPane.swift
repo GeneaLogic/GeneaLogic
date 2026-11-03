@@ -24,7 +24,11 @@ struct ArtifactDocumentPane: View {
                         "This artifact has no attached files. Attach a document, photo, or "
                             + "scan to see it here.")
                 } actions: {
-                    Button("Attach File…") { model.beginAttachOrScan(to: artifactID) }
+                    // The in-pane Attach File…, with the scan options (see `FilesSection`).
+                    Button(ArchiveCommand.attachFile.title) {
+                        model.beginAttachOrScan(to: artifactID)
+                    }
+                    .disabled(!model.canPerform(.attachFile, on: .artifact(artifactID)))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {

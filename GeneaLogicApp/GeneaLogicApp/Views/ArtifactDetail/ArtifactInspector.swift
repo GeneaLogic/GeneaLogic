@@ -61,8 +61,7 @@ struct ArtifactInspector: View {
                 EventsPlacesSection(
                     artifactID: artifactID,
                     events: detail?.events ?? [],
-                    locations: detail?.locations ?? [],
-                    sheet: $sheet)
+                    locations: detail?.locations ?? [])
 
                 PersonsMentionedSection(
                     artifactID: artifactID,
@@ -72,7 +71,7 @@ struct ArtifactInspector: View {
                     relationshipSuggestions: relationshipSuggestions,
                     sheet: $sheet)
 
-                TranscriptSection(transcript: transcript, sheet: $sheet)
+                TranscriptSection(artifactID: artifactID, transcript: transcript)
 
                 FilesSection(artifactID: artifactID, files: files, selectedFileID: $selectedFileID)
 

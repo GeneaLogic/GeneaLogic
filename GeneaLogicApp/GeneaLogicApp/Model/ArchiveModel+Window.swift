@@ -23,6 +23,38 @@ extension ArchiveModel {
             isPresentingModal: isPresentingModal, inspectorVisible: inspectorVisible)
     }
 
+    /// The part of `commandContext` that `command`'s availability depends on, and nothing
+    /// else. A view asking about one command reads only these, so observation redraws it
+    /// only when they change: selecting a file doesn't redraw every person command, and
+    /// editing a person doesn't redraw every file row's ⋯ menu. `CommandAvailabilityTests`
+    /// pins that it decides as the whole context does.
+    func commandContext(for command: ArchiveCommand) -> CommandContext {
+        var context = CommandContext(
+            hasArchive: archive != nil, activeTab: activeTab,
+            isPresentingModal: isPresentingModal)
+        switch command.subjectKind {
+        case .archive: break
+        case .artifact: context.selectedArtifact = selectedArtifact
+        case .file:
+            context.selectedArtifact = selectedArtifact
+            context.selectedFile = selectedFile
+        case .person: context.selectedPerson = selectedPerson
+        }
+        switch command {
+        case .toggleInspector:
+            context.selectedArtifact = selectedArtifact
+            context.inspectorVisible = inspectorVisible
+        case .mergePerson: context.personCount = persons.count
+        default: break
+        }
+        return context
+    }
+
+    /// Whether `command` can run on `subject` now (`CommandContext.canPerform`).
+    func canPerform(_ command: ArchiveCommand, on subject: CommandSubject) -> Bool {
+        commandContext(for: command).canPerform(command, on: subject)
+    }
+
     /// Whether a sheet, dialog, alert or panel is up in this window: the ones this model
     /// drives, and the ones views report (`reportsModal`).
     var isPresentingModal: Bool {
@@ -34,7 +66,7 @@ extension ArchiveModel {
     /// run here; one that opens a sheet a view owns is left for that view as
     /// `pendingCommand`.
     func perform(_ command: ArchiveCommand, on subject: CommandSubject = .archive) {
-        guard commandContext.canPerform(command, on: subject) else { return }
+        guard canPerform(command, on: subject) else { return }
         switch command {
         case .addArtifact:
             pendingTab = .artifacts
@@ -44,7 +76,7 @@ extension ArchiveModel {
             isCreatingPerson = true
         case .verifyIntegrity: beginVerifyIntegrity()
         case .showTrash: beginShowTrash()
-        case .showTab(let tab): pendingTab = tab
+        case .showArtifacts, .showPeople, .showTree, .showReview: pendingTab = command.shownTab
         // Straight to the file importer, *not* the Continuity connected menu: an AppKit
         // `popUpContextMenu` invoked from a menu-bar command has no anchor view and
         // floats as a disconnected menu. The in-pane Attach File… keeps the scan options

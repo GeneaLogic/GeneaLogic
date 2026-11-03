@@ -118,6 +118,35 @@ import Testing
         #expect(model.pendingCommand == nil)
     }
 
+    /// Each command's own slice of the context (`commandContext(for:)`, read so a view
+    /// observes only what its command depends on) decides as the whole context does.
+    @MainActor @Test func aCommandsOwnContextAgreesWithTheWindows() throws {
+        let (model, root) = try AppTestSupport.makeModel()
+        defer { AppTestSupport.remove(root) }
+        let modal = UUID()
+
+        for tab in ArchiveTab.allCases {
+            for selected in [false, true] {
+                for isModal in [false, true] {
+                    model.activeTab = tab
+                    model.selectedArtifact = selected ? artifact : nil
+                    model.selectedFile = selected ? file : nil
+                    model.selectedPerson = selected ? person : nil
+                    model.inspectorVisible = selected
+                    model.setModal(modal, presented: isModal)
+                    let whole = model.commandContext
+                    for command in ArchiveCommand.allCases {
+                        let own = model.commandContext(for: command)
+                        #expect(own.isAvailable(command) == whole.isAvailable(command))
+                        #expect(own.selectionSubject(for: command) == whole.selectionSubject(for: command))
+                        #expect(command.title(in: own) == command.title(in: whole))
+                        #expect(own.ownsShortcut(command) == whole.ownsShortcut(command))
+                    }
+                }
+            }
+        }
+    }
+
     @MainActor @Test func aCommandWaitsForAnOpenSheet() throws {
         let (model, root) = try AppTestSupport.makeModel()
         defer { AppTestSupport.remove(root) }
@@ -138,9 +167,11 @@ import Testing
 @Suite struct CommandShortcutTests {
     /// The system's keys, and the text-editing ones a field answers (⌘E use selection
     /// for find, ⌘G find next, ⌘J jump to selection, ⌘T fonts, ⌘B ⌘U ⌘I styles).
-    private static let reserved: [KeyboardShortcut] =
-        "hmqebjgtui,a".map { KeyboardShortcut(KeyEquivalent($0), modifiers: .command) }
-        + [
+    ///
+    /// Built in typed parts: as one `+` chain it timed out the type checker on CI.
+    private static let reserved: [KeyboardShortcut] = {
+        let command: [KeyboardShortcut] = "hmqebjgtui,a".map(Self.command)
+        let others: [KeyboardShortcut] = [
             KeyboardShortcut("`", modifiers: .command),
             KeyboardShortcut(.space, modifiers: .command),
             KeyboardShortcut("d", modifiers: [.command, .option]),
@@ -150,11 +181,20 @@ import Testing
             KeyboardShortcut("s", modifiers: [.command, .control]),
             KeyboardShortcut("/", modifiers: [.command, .shift]),
             KeyboardShortcut(.escape, modifiers: [.command, .option]),
-        ] + "345".map { KeyboardShortcut(KeyEquivalent($0), modifiers: [.command, .shift]) }
-        // The File and Edit menus' own: New Archive, Open, Close, Undo, Redo, the clipboard.
-        // (⌘F isn't here: Find… is a command, and ⌘F is its standard key.)
-        + "nowzxcv".map { KeyboardShortcut(KeyEquivalent($0), modifiers: .command) }
-        + [KeyboardShortcut("z", modifiers: [.command, .shift])]
+            KeyboardShortcut("z", modifiers: [.command, .shift]),
+        ]
+        let screenshots: [KeyboardShortcut] = "345".map {
+            KeyboardShortcut(KeyEquivalent($0), modifiers: [.command, .shift])
+        }
+        // The File and Edit menus' own: New Archive, Open, Close, Undo, the clipboard (and
+        // Redo, above). ⌘F isn't here: Find… is a command, and ⌘F is its standard key.
+        let menus: [KeyboardShortcut] = "nowzxcv".map(Self.command)
+        return command + others + screenshots + menus
+    }()
+
+    nonisolated private static func command(_ key: Character) -> KeyboardShortcut {
+        KeyboardShortcut(KeyEquivalent(key), modifiers: .command)
+    }
 
     @Test func noCommandTakesAReservedKey() {
         for command in ArchiveCommand.allCases {

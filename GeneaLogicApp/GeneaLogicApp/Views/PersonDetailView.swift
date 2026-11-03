@@ -143,14 +143,9 @@ struct PersonDetailView: View {
         }
     }
 
-    /// A section's Add button: the Person menu's command, with its title and symbol.
+    /// A section's Add button: the Person menu's command.
     private func addButton(_ command: ArchiveCommand) -> some View {
-        Button {
-            model.perform(command, on: .person(personID))
-        } label: {
-            AddAffordanceLabel(title: command.title, systemImage: command.systemImage)
-        }
-        .buttonStyle(.plain)
+        CommandAffordance(command: command, subject: .person(personID))
     }
 
     private var reloadKey: String { "\(personID.raw)-\(model.mutationVersion)" }

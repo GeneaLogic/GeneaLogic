@@ -226,6 +226,7 @@ struct TreeTab: View {
             .padding(Layout.sheetPadding)
             .frame(width: Layout.Tree.focusPickerWidth, height: Layout.Tree.focusPickerHeight)
         }
+        .reportsModal(isPickingFocus)
     }
 
     private var focusName: String {
