@@ -61,7 +61,8 @@ Specced 2026-11-02 from the [second UI audit](workstream-5-ui-audit.md):
    [#50](https://github.com/GeneaLogic/GeneaLogic/issues/50).
 
 No fork for G3: add `SidebarCommands()`. On Tree, which has no split view, the item is
-disabled by the responder chain, as the sidebar button is. G22 is a mechanical swap.
+disabled by the responder chain, as the sidebar button is. G22 is a mechanical swap,
+except one (below).
 
 ## Out of scope
 
@@ -85,10 +86,28 @@ disabled by the responder chain, as the sidebar button is. G22 is a mechanical s
   bottom.
 - About GeneaLogic shows the credits, readable in light and dark mode, and its links open.
 - Create an archive named `Test`: ⌘-clicking the title shows the name alone, and so does
-  Finder. Create one named `Test2.genea`: both show the extension. Open the sample and
+  Finder. Create one named `Test2.genea`: both show the extension. Delete a sample built
+  before 81 (`Application Support/Sample` in the app's container), open the sample, and
   ⌘-click its title: the name alone.
 - Help ▸ GeneaLogic on GitHub and Report an Issue… open the right pages. The Help menu's
   search field still finds menu items.
 - The seven G22 sites look the same as before: the transcript editor's border, the person
-  picker's border, tree cards (focus ring, tint), file chips, and the file strip with no
-  scroll bar.
+  picker's border, tree cards (focus ring, tint) and file chips. The file strip shows no
+  scroll bar by default, and does show one with Scroll bars set to Always.
+
+**Revised on `/code-review`:**
+
+- **The file strip now follows the user's scroll-bar setting.** Measured with scroll
+  bars set to Always: `showsIndicators: false` behaves as `.never` and shows no scroll
+  bar, so the old code overrode the setting. `.hidden` shows the bar under Always or with
+  a mouse, and hides it otherwise. Kept `.hidden`: the strip scrolls sideways, which a
+  mouse user needs the bar for. The review suggested `.never`, a faithful copy of the
+  old behaviour, and that was declined.
+- **The hidden-extension flag is best effort.** A volume that refuses it no longer turns
+  a create that succeeded into "Couldn't create the archive". It is set explicitly
+  because a new package starts with it unset and shows `.genea` (measured).
+- `ArchiveLauncher.create(at:)` now also acquires access and returns the window value,
+  so the scope rule is written once. `createPackage(at:)` is the part the tests cover.
+  The panel's URL always has the extension, so the hand-written append is gone.
+- The tests clean up their temporary folders, and pin that showing the extension
+  clears a flag that is set.

@@ -4353,6 +4353,8 @@ been two slices.
   follows the file's hidden-extension flag, not the window title, which already
   stripped it. The audit missed a seventh soft-deprecated call site, on the file chips.
   `Credits.rtf` rather than HTML, because HTML imports as black text.
+  `ScrollView(showsIndicators: false)` is `.never` on macOS, which overrides Scroll bars:
+  Always (measured). It became `.hidden`, which follows that setting.
 
 ## Carryovers and parked work
 

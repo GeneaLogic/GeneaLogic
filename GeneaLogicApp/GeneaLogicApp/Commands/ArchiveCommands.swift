@@ -199,13 +199,8 @@ struct ArchiveCommands: Commands {
     /// the just-created package itself (uniform with every other open path).
     private func newArchive() {
         guard let location = ArchiveLauncher.newArchiveLocation() else { return }
-        let url = location.url
         do {
-            try ArchiveLauncher.create(at: location)
-            // Create/acquire on the original scoped URL; canonicalize only the window
-            // value (canonicalizing before acquire would strip the security scope).
-            ArchiveAccessStore.shared.acquire(url)
-            openWindow(value: url.canonicalArchiveURL)
+            openWindow(value: try ArchiveLauncher.create(at: location))
         } catch {
             presentFailure("Couldn't create the archive.", error)
         }

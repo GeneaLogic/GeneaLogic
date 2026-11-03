@@ -36,32 +36,41 @@ enum ArchiveLauncher {
         panel.message = "Choose a name and location for the new GeneaLogic archive."
         panel.prompt = "Create"
 
-        guard panel.runModal() == .OK, var url = panel.url else { return nil }
-
-        if url.pathExtension != "genea" {
-            url.appendPathExtension("genea")
-        }
-
+        // With a content type set, the panel's URL always carries the extension.
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
         return NewArchiveLocation(url: url, hidesExtension: panel.isExtensionHidden)
     }
 
-    /// Creates the archive at a location the save panel chose, with its extension
-    /// hidden or shown as the panel said. File ▸ New Archive… and the welcome screen
-    /// both create through here; each then acquires access and opens the window its
-    /// own way.
-    static func create(at location: NewArchiveLocation) throws {
+    /// Creates the archive at a location the save panel chose and acquires access to
+    /// it, returning the value for its window. File ▸ New Archive… and the welcome
+    /// screen both create through here, so the scope rule below is written once.
+    static func create(at location: NewArchiveLocation) throws -> URL {
+        try createPackage(at: location)
+        // Acquire on the original scoped URL; canonicalize only the window value
+        // (canonicalizing before acquire would strip the security scope).
+        ArchiveAccessStore.shared.acquire(location.url)
+        return location.url.canonicalArchiveURL
+    }
+
+    /// The package itself, with its extension hidden or shown as the panel said. Split
+    /// from `create(at:)` so tests can make one without adding it to Recents.
+    static func createPackage(at location: NewArchiveLocation) throws {
         _ = try Archive.create(at: location.url)
-        try setExtensionHidden(location.hidesExtension, at: location.url)
+        setExtensionHidden(location.hidesExtension, at: location.url)
     }
 
     /// Sets the file system's hidden-extension flag, which the window title's path
-    /// menu and Finder both follow. Only on an archive the app has just created: on
-    /// an existing one the flag is the user's, and Finder's Get Info changes it.
-    nonisolated static func setExtensionHidden(_ hidden: Bool, at url: URL) throws {
+    /// menu and Finder both follow. A new package has it unset, so its extension shows
+    /// (measured). Only on an archive the app has just created: on an existing one the
+    /// flag is the user's, and Finder's Get Info changes it.
+    ///
+    /// Best effort: the flag is cosmetic, so a volume that refuses it must not turn a
+    /// create that succeeded into a reported failure.
+    nonisolated static func setExtensionHidden(_ hidden: Bool, at url: URL) {
         var values = URLResourceValues()
         values.hasHiddenExtension = hidden
         var url = url
-        try url.setResourceValues(values)
+        try? url.setResourceValues(values)
     }
 
     /// Shows an `NSOpenPanel` for choosing an existing `.genea` archive package,

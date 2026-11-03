@@ -87,11 +87,8 @@ struct WelcomeView: View {
     /// this window by writing the bound `url`.
     private func createArchive() {
         guard let location = ArchiveLauncher.newArchiveLocation() else { return }
-        let created = location.url
         do {
-            try ArchiveLauncher.create(at: location)
-            ArchiveAccessStore.shared.acquire(created)
-            url = created.canonicalArchiveURL
+            url = try ArchiveLauncher.create(at: location)
         } catch {
             errorMessage = (error as? ArchiveError)?.description ?? String(describing: error)
         }

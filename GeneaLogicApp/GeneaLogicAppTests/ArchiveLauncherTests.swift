@@ -9,13 +9,18 @@ import Testing
 /// said to show it (G21), and the About panel's credits read in dark mode (G17).
 @Suite struct ArchiveLauncherTests {
 
-    private func location(hidesExtension: Bool) -> ArchiveLauncher.NewArchiveLocation {
-        let url = FileManager.default.temporaryDirectory
+    /// A location in a fresh temporary folder, removed by `cleanUp`.
+    private func location(hidesExtension: Bool) throws -> ArchiveLauncher.NewArchiveLocation {
+        let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("ArchiveLauncherTests-\(UUID().uuidString)", isDirectory: true)
-            .appendingPathComponent("Family.genea", isDirectory: true)
-        try? FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        return ArchiveLauncher.NewArchiveLocation(url: url, hidesExtension: hidesExtension)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return ArchiveLauncher.NewArchiveLocation(
+            url: folder.appendingPathComponent("Family.genea", isDirectory: true),
+            hidesExtension: hidesExtension)
+    }
+
+    private func cleanUp(_ location: ArchiveLauncher.NewArchiveLocation) {
+        try? FileManager.default.removeItem(at: location.url.deletingLastPathComponent())
     }
 
     private func hasHiddenExtension(_ url: URL) throws -> Bool {
@@ -23,8 +28,9 @@ import Testing
     }
 
     @Test func aNewArchiveHidesItsExtension() throws {
-        let location = location(hidesExtension: true)
-        try ArchiveLauncher.create(at: location)
+        let location = try location(hidesExtension: true)
+        defer { cleanUp(location) }
+        try ArchiveLauncher.createPackage(at: location)
 
         #expect(try hasHiddenExtension(location.url))
         #expect(FileManager.default.displayName(atPath: location.url.path) == "Family")
@@ -33,8 +39,22 @@ import Testing
 
     /// The user typed `.genea` into the panel's name, so the panel said to show it.
     @Test func aNewArchiveShowsItsExtensionWhenAsked() throws {
-        let location = location(hidesExtension: false)
-        try ArchiveLauncher.create(at: location)
+        let location = try location(hidesExtension: false)
+        defer { cleanUp(location) }
+        try ArchiveLauncher.createPackage(at: location)
+
+        #expect(try !hasHiddenExtension(location.url))
+        #expect(FileManager.default.displayName(atPath: location.url.path) == "Family.genea")
+    }
+
+    /// A new package starts with the flag unset, so the test above can't tell "shown"
+    /// from "never set". This one checks that showing clears a flag that is set.
+    @Test func showingTheExtensionClearsTheFlag() throws {
+        let location = try location(hidesExtension: true)
+        defer { cleanUp(location) }
+        try ArchiveLauncher.createPackage(at: location)
+
+        ArchiveLauncher.setExtensionHidden(false, at: location.url)
 
         #expect(try !hasHiddenExtension(location.url))
     }
