@@ -117,6 +117,74 @@ extension ArchiveModel {
         refreshRelationshipSuggestions(archive)
     }
 
+    // MARK: - Review's commands (slice 83)
+
+    /// The worklist in the sidebar's order: names, facts, relationships, duplicates.
+    var reviewRows: [ReviewTarget] {
+        reviewItems.map(\.target) + factItems.map(\.target)
+            + relationshipItems.map(\.target) + duplicateItems.map(\.target)
+    }
+
+    /// The selected row, if it is still on the worklist.
+    var selectedReviewRow: ReviewTarget? {
+        selectedReviewID.flatMap { id in reviewRows.first { $0.id == id } }
+    }
+
+    /// ⌘↩ on `target`: the top row's yes. A suggestion that can only be applied (a couple
+    /// fact, an age) opens its editor, so nothing writes unseen and no row is skipped.
+    ///
+    /// **One decision at a time.** The write is asynchronous and the row stays until it
+    /// lands, so a quick second press would otherwise decide the same row again.
+    func acceptReviewRow(_ target: ReviewTarget) {
+        guard !hasMutationsInFlight else { return }
+        switch target.lane {
+        case .name:
+            guard let item = reviewItems.first(where: { $0.id == target.id }),
+                let top = item.candidates.first
+            else { return }
+            confirmSuggestion(top.suggestion)
+        case .facts:
+            guard let item = factItems.first(where: { $0.id == target.id }),
+                let top = item.suggestions.first
+            else { return }
+            if top.isDirectlyRecordable {
+                recordSuggestedFact(top, for: item.person.uid)
+            } else {
+                pendingCommand = PendingCommand(
+                    command: .acceptSuggestion, subject: .review(target))
+            }
+        case .relationship:
+            guard let item = relationshipItems.first(where: { $0.id == target.id }) else {
+                return
+            }
+            confirmSuggestedRelationship(item)
+        case .duplicate:
+            break
+        }
+    }
+
+    /// ⌘⌫ on `target`: the top row's no. See `acceptReviewRow`.
+    func declineReviewRow(_ target: ReviewTarget) {
+        guard !hasMutationsInFlight else { return }
+        switch target.lane {
+        case .name:
+            guard let item = reviewItems.first(where: { $0.id == target.id }),
+                let top = item.candidates.first
+            else { return }
+            rejectSuggestion(top.suggestion)
+        case .relationship:
+            guard let item = relationshipItems.first(where: { $0.id == target.id }) else {
+                return
+            }
+            dismissSuggestedRelationship(item)
+        case .duplicate:
+            guard let item = duplicateItems.first(where: { $0.id == target.id }) else { return }
+            dismissDuplicate(item)
+        case .facts:
+            break
+        }
+    }
+
     /// The Review section's **second lane**: every person with promotable evidence still
     /// un-promoted, ordered as the People sidebar orders them (slice 45i).
     ///

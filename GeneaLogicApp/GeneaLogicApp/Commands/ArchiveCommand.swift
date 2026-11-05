@@ -23,7 +23,13 @@ enum ArchiveCommand: Hashable, CaseIterable {
     case openFileInWindow, openFileInDefaultApp, saveFileCopy, scanFileForMetadata
     case replaceFile, deleteFile
     // Person
-    case addName, addFact, addRelationship, mergePerson, deletePerson
+    case addName, addFact, addRelationship, showInTree, showInPeople, mergePerson, deletePerson
+    // Review (slice 83)
+    case acceptSuggestion, declineSuggestion, mergeDuplicate, somebodyNew, refreshReview
+    // Tree (slice 83). The four depth items and Choose Focus… are View's; Focus Here is a
+    // card's, with no menu-bar subject.
+    case focusHere, moreAncestors, fewerAncestors, moreDescendants, fewerDescendants
+    case chooseFocus
 
     /// The command that shows `tab` (View ▸ ⌘1–⌘4).
     nonisolated static func showTab(_ tab: ArchiveTab) -> ArchiveCommand {
@@ -34,6 +40,19 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .review: .showReview
         }
     }
+
+    /// The one File ▸ Delete item's command on `tab`, or `nil` on a tab with nothing to
+    /// delete (slice 83, fork 1).
+    nonisolated static func delete(on tab: ArchiveTab) -> ArchiveCommand? {
+        switch tab {
+        case .artifacts: .deleteArtifact
+        case .people: .deletePerson
+        case .tree, .review: nil
+        }
+    }
+
+    /// File ▸ Delete's title on a tab with nothing to delete, dimmed.
+    static let idleDeleteTitle = "Delete…"
 
     /// The tab this command shows, if it is one of View's tab commands.
     var shownTab: ArchiveTab? {
@@ -47,30 +66,43 @@ enum ArchiveCommand: Hashable, CaseIterable {
     }
 
     /// What a command acts on.
-    enum SubjectKind { case archive, artifact, file, person }
+    enum SubjectKind { case archive, artifact, file, person, review }
 
     var subjectKind: SubjectKind {
         switch self {
         case .addArtifact, .newPerson, .verifyIntegrity, .showTrash, .find, .showArtifacts,
-            .showPeople, .showTree, .showReview, .toggleInspector:
+            .showPeople, .showTree, .showReview, .toggleInspector, .refreshReview, .moreAncestors,
+            .fewerAncestors, .moreDescendants, .fewerDescendants, .chooseFocus:
             .archive
         case .addEvent, .addPlace, .addMention, .editTranscript, .attachFile, .deleteArtifact:
             .artifact
         case .openFileInWindow, .openFileInDefaultApp, .saveFileCopy, .scanFileForMetadata,
             .replaceFile, .deleteFile:
             .file
-        case .addName, .addFact, .addRelationship, .mergePerson, .deletePerson:
+        case .addName, .addFact, .addRelationship, .showInTree, .showInPeople, .mergePerson,
+            .deletePerson, .focusHere:
             .person
+        case .acceptSuggestion, .declineSuggestion, .mergeDuplicate, .somebodyNew:
+            .review
         }
     }
 
     /// The tab a command belongs to, or `nil` for one that works from any tab. A create
     /// belongs to no tab: it switches to its own first (fork 2), so the result is in view.
     var tab: ArchiveTab? {
-        switch subjectKind {
-        case .archive: self == .toggleInspector ? .artifacts : nil
-        case .artifact, .file: .artifacts
-        case .person: .people
+        switch self {
+        case .toggleInspector: .artifacts
+        case .refreshReview: .review
+        case .focusHere, .showInPeople, .moreAncestors, .fewerAncestors, .moreDescendants,
+            .fewerDescendants, .chooseFocus:
+            .tree
+        default:
+            switch subjectKind {
+            case .archive: nil
+            case .artifact, .file: .artifacts
+            case .person: .people
+            case .review: .review
+            }
         }
     }
 
@@ -102,7 +134,22 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .addFact: "Add Fact…"
         case .addRelationship: "Add Relationship…"
         case .mergePerson: "Merge Into…"
+        case .showInTree: "Show in Tree"
+        case .showInPeople: "Show in People"
         case .deletePerson: "Delete Person…"
+        // Stable, whichever lane is selected, as the HIG asks of a menu. The panes keep
+        // their lane's words (`paneTitle(in:)`).
+        case .acceptSuggestion: "Accept Suggestion"
+        case .declineSuggestion: "Decline Suggestion"
+        case .mergeDuplicate: "Merge People…"
+        case .somebodyNew: "This Is Somebody New…"
+        case .refreshReview: "Refresh"
+        case .focusHere: "Focus Here"
+        case .moreAncestors: "Show More Ancestors"
+        case .fewerAncestors: "Show Fewer Ancestors"
+        case .moreDescendants: "Show More Descendants"
+        case .fewerDescendants: "Show Fewer Descendants"
+        case .chooseFocus: "Choose Focus…"
         }
     }
 
@@ -126,10 +173,48 @@ enum ArchiveCommand: Hashable, CaseIterable {
         self == .editTranscript ? "Add Transcript…" : paneTitle
     }
 
+    /// What a Review pane calls this command in `lane`.
+    func paneTitle(in lane: ReviewLane) -> String {
+        switch (self, lane) {
+        case (.acceptSuggestion, .name): "Confirm"
+        case (.acceptSuggestion, .facts): "Record"
+        case (.acceptSuggestion, .relationship): "Record Relationship"
+        case (.declineSuggestion, .name): "Reject"
+        case (.declineSuggestion, .relationship): "Not This Relationship"
+        case (.declineSuggestion, .duplicate): "Not a Duplicate"
+        default: title
+        }
+    }
+
+    /// The caption on the row Review's keys act on, naming only the keys `lane` has
+    /// (slice 83, fork 3). This, not a prominent button, is what says where ⌘↩ lands:
+    /// prominence would say the matcher's top guess is the likely answer.
+    ///
+    /// `acceptTitle` replaces the lane's word when the top row does something else: a
+    /// suggestion that can only be applied opens its editor.
+    static func reviewKeyCaption(for lane: ReviewLane, acceptTitle: String? = nil) -> String {
+        var parts: [String] = []
+        if lane.canAccept, let key = acceptSuggestion.shortcutGlyphs {
+            parts.append("\(key) \(acceptTitle ?? acceptSuggestion.paneTitle(in: lane))")
+        }
+        if lane.canDecline, let key = declineSuggestion.shortcutGlyphs {
+            parts.append("\(key) \(declineSuggestion.paneTitle(in: lane))")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// The shortcut as a menu shows it, for the two keys a caption names.
+    private var shortcutGlyphs: String? {
+        switch shortcut?.key {
+        case KeyEquivalent.return: "⌘↩"
+        case KeyEquivalent.delete: "⌘⌫"
+        default: nil
+        }
+    }
+
     var systemImage: String {
         switch self {
-        case .addArtifact: "plus"
-        case .newPerson: "person.crop.circle.badge.plus"
+        case .addArtifact, .newPerson: "plus"
         case .verifyIntegrity: "checkmark.shield"
         case .showTrash: "trash"
         case .find: "magnifyingglass"
@@ -149,7 +234,15 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .addName: "person.badge.plus"
         case .addFact: "calendar.badge.plus"
         case .addRelationship: "person.2.badge.plus"
-        case .mergePerson: "arrow.triangle.merge"
+        case .mergePerson, .mergeDuplicate: "arrow.triangle.merge"
+        case .showInTree, .focusHere, .chooseFocus: "target"
+        case .showInPeople: "person.2"
+        case .acceptSuggestion: "checkmark"
+        case .declineSuggestion: "xmark"
+        case .somebodyNew: "person.fill.badge.plus"
+        case .refreshReview: "arrow.clockwise"
+        case .moreAncestors, .moreDescendants: "plus"
+        case .fewerAncestors, .fewerDescendants: "minus"
         }
     }
 
@@ -160,13 +253,14 @@ enum ArchiveCommand: Hashable, CaseIterable {
         }
     }
 
-    /// The shortcut table in `docs/slices/82-one-source-for-commands.md`.
+    /// The shortcut table in `docs/slices/82-one-source-for-commands.md`, as changed by
+    /// `83-command-coverage.md`.
     /// `CommandShortcutTests` pins that none is reserved and none is shared within a tab.
     var shortcut: KeyboardShortcut? {
         switch self {
         // ⇧⌘I is Photos' Import; ⌘I is left free (fork 1).
         case .addArtifact: KeyboardShortcut("i", modifiers: [.command, .shift])
-        // Provisional, to revisit in the hand-test (fork 3).
+        // Shift complements ⌘N New Archive, as the HIG suggests.
         case .newPerson: KeyboardShortcut("n", modifiers: [.command, .shift])
         case .find: KeyboardShortcut("f", modifiers: [.command])
         case .showArtifacts, .showPeople, .showTree, .showReview:
@@ -175,8 +269,27 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .toggleInspector: KeyboardShortcut("i", modifiers: [.command, .option])
         // Finder's Move to Trash, and both deletes go to the archive's trash or undo.
         case .deleteArtifact, .deletePerson: KeyboardShortcut(.delete, modifiers: [.command])
+        // One key per role, shared across tabs as ⌘⌫ is (slice 83, fork 6). ⌘E and ⌘T are
+        // text-editing keys elsewhere, whose actions mean nothing here: there is no find
+        // panel and no styled text.
+        case .addEvent, .addFact: KeyboardShortcut("e", modifiers: [.command])
+        case .addPlace: KeyboardShortcut("l", modifiers: [.command])
+        case .addMention, .addRelationship: KeyboardShortcut("k", modifiers: [.command])
+        case .editTranscript: KeyboardShortcut("t", modifiers: [.command])
+        // Triage is one hand on two keys. They sit on the menu items, not the panes'
+        // buttons: SwiftUI keeps one owner per key, and the menu is what shows it.
+        case .acceptSuggestion: KeyboardShortcut(.return, modifiers: [.command])
+        case .declineSuggestion: KeyboardShortcut(.delete, modifiers: [.command])
+        case .refreshReview: KeyboardShortcut("r", modifiers: [.command])
         default: nil
         }
+    }
+
+    /// Whether a held key runs this command once. Every other key undoes or opens
+    /// something; these two write a human verdict and move to the next row, so a repeat
+    /// would confirm a queue nobody read.
+    var ignoresKeyRepeat: Bool {
+        self == .acceptSuggestion || self == .declineSuggestion
     }
 
     /// The text-editing action a command's shortcut also means, sent instead when that
@@ -185,19 +298,21 @@ enum ArchiveCommand: Hashable, CaseIterable {
     /// to delete the artifact rather than the line.
     var textEditingAction: Selector? {
         switch self {
-        case .deleteArtifact, .deletePerson: #selector(NSResponder.deleteToBeginningOfLine(_:))
+        case .deleteArtifact, .deletePerson, .declineSuggestion:
+            #selector(NSResponder.deleteToBeginningOfLine(_:))
         default: nil
         }
     }
 }
 
-/// What a command acts on: the archive as a whole, an artifact, one of its files, or a
-/// person. (Not `.none`, which an optional subject would read as `nil`.)
+/// What a command acts on: the archive as a whole, an artifact, one of its files, a
+/// person, or a row of Review's worklist. (Not `.none`, which an optional subject would read as `nil`.)
 enum CommandSubject: Hashable {
     case archive
     case artifact(ArtifactID)
     case file(FileID, in: ArtifactID)
     case person(PersonID)
+    case review(ReviewTarget)
 
     var kind: ArchiveCommand.SubjectKind {
         switch self {
@@ -205,8 +320,19 @@ enum CommandSubject: Hashable {
         case .artifact: .artifact
         case .file: .file
         case .person: .person
+        case .review: .review
         }
     }
+}
+
+/// How far the Tree draws from its focus, mirrored from `TreeTab`'s `@SceneStorage` so
+/// View's depth items can grey at the ends of the range.
+struct TreeDepths: Equatable {
+    /// The one range the steppers and the menu items share.
+    static let range = 0...8
+
+    var ancestors = 3
+    var descendants = 3
 }
 
 /// What the window looks like to the commands: everything availability depends on, in
@@ -222,6 +348,11 @@ struct CommandContext: Equatable {
     /// one that opened a second sheet would dismiss the first and drop what was typed.
     var isPresentingModal = false
     var inspectorVisible = true
+    /// The row selected in Review.
+    var selectedReview: ReviewTarget?
+    /// The person the Tree is drawn around, while it shows.
+    var treeFocus: PersonID?
+    var treeDepths = TreeDepths()
 
     /// The subject the menu bar acts on, taken from the selection, or `nil` when there is
     /// nothing selected for the command to act on.
@@ -233,7 +364,14 @@ struct CommandContext: Equatable {
             selectedArtifact.flatMap { artifact in
                 selectedFile.map { CommandSubject.file($0, in: artifact) }
             }
-        case .person: selectedPerson.map(CommandSubject.person)
+        case .person:
+            switch command {
+            // A card's verb: it has no selection to act on.
+            case .focusHere: nil
+            case .showInPeople: treeFocus.map(CommandSubject.person)
+            default: selectedPerson.map(CommandSubject.person)
+            }
+        case .review: selectedReview.map(CommandSubject.review)
         }
     }
 
@@ -249,6 +387,20 @@ struct CommandContext: Equatable {
         case .mergePerson: return personCount > 1
         // The two tabs with a search field.
         case .find: return activeTab == .artifacts || activeTab == .people
+        case .acceptSuggestion: return subject.reviewLane?.canAccept == true
+        case .declineSuggestion: return subject.reviewLane?.canDecline == true
+        case .mergeDuplicate: return subject.reviewLane == .duplicate
+        case .somebodyNew: return subject.reviewLane?.isName == true
+        // Tree has no controls with nobody in it.
+        case .chooseFocus: return personCount > 0
+        case .moreAncestors:
+            return personCount > 0 && treeDepths.ancestors < TreeDepths.range.upperBound
+        case .fewerAncestors:
+            return personCount > 0 && treeDepths.ancestors > TreeDepths.range.lowerBound
+        case .moreDescendants:
+            return personCount > 0 && treeDepths.descendants < TreeDepths.range.upperBound
+        case .fewerDescendants:
+            return personCount > 0 && treeDepths.descendants > TreeDepths.range.lowerBound
         default: return true
         }
     }
@@ -264,6 +416,12 @@ struct CommandContext: Equatable {
     /// key attached to both would leave Delete Person… with none.
     func ownsShortcut(_ command: ArchiveCommand) -> Bool {
         command.tab == nil || command.tab == activeTab
+    }
+}
+
+extension CommandSubject {
+    fileprivate var reviewLane: ReviewLane? {
+        if case .review(let target) = self { target.lane } else { nil }
     }
 }
 

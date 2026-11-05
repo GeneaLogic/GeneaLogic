@@ -20,7 +20,8 @@ extension ArchiveModel {
             hasArchive: archive != nil, activeTab: activeTab,
             selectedArtifact: selectedArtifact, selectedFile: selectedFile,
             selectedPerson: selectedPerson, personCount: persons.count,
-            isPresentingModal: isPresentingModal, inspectorVisible: inspectorVisible)
+            isPresentingModal: isPresentingModal, inspectorVisible: inspectorVisible,
+            selectedReview: selectedReviewRow, treeFocus: treeFocus, treeDepths: treeDepths)
     }
 
     /// The part of `commandContext` that `command`'s availability depends on, and nothing
@@ -39,12 +40,17 @@ extension ArchiveModel {
             context.selectedArtifact = selectedArtifact
             context.selectedFile = selectedFile
         case .person: context.selectedPerson = selectedPerson
+        case .review: context.selectedReview = selectedReviewRow
         }
         switch command {
         case .toggleInspector:
             context.selectedArtifact = selectedArtifact
             context.inspectorVisible = inspectorVisible
-        case .mergePerson: context.personCount = persons.count
+        case .mergePerson, .chooseFocus: context.personCount = persons.count
+        case .moreAncestors, .fewerAncestors, .moreDescendants, .fewerDescendants:
+            context.personCount = persons.count
+            context.treeDepths = treeDepths
+        case .showInPeople: context.treeFocus = treeFocus
         default: break
         }
         return context
@@ -53,6 +59,15 @@ extension ArchiveModel {
     /// Whether `command` can run on `subject` now (`CommandContext.canPerform`).
     func canPerform(_ command: ArchiveCommand, on subject: CommandSubject) -> Bool {
         commandContext(for: command).canPerform(command, on: subject)
+    }
+
+    /// Whether a surface inside the window can offer `command` on `subject`: the same rule,
+    /// without the sheet, which can't be clicked through and would only flicker the window
+    /// behind it.
+    func canOffer(_ command: ArchiveCommand, on subject: CommandSubject) -> Bool {
+        var context = commandContext(for: command)
+        context.isPresentingModal = false
+        return context.canPerform(command, on: subject)
     }
 
     /// Whether a sheet, dialog, alert or panel is up in this window: the ones this model
@@ -83,6 +98,17 @@ extension ArchiveModel {
         // (`beginAttachOrScan`), where the connected menu anchors correctly.
         case .attachFile:
             if case .artifact(let id) = subject { beginAttach(to: id) }
+        case .showInTree, .focusHere:
+            if case .person(let id) = subject { pendingTreeFocus = id }
+        case .showInPeople:
+            if case .person(let id) = subject { navigateToPerson(id) }
+        case .acceptSuggestion:
+            if case .review(let target) = subject { acceptReviewRow(target) }
+        case .declineSuggestion:
+            if case .review(let target) = subject { declineReviewRow(target) }
+        case .refreshReview:
+            refreshReviewWorklist()
+            refreshDuplicateCandidates()
         default:
             pendingCommand = PendingCommand(command: command, subject: subject)
         }

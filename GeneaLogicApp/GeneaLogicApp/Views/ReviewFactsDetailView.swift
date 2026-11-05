@@ -89,6 +89,7 @@ struct ReviewFactsDetailView: View {
                 ForEach(item.suggestions) { suggestion in
                     FactSuggestionRow(
                         suggestion: suggestion,
+                        keyCaption: keyCaption(for: suggestion),
                         onRecord: {
                             model.recordSuggestedFact(suggestion, for: item.person.uid)
                         },
@@ -98,5 +99,13 @@ struct ReviewFactsDetailView: View {
                 }
             }
         }
+    }
+
+    /// ⌘↩ acts on the top suggestion, and opens its editor if it can only be applied.
+    private func keyCaption(for suggestion: FactSuggestion) -> String? {
+        guard suggestion.id == item.suggestions.first?.id else { return nil }
+        return ArchiveCommand.reviewKeyCaption(
+            for: item.target.lane,
+            acceptTitle: suggestion.isDirectlyRecordable ? nil : "Apply…")
     }
 }

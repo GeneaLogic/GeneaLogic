@@ -141,6 +141,7 @@ struct PersonListView: View {
                     PersonRow(summary: person)
                         .tag(person.uid)
                         .contextMenu {
+                            CommandButton(.showInTree, on: .person(person.uid))
                             CommandButton(.mergePerson, on: .person(person.uid))
                             CommandButton(.deletePerson, on: .person(person.uid))
                         }

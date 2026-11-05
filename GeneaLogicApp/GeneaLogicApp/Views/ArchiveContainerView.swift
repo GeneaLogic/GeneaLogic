@@ -423,6 +423,14 @@ private struct OpenArchiveView: View {
                     model.pendingPersonNavigation = nil
                 }
             }
+            // Show in Tree and Focus Here (slice 83). The focus is the person selection.
+            .onChange(of: model.pendingTreeFocus) { _, target in
+                if let target {
+                    tab = .tree
+                    personSelection = target
+                    model.pendingTreeFocus = nil
+                }
+            }
             // The mirror jump: a person Sources row → switch to the Artifacts tab and
             // select the citing artifact (slice 42b).
             .onChange(of: model.pendingArtifactNavigation) { _, target in
@@ -523,25 +531,31 @@ private struct OpenArchiveView: View {
                 PersonDetailPlaceholder()
             }
         case .review:
-            // Two lanes share one sidebar and one selection, so the pane is chosen by which
-            // worklist claims the selected id (the ids are lane-prefixed — `ReviewSelection`).
-            if let selectedReviewItem {
-                ReviewDetailView(item: selectedReviewItem)
-            } else if let selectedFactItem {
-                ReviewFactsDetailView(item: selectedFactItem)
-            } else if let selectedRelationshipItem {
-                ReviewRelationshipDetailView(item: selectedRelationshipItem)
-            } else if let selectedDuplicateItem {
-                ReviewDuplicateDetailView(item: selectedDuplicateItem)
-            } else {
-                ReviewDetailPlaceholder(
-                    hasWork: !model.reviewItems.isEmpty || !model.factItems.isEmpty
-                        || !model.relationshipItems.isEmpty || !model.duplicateItems.isEmpty)
-            }
+            reviewDetail
+                .modifier(ReviewCommandHost(selection: $reviewSelection))
         case .tree:
             // Tree is a full-width pane handled by `content`, not a split-view detail;
             // never reached (present only to keep the `switch` exhaustive).
             EmptyView()
+        }
+    }
+
+    /// Two lanes share one sidebar and one selection, so the pane is chosen by which
+    /// worklist claims the selected id (the ids are lane-prefixed — `ReviewSelection`).
+    @ViewBuilder
+    private var reviewDetail: some View {
+        if let selectedReviewItem {
+            ReviewDetailView(item: selectedReviewItem)
+        } else if let selectedFactItem {
+            ReviewFactsDetailView(item: selectedFactItem)
+        } else if let selectedRelationshipItem {
+            ReviewRelationshipDetailView(item: selectedRelationshipItem)
+        } else if let selectedDuplicateItem {
+            ReviewDuplicateDetailView(item: selectedDuplicateItem)
+        } else {
+            ReviewDetailPlaceholder(
+                hasWork: !model.reviewItems.isEmpty || !model.factItems.isEmpty
+                    || !model.relationshipItems.isEmpty || !model.duplicateItems.isEmpty)
         }
     }
 
@@ -552,9 +566,9 @@ private struct OpenArchiveView: View {
             // One connected menu (Add Artifact… + Continuity scan options), shown by
             // the AppKit receiver — a plain SwiftUI `Menu` can't host the auto-inserted
             // scan items, so this button pops that menu.
-            Button("Add", systemImage: "plus") { model.beginAddOrScan() }
+            CommandToolbarButton(command: .addArtifact) { model.beginAddOrScan() }
         case .people:
-            Button("New Person", systemImage: "plus") { model.perform(.newPerson) }
+            CommandToolbarButton(command: .newPerson)
         case .tree, .review:
             // Nothing is *added* in Review — every row is a mention that already exists,
             // and the only thing it can mint (a person) belongs to the row's own

@@ -304,6 +304,19 @@ final class ArchiveModel {
     /// `selectedArtifact`, for the Person menu (slice 82).
     var selectedPerson: PersonID?
 
+    /// The id of the row selected in Review, mirrored by `ReviewCommandHost` for the Review
+    /// menu (slice 83). Resolved against the live lanes (`selectedReviewRow`), so a row
+    /// that has left the worklist is no target.
+    var selectedReviewID: ReviewItem.ID?
+
+    /// The person the Tree is drawn around, mirrored by `TreeTab` for Show in People
+    /// (slice 83). Not `selectedPerson`: with nobody selected the Tree still draws
+    /// someone.
+    var treeFocus: PersonID?
+
+    /// The Tree's depths, mirrored by `TreeTab` for View's depth items (slice 83).
+    var treeDepths = TreeDepths()
+
     /// Whether the detail inspector is currently shown, mirrored from the view's
     /// `@SceneStorage`, so the View menu can label its toggle Show vs. Hide.
     var inspectorVisible = true
@@ -333,6 +346,11 @@ final class ArchiveModel {
     /// window to the People tab. The container observes it, moves the scene-stored
     /// tab + person selection, and clears it back to `nil`.
     var pendingPersonNavigation: PersonID?
+
+    /// One-shot "show this person's tree" intent (Show in Tree, Focus Here; slice 83). The
+    /// focus is the window's person selection, which the container owns, so it moves it
+    /// and the tab and clears this.
+    var pendingTreeFocus: PersonID?
 
     /// One-shot "jump to the Artifacts tab and select this artifact" intent — the
     /// mirror of `pendingPersonNavigation`, driven by a person Sources row's tap

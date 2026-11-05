@@ -108,13 +108,20 @@ struct ReviewRelationshipDetailView: View {
             Divider()
             // No `.defaultAction`: no other Review pane binds ⏎ to its verb, and a detail
             // pane where Return silently writes a conclusion is not a habit worth teaching
-            // in a section whose other lanes include a destructive one.
-            Button("Record Relationship", systemImage: "checkmark") {
+            // in a section whose other lanes include a destructive one. ⌘↩ is the Review
+            // menu's.
+            Button(
+                ArchiveCommand.acceptSuggestion.paneTitle(in: item.target.lane),
+                systemImage: ArchiveCommand.acceptSuggestion.systemImage
+            ) {
                 model.confirmSuggestedRelationship(item)
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Button("Not This Relationship", systemImage: "xmark") {
+                Button(
+                    ArchiveCommand.declineSuggestion.paneTitle(in: item.target.lane),
+                    systemImage: ArchiveCommand.declineSuggestion.systemImage
+                ) {
                     model.dismissSuggestedRelationship(item)
                 }
                 Text(
@@ -126,6 +133,10 @@ struct ReviewRelationshipDetailView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
+
+            Text(ArchiveCommand.reviewKeyCaption(for: item.target.lane))
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
     }
 }

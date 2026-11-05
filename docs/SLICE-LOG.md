@@ -4376,6 +4376,19 @@ been two slices.
   `map`s in a test timed out the type checker on CI only. SwiftUI drops a duplicate key
   from the later menu item, enabled or not, so a shared key must be attached to one.
 
+- **83 — command coverage** (app only; no format change; #38). G1's second half and G15;
+  the row-level verbs inside panes went to 83b. **The invariant:** Review's two keys act
+  on the selected row's top suggestion, a lane's table says which it has, and a decision
+  moves the selection down the list without entering Possible Duplicates. **Decided:** one
+  File ▸ Delete item whose label follows the tab; a Review menu with stable titles; no
+  Tree menu; ⌘E ⌘L ⌘K ⌘T for the adds, which reverses 82's reservation of ⌘E and ⌘T; ⇧⌘N
+  final. **No prominent button in Review:** prominence says "the likely answer", which the
+  matcher can't know, so a caption says where the keys land. **Gotchas:** without an
+  advance the keys did one row. A held key would have confirmed a queue, so the two verbs
+  ignore repeats, and a quick second press would have decided a row still waiting on its
+  write, so they wait. A row's context menu names a row that may not be showing, so
+  Review's sheets moved from the panes to `ReviewCommandHost` on the detail column.
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the
