@@ -135,7 +135,10 @@ struct ReviewDuplicateDetailView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Button("Not a Duplicate", systemImage: "xmark") {
+                Button(
+                    ArchiveCommand.declineSuggestion.paneTitle(in: item.target.lane),
+                    systemImage: ArchiveCommand.declineSuggestion.systemImage
+                ) {
                     model.dismissDuplicate(item)
                 }
                 Text(
@@ -146,6 +149,10 @@ struct ReviewDuplicateDetailView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
+
+            Text(ArchiveCommand.reviewKeyCaption(for: item.target.lane))
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
     }
 }

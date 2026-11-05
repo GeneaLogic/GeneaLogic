@@ -103,17 +103,10 @@ struct ArtifactDetailView: View {
                 max: Self.inspectorWidthRange.upperBound)
         }
         .toolbar {
-            ToolbarItem {
-                Button {
-                    inspectorShown.toggle()
-                } label: {
-                    // The circled "i" (à la Preview's inspector toggle) reads as
-                    // "info about this artifact" and avoids mirroring the leading
-                    // sidebar toggle the way a trailing-panel glyph would.
-                    Label("Inspector", systemImage: "info.circle")
-                }
-                .help(inspectorShown ? "Hide the inspector" : "Show the inspector")
-            }
+            // The circled "i" (à la Preview's inspector toggle) reads as "info about this
+            // artifact" and avoids mirroring the leading sidebar toggle the way a
+            // trailing-panel glyph would.
+            ToolbarItem { CommandToolbarButton(command: .toggleInspector) }
         }
         // Reloads the full record (fields/events/persons/transcript) and the file
         // list on selection change, after an attach (the summary's `fileCount`
@@ -195,7 +188,7 @@ struct ArtifactDetailView: View {
         case .artifact: command != .deleteArtifact
         case .file: true
         case .archive: command == .toggleInspector
-        case .person: false
+        case .person, .review: false
         }
     }
 
@@ -226,7 +219,7 @@ struct ArtifactDetailView: View {
             guard id == artifact.uid, let entry = files.first(where: { $0.uid == fileID })
             else { return }
             performFileCommand(command, on: entry)
-        case .person:
+        case .person, .review:
             break
         }
     }

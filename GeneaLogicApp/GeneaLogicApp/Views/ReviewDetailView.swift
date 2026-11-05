@@ -18,13 +18,6 @@ struct ReviewDetailView: View {
     @Environment(ArchiveModel.self) private var model
     let item: ReviewItem
 
-    /// The somebody-new confirm step, carrying the below-threshold candidates it will show.
-    ///
-    /// Loaded here, before presenting, rather than by the sheet on appear: a `.fitted` sheet
-    /// measures its content once at open, so one that fills in afterwards is sized for
-    /// content it doesn't have yet.
-    @State private var creationRequest: CreationRequest?
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -36,11 +29,6 @@ struct ReviewDetailView: View {
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .sheet(item: $creationRequest) { request in
-            SomebodyNewSheet(item: item, closest: request.closest)
-                .environment(model)
-        }
-        .reportsModal(creationRequest != nil)
     }
 
     // MARK: - Header
@@ -146,6 +134,8 @@ struct ReviewDetailView: View {
                     ForEach(item.candidates) { candidate in
                         CandidateCard(
                             candidate: candidate,
+                            keyCaption: candidate.id == item.candidates.first?.id
+                                ? ArchiveCommand.reviewKeyCaption(for: item.target.lane) : nil,
                             onConfirm: { model.confirmSuggestion(candidate.suggestion) },
                             onReject: { model.rejectSuggestion(candidate.suggestion) })
                     }
@@ -162,12 +152,7 @@ struct ReviewDetailView: View {
     private var somebodyNewSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Divider()
-            Button {
-                creationRequest = CreationRequest(
-                    closest: model.closestCandidates(to: item.mention))
-            } label: {
-                Label("This Is Somebody New…", systemImage: "person.fill.badge.plus")
-            }
+            CommandButton(.somebodyNew, on: .review(item.target))
             Text(
                 "Creates a person from “\(item.recordedName)” and links this mention to "
                     + "them. You’ll see the closest existing people first."
@@ -177,14 +162,6 @@ struct ReviewDetailView: View {
             .fixedSize(horizontal: false, vertical: true)
         }
     }
-}
-
-/// A pending somebody-new confirmation, holding the below-threshold candidates the sheet
-/// will show. `Identifiable` so `.sheet(item:)` presents it — which, unlike
-/// `isPresented:`, guarantees the content exists before the sheet is measured.
-private struct CreationRequest: Identifiable {
-    let id = UUID()
-    let closest: [SuggestedLink]
 }
 
 /// The way back from a rejection: one button per tombstone on this mention, naming the
@@ -254,6 +231,8 @@ struct ReviewDetailPlaceholder: View {
 /// One candidate: who they are, what agreed, the full breakdown, and the two verdicts.
 private struct CandidateCard: View {
     let candidate: ReviewCandidate
+    /// The keys, on the top candidate only: they act on it, and no other.
+    let keyCaption: String?
     let onConfirm: () -> Void
     let onReject: () -> Void
 
@@ -294,16 +273,29 @@ private struct CandidateCard: View {
                 informationQuality: candidate.suggestion.match.informationQualityWeight)
 
             HStack(spacing: 8) {
-                Button("Confirm", systemImage: "checkmark", action: onConfirm)
-                    .buttonStyle(.borderedProminent)
-                Button("Reject", systemImage: "xmark", action: onReject)
+                // Neither is prominent (slice 83, fork 3): that says "the likely answer",
+                // which is the one thing this card must not claim. The caption says where
+                // the keys land.
+                Button(
+                    ArchiveCommand.acceptSuggestion.paneTitle(in: lane),
+                    systemImage: ArchiveCommand.acceptSuggestion.systemImage,
+                    action: onConfirm)
+                Button(
+                    ArchiveCommand.declineSuggestion.paneTitle(in: lane),
+                    systemImage: ArchiveCommand.declineSuggestion.systemImage,
+                    action: onReject)
                 Spacer()
-                Text("⌘Z undoes either")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                Text(
+                    [keyCaption, "⌘Z undoes either"].compactMap(\.self)
+                        .joined(separator: " · ")
+                )
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
             }
         }
         .padding(12)
         .background(.quinary, in: RoundedRectangle(cornerRadius: 8))
     }
+
+    private let lane = ReviewLane.name(hasCandidates: true)
 }

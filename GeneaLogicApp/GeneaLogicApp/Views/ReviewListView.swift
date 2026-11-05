@@ -57,52 +57,64 @@ struct ReviewListView: View {
                         + "two people look like one. Catalogue a document’s Persons "
                         + "Mentioned and its names will show up here.")
             } actions: {
-                Button("Refresh") {
-                    model.refreshReviewWorklist()
-                    model.refreshDuplicateCandidates()
-                }
+                CommandButton(.refreshReview, on: .archive)
             }
         } else {
-            List(selection: $selection) {
-                ForEach(groups) { group in
-                    Section(group.title) {
-                        ForEach(group.items) { item in
-                            ReviewRow(item: item)
-                                .tag(item.id)
-                        }
+            // Scrolled by hand: the keys move the selection down a list the pointer isn't
+            // on, and `List` doesn't follow a selection set from outside.
+            ScrollViewReader { proxy in
+                worklist
+                    .onChange(of: selection) { _, id in
+                        if let id { proxy.scrollTo(id) }
+                    }
+            }
+        }
+    }
+
+    private var worklist: some View {
+        List(selection: $selection) {
+            ForEach(groups) { group in
+                Section(group.title) {
+                    ForEach(group.items) { item in
+                        ReviewRow(item: item)
+                            .tag(item.id)
+                            .contextMenu { ReviewRowMenu(target: item.target) }
                     }
                 }
-                if !model.factItems.isEmpty {
-                    Section("Suggested Facts") {
-                        ForEach(model.factItems) { item in
-                            FactReviewRow(item: item)
-                                .tag(item.id)
-                        }
+            }
+            if !model.factItems.isEmpty {
+                Section("Suggested Facts") {
+                    ForEach(model.factItems) { item in
+                        FactReviewRow(item: item)
+                            .tag(item.id)
+                            .contextMenu { ReviewRowMenu(target: item.target) }
                     }
                 }
-                // After the facts and before the duplicates: promoting an edge is additive
-                // and reversible like recording a fact, so it belongs with the cataloguing
-                // work rather than beside the one destructive lane.
-                if !model.relationshipItems.isEmpty {
-                    Section("Suggested Relationships") {
-                        ForEach(model.relationshipItems) { item in
-                            RelationshipReviewRow(item: item)
-                                .tag(item.id)
-                        }
+            }
+            // After the facts and before the duplicates: promoting an edge is additive
+            // and reversible like recording a fact, so it belongs with the cataloguing
+            // work rather than beside the one destructive lane.
+            if !model.relationshipItems.isEmpty {
+                Section("Suggested Relationships") {
+                    ForEach(model.relationshipItems) { item in
+                        RelationshipReviewRow(item: item)
+                            .tag(item.id)
+                            .contextMenu { ReviewRowMenu(target: item.target) }
                     }
                 }
-                // Last, and deliberately: the action on the other side of these rows is
-                // the most destructive one in the app, so they are the least urgent thing
-                // in a section otherwise made of unfinished cataloguing.
-                if model.isScanningDuplicates || !model.duplicateItems.isEmpty {
-                    Section("Possible Duplicates") {
-                        if model.isScanningDuplicates && model.duplicateItems.isEmpty {
-                            DuplicateScanRow()
-                        }
-                        ForEach(model.duplicateItems) { item in
-                            DuplicateReviewRow(item: item)
-                                .tag(item.id)
-                        }
+            }
+            // Last, and deliberately: the action on the other side of these rows is
+            // the most destructive one in the app, so they are the least urgent thing
+            // in a section otherwise made of unfinished cataloguing.
+            if model.isScanningDuplicates || !model.duplicateItems.isEmpty {
+                Section("Possible Duplicates") {
+                    if model.isScanningDuplicates && model.duplicateItems.isEmpty {
+                        DuplicateScanRow()
+                    }
+                    ForEach(model.duplicateItems) { item in
+                        DuplicateReviewRow(item: item)
+                            .tag(item.id)
+                            .contextMenu { ReviewRowMenu(target: item.target) }
                     }
                 }
             }
@@ -125,6 +137,27 @@ struct ReviewListView: View {
             }
         }
         return result
+    }
+}
+
+/// A worklist row's context menu: the verbs of its lane, on that row, which needn't be the
+/// selected one. What its lane doesn't have stays out, rather than dim.
+private struct ReviewRowMenu: View {
+    let target: ReviewTarget
+
+    var body: some View {
+        if target.lane.canAccept {
+            CommandButton(.acceptSuggestion, on: .review(target))
+        }
+        if target.lane.canDecline {
+            CommandButton(.declineSuggestion, on: .review(target))
+        }
+        if target.lane == .duplicate {
+            CommandButton(.mergeDuplicate, on: .review(target))
+        }
+        if target.lane.isName {
+            CommandButton(.somebodyNew, on: .review(target))
+        }
     }
 }
 
@@ -362,10 +395,9 @@ private struct ReviewControlsBar: View {
                 .foregroundStyle(.secondary)
             Spacer()
             Button {
-                model.refreshReviewWorklist()
-                model.refreshDuplicateCandidates()
+                model.perform(.refreshReview)
             } label: {
-                Image(systemName: "arrow.clockwise")
+                Image(systemName: ArchiveCommand.refreshReview.systemImage)
             }
             .buttonStyle(.borderless)
             .help("Re-run the matcher over the archive")

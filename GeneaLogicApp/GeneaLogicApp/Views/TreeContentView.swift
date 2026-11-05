@@ -29,8 +29,6 @@ struct TreeContentView: View {
     let qualifiers: [RelationshipID: FactType]
     /// Refocuses the tree on a person (a card tap).
     let onFocus: (PersonID) -> Void
-    /// Jumps to the People tab (a card's context menu).
-    let onShowInPeople: (PersonID) -> Void
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -43,10 +41,10 @@ struct TreeContentView: View {
             ForEach(layout.nodes) { node in
                 let frame = geometry.frame(of: node)
                 TreePersonCard(
+                    person: node.person,
                     summary: personsByID[node.person],
                     isFocus: node.isFocus,
-                    onFocus: { onFocus(node.person) },
-                    onShowInPeople: { onShowInPeople(node.person) }
+                    onFocus: { onFocus(node.person) }
                 )
                 .frame(width: frame.width, height: frame.height)
                 .offset(x: frame.minX, y: frame.minY)
@@ -205,10 +203,10 @@ struct TreeContentView: View {
 
 /// One person in the tree: display name over their EDTF-glossed primary date.
 private struct TreePersonCard: View {
+    let person: PersonID
     let summary: PersonSummary?
     let isFocus: Bool
     let onFocus: () -> Void
-    let onShowInPeople: () -> Void
 
     @State private var isHovering = false
 
@@ -268,8 +266,8 @@ private struct TreePersonCard: View {
         .help(isDangling ? "This person's record was deleted" : "Focus the tree on \(name)")
         .accessibilityLabel(name)
         .contextMenu {
-            Button("Focus Here", action: onFocus)
-            Button("Show in People", action: onShowInPeople)
+            CommandButton(.focusHere, on: .person(person))
+            CommandButton(.showInPeople, on: .person(person))
         }
     }
 

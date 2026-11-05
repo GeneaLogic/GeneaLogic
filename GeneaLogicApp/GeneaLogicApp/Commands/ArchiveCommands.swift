@@ -33,6 +33,7 @@ struct ArchiveCommands: Commands {
             Divider()
             item(.verifyIntegrity)
             item(.showTrash)
+            DeleteMenuItem(model: activeModel)
         }
 
         // The window has no Find of its own: the Edit menu's Find submenu comes with a
@@ -45,6 +46,7 @@ struct ArchiveCommands: Commands {
         viewMenuAdditions
         artifactMenu
         personMenu
+        reviewMenu
         helpMenu
     }
 
@@ -88,6 +90,15 @@ struct ArchiveCommands: Commands {
                 // Sort drives the Artifacts browse list only, so gate it to that tab
                 // (the People list sorts independently by name).
                 .disabled(!isArtifactsTab)
+
+                // No Tree menu (slice 83, fork 5): a card's verbs act on the card, and
+                // what has a menu-bar subject, the focus and the depths, goes here.
+                Divider()
+                item(.moreAncestors)
+                item(.fewerAncestors)
+                item(.moreDescendants)
+                item(.fewerDescendants)
+                item(.chooseFocus)
             }
         }
     }
@@ -115,9 +126,6 @@ struct ArchiveCommands: Commands {
                 item(.replaceFile)
                 item(.deleteFile)
             }
-
-            Divider()
-            item(.deleteArtifact)
         }
     }
 
@@ -131,9 +139,26 @@ struct ArchiveCommands: Commands {
             item(.addFact)
             item(.addRelationship)
             Divider()
-            item(.mergePerson)
+            item(.showInTree)
+            item(.showInPeople)
             Divider()
-            item(.deletePerson)
+            item(.mergePerson)
+        }
+    }
+
+    // MARK: - Review menu
+
+    /// The verbs on the selected row of Review's worklist (slice 83). A menu of its own:
+    /// they act on a suggestion, which is neither an artifact nor a person.
+    private var reviewMenu: some Commands {
+        CommandMenu("Review") {
+            item(.acceptSuggestion)
+            item(.declineSuggestion)
+            Divider()
+            item(.mergeDuplicate)
+            item(.somebodyNew)
+            Divider()
+            item(.refreshReview)
         }
     }
 
@@ -205,6 +230,22 @@ struct ArchiveCommands: Commands {
         alert.messageText = message
         alert.informativeText = (error as? ArchiveError)?.description ?? String(describing: error)
         alert.runModal()
+    }
+}
+
+/// File's one Delete item: its label follows the tab (slice 83, fork 1), which is what lets
+/// ⌘⌫ show on it. Two items would each hide the other's key (`ownsShortcut`). Review's
+/// ⌘⌫ is Decline Suggestion's, and this item is dim there.
+private struct DeleteMenuItem: View {
+    let model: ArchiveModel?
+
+    var body: some View {
+        if let command = model.flatMap({ ArchiveCommand.delete(on: $0.activeTab) }) {
+            CommandMenuItem(command: command, model: model)
+        } else {
+            Button(ArchiveCommand.idleDeleteTitle) {}
+                .disabled(true)
+        }
     }
 }
 

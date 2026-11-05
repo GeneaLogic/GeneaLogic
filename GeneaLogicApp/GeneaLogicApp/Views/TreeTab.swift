@@ -66,6 +66,40 @@ struct TreeTab: View {
         .safeAreaInset(edge: .top) { if !model.persons.isEmpty { controls } }
         // Rebuild whenever the focus, the depths, or any conclusion mutation changes.
         .task(id: rebuildKey) { await rebuild() }
+        // Mirrored for View's depth items and Person ▸ Show in People (slice 83).
+        .onChange(of: effectiveFocus, initial: true) { _, person in model.treeFocus = person }
+        .onChange(of: ancestorDepth, initial: true) { _, depth in
+            model.treeDepths.ancestors = depth
+        }
+        .onChange(of: descendantDepth, initial: true) { _, depth in
+            model.treeDepths.descendants = depth
+        }
+        .onDisappear { model.treeFocus = nil }
+        .onChange(of: model.pendingCommand) {
+            guard let (command, _) = model.claimPendingCommand(Self.runs) else { return }
+            perform(command)
+        }
+    }
+
+    private static func runs(_ command: ArchiveCommand) -> Bool {
+        switch command {
+        case .moreAncestors, .fewerAncestors, .moreDescendants, .fewerDescendants, .chooseFocus:
+            true
+        default: false
+        }
+    }
+
+    private func perform(_ command: ArchiveCommand) {
+        switch command {
+        case .moreAncestors: ancestorDepth += 1
+        case .fewerAncestors: ancestorDepth -= 1
+        case .moreDescendants: descendantDepth += 1
+        case .fewerDescendants: descendantDepth -= 1
+        case .chooseFocus:
+            focusSearch = ""
+            isPickingFocus = true
+        default: break
+        }
     }
 
     /// Everything the drawing depends on. `mutationVersion` covers relationship and
@@ -129,8 +163,7 @@ struct TreeTab: View {
                 geometry: render.geometry,
                 personsByID: render.personsByID,
                 qualifiers: render.qualifiers,
-                onFocus: { focus = $0 },
-                onShowInPeople: { model.navigateToPerson($0) }
+                onFocus: { focus = $0 }
             )
             // `NSHostingView` starts a fresh SwiftUI environment rather than inheriting
             // this one, so anything the content reads must be injected here — the same
@@ -184,8 +217,9 @@ struct TreeTab: View {
         HStack(spacing: 16) {
             focusPicker
             Spacer()
-            Stepper("Ancestors: \(ancestorDepth)", value: $ancestorDepth, in: 0...8)
-            Stepper("Descendants: \(descendantDepth)", value: $descendantDepth, in: 0...8)
+            Stepper("Ancestors: \(ancestorDepth)", value: $ancestorDepth, in: TreeDepths.range)
+            Stepper(
+                "Descendants: \(descendantDepth)", value: $descendantDepth, in: TreeDepths.range)
         }
         .font(.callout)
         .padding(.horizontal, 12)
