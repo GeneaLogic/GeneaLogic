@@ -188,7 +188,8 @@ Each is specced in `docs/slices/` before it is built.
 | --- | --- | --- |
 | **81** — small ones | G3, G9, G17, G21, G22; the Help menu points at the project page and Report an Issue… (G8's `0.1` part) | `0.1` |
 | **82** — one source for commands | G1 (the command source, Artifact and Person menus, the shortcut table), G2 | `0.1` |
-| **83** — command coverage | G1 (Tree and Review, context menus from the same source), G15 | `0.1` |
+| **83** — command coverage | G1 (Tree and Review, list-row and card context menus), G15 | `0.1` |
+| **83b** — row-level commands | G1 (verbs on rows inside panes: a mention's Resolve… and Unlink, a metadata entry's Apply…, a suggestion's Record and Edit…) | `0.1` |
 | **84** — the tab switcher stays put | G4 | `0.1` |
 | **85** — window and document lifecycle | G10, G11, G24; G12 investigated, split off if deep | `0.1` |
 | **86** — a visible trash | G7 | `0.1` |
