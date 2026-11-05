@@ -259,8 +259,9 @@ struct CommandContext: Equatable {
     }
 
     /// Whether `command`'s menu item carries its shortcut in this window. Commands of
-    /// another tab don't, so two tabs can each use ⌘⌫ (as Finder does) with only one
-    /// item ever answering it.
+    /// another tab don't, so two tabs can each use ⌘⌫. This is not only tidiness: SwiftUI
+    /// drops a duplicate key from the later menu item, enabled or not (measured), so a
+    /// key attached to both would leave Delete Person… with none.
     func ownsShortcut(_ command: ArchiveCommand) -> Bool {
         command.tab == nil || command.tab == activeTab
     }

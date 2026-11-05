@@ -155,3 +155,18 @@ is no selection for them to act on. 83 gives them context menus from the same so
 - **The tab commands are one case each**, so `allCases` is the compiler's.
 - **CI:** the test's reserved-key list, as one `+` chain, timed out the type checker on
   the runner (not locally). It is built in typed parts.
+
+**From the hand-test:**
+
+- **A dimmed Delete on the other tab shows no ⌘⌫, and that is forced.** SwiftUI drops a
+  duplicate key equivalent from the later menu item, enabled or not (measured in a small
+  test app), so attaching ⌘⌫ to both would leave Delete Person… with no key. The HIG
+  doesn't address two commands sharing a key.
+- **Fork 4 was underspecified.** Most Review lanes have no single target for ⌘↩. That,
+  shortcuts for the Artifact and Person menus, one Delete item, and the Review and Tree
+  menus are forks in [83](83-command-coverage.md).
+- Filed for later: the file panel's Open button
+  ([#55](https://github.com/GeneaLogic/GeneaLogic/issues/55)) and the Add Fact sheet's
+  height ([#56](https://github.com/GeneaLogic/GeneaLogic/issues/56)).
+
+**Shipped 2026-11-04** (merged); **hand-test passed**.
