@@ -1149,8 +1149,10 @@ GeneaLogicKit.
 >   guarded by `url == nil` so the window *becoming* an archive is spared. Opening
 >   from the welcome screen's own buttons instead writes the window's `url` binding,
 >   transforming it in place.
-> - **File-menu commands** target the key window's `ArchiveModel` via
->   `@FocusedValue`; New/Open present AppKit panels (window-independent) and then
+> - **Menu-bar commands** target the key window's `ArchiveModel` via
+>   `@FocusedValue`. Every archive verb is an `ArchiveCommand` (slice 82): title,
+>   shortcut and availability (`CommandContext.canPerform`) are spelled once, and the
+>   menu bar, context menus and in-pane buttons all draw from it; New/Open present AppKit panels (window-independent) and then
 >   `openWindow(value:)`, so they work with no window open (retiring slice-3's
 >   `ensureWindow` workaround for *Open* doing nothing with no window open). Hence the open-panel split: the welcome
 >   screen uses SwiftUI `.fileImporter` (a view can host it; stays drivable), the

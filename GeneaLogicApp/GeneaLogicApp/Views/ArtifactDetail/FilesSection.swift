@@ -23,13 +23,11 @@ struct FilesSection: View {
                 // pop **one** connected AppKit menu — Attach File… above the flat scan
                 // items — exactly like the toolbar `+`, instead of a SwiftUI menu that
                 // then pops a second, disconnected AppKit menu (a slice 32 follow-up).
-                Button {
-                    model.beginAttachOrScan(to: artifactID)
-                } label: {
-                    AddAffordanceLabel(
-                        title: "Attach File…", systemImage: "paperclip", opensMenu: true)
-                }
-                .buttonStyle(.plain)
+                // Not `model.perform(.attachFile)`: the menu bar's version goes straight to
+                // the importer, because the connected menu can't anchor to a menu item.
+                CommandAffordance(
+                    command: .attachFile, subject: .artifact(artifactID), opensMenu: true,
+                    action: { model.beginAttachOrScan(to: artifactID) })
             }
 
             if files.isEmpty {
@@ -67,13 +65,11 @@ struct FilesSection: View {
 /// file redraws the two rows whose highlight changes and no others.
 private struct FileRow: View {
     @Environment(ArchiveModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
     let artifactID: ArtifactID
     let entry: FileEntry
     let isSelected: Bool
     @Binding var selectedFileID: FileID?
 
-    @State private var confirmingDelete = false
     @State private var isHovering = false
 
     var body: some View {
@@ -105,16 +101,14 @@ private struct FileRow: View {
             .buttonStyle(.plain)
             .help("Click to preview")
 
+            // The Artifact ▸ Selected File verbs, in the same order, on this row's file
+            // (slice 82). The detail view runs them, Delete File…'s confirm included.
             Menu {
-                Button("Open in Default App", systemImage: "arrow.up.forward.app") {
-                    fileActions.openExternally(entry)
-                }
-                Button("Save a Copy…", systemImage: "square.and.arrow.down") {
-                    fileActions.saveCopy(entry)
-                }
-                Button("Open in Separate Window", systemImage: "macwindow.on.rectangle") {
-                    fileActions.popOut(entry)
-                }
+                let file = CommandSubject.file(entry.uid, in: artifactID)
+                CommandButton(.openFileInWindow, on: file)
+                CommandButton(.openFileInDefaultApp, on: file)
+                CommandButton(.saveFileCopy, on: file)
+                CommandButton(.scanFileForMetadata, on: file)
                 Divider()
                 // Change the file's archival role after the fact (slice 32). A
                 // Picker renders the four roles with a checkmark on the current one.
@@ -123,17 +117,9 @@ private struct FileRow: View {
                         Text(role.displayName).tag(role)
                     }
                 }
-                Button("Scan for Metadata", systemImage: "doc.text.magnifyingglass") {
-                    model.scanFileForMetadata(
-                        entry.uid, in: artifactID, originalName: entry.originalName)
-                }
                 Divider()
-                Button("Replace…", systemImage: "arrow.triangle.2.circlepath") {
-                    model.beginReplace(fileID: entry.uid, artifactID: artifactID)
-                }
-                Button("Delete", systemImage: "trash", role: .destructive) {
-                    confirmingDelete = true
-                }
+                CommandButton(.replaceFile, on: file)
+                CommandButton(.deleteFile, on: file)
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .imageScale(.large)
@@ -151,18 +137,6 @@ private struct FileRow: View {
         }
         .hoverRowBackground(isHovering: isHovering, isSelected: isSelected)
         .onHover { isHovering = $0 }
-        .confirmationDialog(
-            "Delete “\(entry.originalName)”?", isPresented: $confirmingDelete,
-            titleVisibility: .visible
-        ) {
-            Button("Delete File", role: .destructive) {
-                model.detachFile(entry.uid, from: artifactID)
-            }
-        } message: {
-            Text(
-                "This moves the file to the Trash. Undo with ⌘Z, or restore it later from "
-                    + "File ▸ Show Trash.")
-        }
     }
 
     /// Bridges the file's current role to the Role picker: reads `entry.role`
@@ -172,10 +146,6 @@ private struct FileRow: View {
         Binding(
             get: { entry.role },
             set: { model.setFileRole(entry.uid, in: artifactID, to: $0) })
-    }
-
-    private var fileActions: ArtifactFileActions {
-        ArtifactFileActions(model: model, artifactID: artifactID, openWindow: openWindow)
     }
 
     private var subtitle: String {

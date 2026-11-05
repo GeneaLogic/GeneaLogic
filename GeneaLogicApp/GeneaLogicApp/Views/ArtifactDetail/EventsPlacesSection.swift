@@ -15,7 +15,6 @@ struct EventsPlacesSection: View {
     let artifactID: ArtifactID
     let events: [Event]
     let locations: [Location]
-    @Binding var sheet: ArtifactSheet?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -24,12 +23,8 @@ struct EventsPlacesSection: View {
                     .font(.headline)
                 Spacer()
                 Menu {
-                    Button("Add Event…", systemImage: "calendar") {
-                        sheet = ArtifactSheet(.assertion(.blankEvent))
-                    }
-                    Button("Add Place…", systemImage: "mappin.and.ellipse") {
-                        sheet = ArtifactSheet(.assertion(.blankPlace))
-                    }
+                    CommandButton(.addEvent, on: .artifact(artifactID))
+                    CommandButton(.addPlace, on: .artifact(artifactID))
                 } label: {
                     AddAffordanceLabel(title: "Add…", systemImage: "plus", opensMenu: true)
                 }

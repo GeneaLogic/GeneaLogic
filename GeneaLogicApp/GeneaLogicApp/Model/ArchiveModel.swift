@@ -300,29 +300,32 @@ final class ArchiveModel {
     /// Artifact ▸ Selected File submenu's enablement and is the per-file target.
     var selectedFile: FileID?
 
+    /// The selected person, mirrored from the container's selection like
+    /// `selectedArtifact`, for the Person menu (slice 82).
+    var selectedPerson: PersonID?
+
     /// Whether the detail inspector is currently shown, mirrored from the view's
     /// `@SceneStorage`, so the View menu can label its toggle Show vs. Hide.
     var inspectorVisible = true
 
-    /// The active window tab, mirrored from the container's `@SceneStorage`. The
-    /// artifact-scoped menu commands (Artifact menu, Selected File, inspector toggle)
-    /// gate on this being `.artifacts`, so they don't act on a stale artifact
-    /// selection while the People or Tree tab is showing.
+    /// The active window tab, mirrored from the container's `@SceneStorage`. Commands
+    /// that belong to a tab gate on it (`CommandContext.canPerform`), so they don't act
+    /// on a stale selection while another tab is showing.
     var activeTab: ArchiveTab = .artifacts
 
-    var pendingArtifactCommand: ArtifactCommand?
+    /// The command a view owns, waiting for that view to run it (slice 82). One intent
+    /// for every such command; each owning view claims the ones it runs
+    /// (`claimPendingCommand`).
+    var pendingCommand: PendingCommand?
 
-    var pendingFileCommand: FileCommand?
+    /// One-shot "switch to this tab" intent (View ▸ ⌘1–⌘4, and a create that switches to
+    /// its own tab first). The container owns the scene-stored tab, so it moves it and
+    /// clears this.
+    var pendingTab: ArchiveTab?
 
-    /// One-shot "confirm-then-delete the selected artifact" intent (Artifact ▸
-    /// Delete Artifact… / ⌘⌫). The sidebar list observes it and raises the *same*
-    /// confirm dialog as its own ⌫ / context-menu delete.
-    var pendingArtifactDeletion = false
-
-    /// One-shot "toggle the inspector" intent (View ▸ Show/Hide Inspector, ⌘⌥I).
-    /// The detail view owns the inspector's `@SceneStorage` visibility, so it flips
-    /// that and updates `inspectorVisible`.
-    var pendingInspectorToggle = false
+    /// The sheets, dialogs and alerts a view in this window has up, each reported by its
+    /// presenting view (`reportsModal`). Every command waits while any is up.
+    var presentedModals: Set<UUID> = []
 
     /// One-shot "jump to the People tab and select this person" intent — the
     /// resolved-mention chip's tap (slice 42). Unlike `lastCreatedPerson` (which
@@ -350,6 +353,9 @@ final class ArchiveModel {
 
     /// Drives the trash sheet (File ▸ Show Trash…).
     var isShowingTrash = false
+
+    /// Drives the New Person sheet (File ▸ New Person…, the People toolbar's +).
+    var isCreatingPerson = false
 
     /// The window's Continuity Camera scanner, set by `ContinuityCameraHost` once
     /// the view hierarchy exists. Referenced through a UI-free protocol so this

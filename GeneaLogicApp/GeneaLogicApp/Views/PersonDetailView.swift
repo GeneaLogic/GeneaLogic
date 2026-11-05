@@ -85,6 +85,7 @@ struct PersonDetailView: View {
             )
             .environment(model)
         }
+        .reportsModal(nameEditorRequest != nil)
         .sheet(
             item: $factEditorRequest,
             onDismiss: { RowFocusReturn.sheetClosed($factFocusReturn) }
@@ -95,6 +96,7 @@ struct PersonDetailView: View {
             )
             .environment(model)
         }
+        .reportsModal(factEditorRequest != nil)
         .sheet(item: $replacingEndpoint) { request in
             ReplacePersonSheet(
                 subjectID: personID, roleDescription: request.roleDescription
@@ -104,6 +106,7 @@ struct PersonDetailView: View {
             }
             .environment(model)
         }
+        .reportsModal(replacingEndpoint != nil)
         .sheet(isPresented: $isAddingRelationship) {
             if let person {
                 RelationshipEditorSheet(
@@ -112,6 +115,37 @@ struct PersonDetailView: View {
                 .environment(model)
             }
         }
+        .reportsModal(isAddingRelationship)
+        // The Person menu's adds (slice 82); the section buttons run the same commands.
+        .onChange(of: model.pendingCommand) {
+            guard
+                let (command, subject) = model.claimPendingCommand({
+                    $0 == .addName || $0 == .addFact || $0 == .addRelationship
+                }),
+                subject == .person(personID)
+            else { return }
+            perform(command)
+        }
+    }
+
+    /// Opens the editor a Person-menu add asks for. Never over another sheet: the
+    /// commands are off while one is up, and replacing a request would drop the editor's
+    /// text.
+    private func perform(_ command: ArchiveCommand) {
+        guard nameEditorRequest == nil, factEditorRequest == nil, replacingEndpoint == nil,
+            !isAddingRelationship
+        else { return }
+        switch command {
+        case .addName: nameEditorRequest = NameEditorRequest(index: nil, existing: nil)
+        case .addFact: factEditorRequest = FactEditorRequest(mode: .add)
+        case .addRelationship: isAddingRelationship = true
+        default: break
+        }
+    }
+
+    /// A section's Add button: the Person menu's command.
+    private func addButton(_ command: ArchiveCommand) -> some View {
+        CommandAffordance(command: command, subject: .person(personID))
     }
 
     private var reloadKey: String { "\(personID.raw)-\(model.mutationVersion)" }
@@ -154,12 +188,7 @@ struct PersonDetailView: View {
                 Spacer()
                 // Direct-action button (opens the editor sheet) — no chevron, like the
                 // artifact "Add Person…" affordance (F8).
-                Button {
-                    nameEditorRequest = NameEditorRequest(index: nil, existing: nil)
-                } label: {
-                    AddAffordanceLabel(title: "Add Name…", systemImage: "person.badge.plus")
-                }
-                .buttonStyle(.plain)
+                addButton(.addName)
             }
 
             if person.names.isEmpty {
@@ -210,12 +239,7 @@ struct PersonDetailView: View {
                 Text("Facts")
                     .font(.headline)
                 Spacer()
-                Button {
-                    factEditorRequest = FactEditorRequest(mode: .add)
-                } label: {
-                    AddAffordanceLabel(title: "Add Fact…", systemImage: "calendar.badge.plus")
-                }
-                .buttonStyle(.plain)
+                addButton(.addFact)
             }
 
             if rows.isEmpty {
@@ -300,13 +324,7 @@ struct PersonDetailView: View {
                 Text("Relationships")
                     .font(.headline)
                 Spacer()
-                Button {
-                    isAddingRelationship = true
-                } label: {
-                    AddAffordanceLabel(
-                        title: "Add Relationship…", systemImage: "person.2.badge.plus")
-                }
-                .buttonStyle(.plain)
+                addButton(.addRelationship)
             }
 
             if relatives.isEmpty {

@@ -40,6 +40,7 @@ struct ReviewDetailView: View {
             SomebodyNewSheet(item: item, closest: request.closest)
                 .environment(model)
         }
+        .reportsModal(creationRequest != nil)
     }
 
     // MARK: - Header

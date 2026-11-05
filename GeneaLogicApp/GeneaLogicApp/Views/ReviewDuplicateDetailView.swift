@@ -54,6 +54,7 @@ struct ReviewDuplicateDetailView: View {
                     + "moves to the record you keep. The other record is removed. You can "
                     + "undo it with ⌘Z.")
         }
+        .reportsModal(pendingMerge != nil)
     }
 
     // MARK: - Header

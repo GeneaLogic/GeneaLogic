@@ -4356,6 +4356,26 @@ been two slices.
   `ScrollView(showsIndicators: false)` is `.never` on macOS, which overrides Scroll bars:
   Always (measured). It became `.hidden`, which follows that setting.
 
+- **82 — one source for commands** (app only; no format change; #38). G1's first half
+  and G2. **The invariant:** a command's title, symbol, shortcut and availability live in
+  `ArchiveCommand` and nowhere else; the menu bar, context menus, the file row's ⋯ menu
+  and the in-pane Add buttons draw from it. Availability is one pure function over a
+  `CommandContext` (archive, tab, selection, person count, *a modal is up*), so "can't
+  act" is computed once and swept by tests. Every command waits while a sheet, dialog
+  or alert is up; views report theirs with `reportsModal`. A command carries its subject,
+  so a context menu acts on its own row. One `pendingCommand` intent replaces four.
+  **Decided:** Add Artifact… ⇧⌘I (⌘I left free), New Person… ⇧⌘N (provisional), ⌘1–⌘4
+  tabs, creates switch to their tab, Review ⌘↩/⌘⌫ for 83. A shortcut is attached only
+  while its tab shows, so ⌘⌫ can delete an artifact on one tab and a person on another.
+  **Gotchas:** a `CommandSubject.none` case reads as `Optional.none` wherever the subject
+  is optional, and made every global command look unavailable; it is `.archive`. The
+  Edit menu had no Find and `.searchable` takes no ⌘F (measured), so Find… is a command.
+  A menu key equivalent beats the text field, so ⌘⌫ typed in a field is sent back to it.
+  Reporting modals by hand drifts (review found an unreported popover), so a menu
+  command also refuses while AppKit has a sheet on the key window. A long `+` chain of
+  `map`s in a test timed out the type checker on CI only. SwiftUI drops a duplicate key
+  from the later menu item, enabled or not, so a shared key must be attached to one.
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the

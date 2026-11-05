@@ -29,8 +29,23 @@ struct PersonListView: View {
 
     var body: some View {
         // The confirm lives on the always-mounted outer body (not the `List`), so a
-        // ⌫ delete still confirms when a search has emptied the list.
+        // ⌫ delete still confirms when a search has emptied the list, and so do the
+        // Person menu's Delete and Merge (slice 82).
         listContent
+            .onChange(of: model.pendingCommand) {
+                guard
+                    let (command, subject) = model.claimPendingCommand({
+                        $0 == .deletePerson || $0 == .mergePerson
+                    }),
+                    case .person(let id) = subject,
+                    let person = model.persons.first(where: { $0.uid == id })
+                else { return }
+                if command == .deletePerson {
+                    pendingDelete = person
+                } else {
+                    mergeSource = MergeSource(person: person)
+                }
+            }
             .confirmationDialog(
                 pendingDelete.map { "Delete “\($0.displayName ?? "this person")”?" } ?? "",
                 isPresented: Binding(
@@ -43,6 +58,7 @@ struct PersonListView: View {
                     "This removes the person from the archive. Any relationships or "
                         + "evidence links to them are left in place. You can undo it with ⌘Z.")
             }
+            .reportsModal(pendingDelete != nil)
             .sheet(item: $mergeSource) { source in
                 let duplicate = source.person
                 PersonPickerSheet(
@@ -59,6 +75,7 @@ struct PersonListView: View {
                 }
                 .environment(model)
             }
+            .reportsModal(mergeSource != nil)
             .confirmationDialog(
                 pendingMerge.map { merge in
                     "Merge “\(merge.absorbed.displayName ?? "this person")” into "
@@ -77,6 +94,7 @@ struct PersonListView: View {
                         + "moves to the record you keep. The other record is removed. You can "
                         + "undo it with ⌘Z.")
             }
+            .reportsModal(pendingMerge != nil)
     }
 
     /// Identifiable wrapper so a merge request can drive `.sheet(item:)` — the app's
@@ -123,16 +141,14 @@ struct PersonListView: View {
                     PersonRow(summary: person)
                         .tag(person.uid)
                         .contextMenu {
-                            Button("Merge Into…", systemImage: "arrow.triangle.merge") {
-                                mergeSource = MergeSource(person: person)
-                            }
-                            Button("Delete Person…", systemImage: "trash", role: .destructive) {
-                                pendingDelete = person
-                            }
+                            CommandButton(.mergePerson, on: .person(person.uid))
+                            CommandButton(.deletePerson, on: .person(person.uid))
                         }
                 }
             }
-            .onDeleteCommand { confirmDeleteSelection() }
+            .onDeleteCommand {
+                if let selection { model.perform(.deletePerson, on: .person(selection)) }
+            }
         }
     }
 
@@ -156,15 +172,6 @@ struct PersonListView: View {
                 }
             }
         }
-    }
-
-    /// Raises the delete confirm for the selected person (⌫). Resolves against the
-    /// full person list so an active search doesn't lose the target. No-op when
-    /// nothing is selected.
-    private func confirmDeleteSelection() {
-        guard let selection, let summary = model.persons.first(where: { $0.uid == selection })
-        else { return }
-        pendingDelete = summary
     }
 }
 
