@@ -169,7 +169,8 @@ import Testing
 
     @Test func theSelectionCrossesLanesButNotIntoDuplicates() {
         #expect(ReviewTarget.rowAfter("n2", before: [name2, facts], after: [facts]) == "f")
-        #expect(ReviewTarget.rowAfter("f", before: [facts, duplicate1], after: [duplicate1]) == nil)
+        #expect(
+            ReviewTarget.rowAfter("f", before: [facts, duplicate1], after: [duplicate1]) == nil)
         #expect(
             ReviewTarget.rowAfter(
                 "d1", before: [duplicate1, duplicate2], after: [duplicate2]) == "d2")
