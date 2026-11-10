@@ -75,6 +75,20 @@ struct ReviewTarget: Hashable {
     let id: String
     let lane: ReviewLane
 
+    /// The selection once the worklist has gone from `before` to `after`: unchanged unless
+    /// the selected row was there and left, which moves it on (`rowAfter`).
+    ///
+    /// A selection restored at launch, before its lane has been computed (the duplicates
+    /// scan is asynchronous), is waiting for its row rather than past it, so it stays.
+    static func selection(
+        _ selected: String?, before: [ReviewTarget], after: [ReviewTarget]
+    ) -> String? {
+        guard let selected, before.contains(where: { $0.id == selected }),
+            !after.contains(where: { $0.id == selected })
+        else { return selected }
+        return rowAfter(selected, before: before, after: after)
+    }
+
     /// The row that takes the selection after `selected` has left the worklist (slice 83,
     /// fork 7): the next one down that is still there, so the keys work down the queue.
     ///
@@ -208,6 +222,22 @@ struct DuplicateReviewItem: Identifiable {
     var id: String { ReviewSelection.duplicate(candidate.person1, candidate.person2).id }
 
     var target: ReviewTarget { ReviewTarget(id: id, lane: .duplicate) }
+
+    /// The two records as a merge dialog names them, told apart even when the names
+    /// aren't: a duplicate pair usually shares one, and two unnamed people share "Unnamed
+    /// person". The subtitle comes first, as the pane's columns show it, and the uid only
+    /// when that is the same too.
+    var distinguishedNames: (first: String, second: String) {
+        let first = "“\(firstName)”"
+        let second = "“\(secondName)”"
+        guard first == second else { return (first, second) }
+        let firstDetail = self.first?.browseSubtitle ?? candidate.person1.raw
+        let secondDetail = self.second?.browseSubtitle ?? candidate.person2.raw
+        guard firstDetail == secondDetail else {
+            return ("\(first) (\(firstDetail))", "\(second) (\(secondDetail))")
+        }
+        return ("\(first) (\(candidate.person1.raw))", "\(second) (\(candidate.person2.raw))")
+    }
 
     /// Same fallback as `ReviewCandidate`: an unnamed person is a normal state, and their
     /// uid would say nothing to a reader deciding whether two records are one human being.

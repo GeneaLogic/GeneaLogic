@@ -125,18 +125,40 @@ extension ArchiveModel {
             + relationshipItems.map(\.target) + duplicateItems.map(\.target)
     }
 
-    /// The selected row, if it is still on the worklist.
+    /// The selected row, if it is still on the worklist. Looked up lane by lane rather
+    /// than through `reviewRows`, which a menu item would rebuild on every draw.
     var selectedReviewRow: ReviewTarget? {
-        selectedReviewID.flatMap { id in reviewRows.first { $0.id == id } }
+        guard let id = selectedReviewID else { return nil }
+        return reviewItems.first { $0.id == id }?.target
+            ?? factItems.first { $0.id == id }?.target
+            ?? relationshipItems.first { $0.id == id }?.target
+            ?? duplicateItems.first { $0.id == id }?.target
+    }
+
+    /// Runs one Review verb, counting the write it starts as a Review decision, which the
+    /// two commands wait for (`CommandContext.isDecidingReview`).
+    private func decide(_ verb: () -> Void) {
+        marksNextMutationAsReviewDecision = true
+        verb()
+        marksNextMutationAsReviewDecision = false
     }
 
     /// ⌘↩ on `target`: the top row's yes. A suggestion that can only be applied (a couple
     /// fact, an age) opens its editor, so nothing writes unseen and no row is skipped.
     ///
     /// **One decision at a time.** The write is asynchronous and the row stays until it
-    /// lands, so a quick second press would otherwise decide the same row again.
+    /// lands, so a quick second press would otherwise decide the same row again. The
+    /// commands are off until it lands (`isDecidingReview`), and the menu beeps.
     func acceptReviewRow(_ target: ReviewTarget) {
-        guard !hasMutationsInFlight else { return }
+        decide { accept(target) }
+    }
+
+    /// ⌘⌫ on `target`: the top row's no. See `acceptReviewRow`.
+    func declineReviewRow(_ target: ReviewTarget) {
+        decide { decline(target) }
+    }
+
+    private func accept(_ target: ReviewTarget) {
         switch target.lane {
         case .name:
             guard let item = reviewItems.first(where: { $0.id == target.id }),
@@ -163,9 +185,7 @@ extension ArchiveModel {
         }
     }
 
-    /// ⌘⌫ on `target`: the top row's no. See `acceptReviewRow`.
-    func declineReviewRow(_ target: ReviewTarget) {
-        guard !hasMutationsInFlight else { return }
+    private func decline(_ target: ReviewTarget) {
         switch target.lane {
         case .name:
             guard let item = reviewItems.first(where: { $0.id == target.id }),

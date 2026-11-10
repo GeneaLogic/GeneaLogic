@@ -49,10 +49,7 @@ struct ReviewDuplicateDetailView: View {
                 model.mergePersons(merge.absorbed, into: merge.survivor)
             }
         } message: { _ in
-            Text(
-                "Names and facts are combined, and every relationship and evidence link "
-                    + "moves to the record you keep. The other record is removed. You can "
-                    + "undo it with ⌘Z.")
+            Text(MergeWording.explanation)
         }
         .reportsModal(pendingMerge != nil)
     }
@@ -150,9 +147,7 @@ struct ReviewDuplicateDetailView: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
 
-            Text(ArchiveCommand.reviewKeyCaption(for: item.target.lane))
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            ReviewKeyCaption(for: item.target.lane)
         }
     }
 }

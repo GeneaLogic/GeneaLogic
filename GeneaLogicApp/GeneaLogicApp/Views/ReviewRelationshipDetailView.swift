@@ -134,9 +134,7 @@ struct ReviewRelationshipDetailView: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
 
-            Text(ArchiveCommand.reviewKeyCaption(for: item.target.lane))
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            ReviewKeyCaption(for: item.target.lane)
         }
     }
 }

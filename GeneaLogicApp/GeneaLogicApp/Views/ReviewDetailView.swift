@@ -285,12 +285,9 @@ private struct CandidateCard: View {
                     systemImage: ArchiveCommand.declineSuggestion.systemImage,
                     action: onReject)
                 Spacer()
-                Text(
+                ReviewKeyCaption(
                     [keyCaption, "⌘Z undoes either"].compactMap(\.self)
-                        .joined(separator: " · ")
-                )
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+                        .joined(separator: " · "))
             }
         }
         .padding(12)

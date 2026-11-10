@@ -141,22 +141,19 @@ struct ReviewListView: View {
 }
 
 /// A worklist row's context menu: the verbs of its lane, on that row, which needn't be the
-/// selected one. What its lane doesn't have stays out, rather than dim.
+/// selected one. What the rule won't offer on it stays out, rather than dim; the rule is
+/// the menu bar's, so the two can't disagree.
 private struct ReviewRowMenu: View {
+    @Environment(ArchiveModel.self) private var model
     let target: ReviewTarget
 
+    private static let verbs: [ArchiveCommand] = [
+        .acceptSuggestion, .declineSuggestion, .mergeDuplicate, .somebodyNew,
+    ]
+
     var body: some View {
-        if target.lane.canAccept {
-            CommandButton(.acceptSuggestion, on: .review(target))
-        }
-        if target.lane.canDecline {
-            CommandButton(.declineSuggestion, on: .review(target))
-        }
-        if target.lane == .duplicate {
-            CommandButton(.mergeDuplicate, on: .review(target))
-        }
-        if target.lane.isName {
-            CommandButton(.somebodyNew, on: .review(target))
+        ForEach(Self.verbs.filter { model.canOffer($0, on: .review(target)) }, id: \.self) {
+            CommandButton($0, on: .review(target))
         }
     }
 }

@@ -36,9 +36,7 @@ struct FactSuggestionRow: View {
                         .foregroundStyle(.secondary)
                 }
                 if let keyCaption {
-                    Text(keyCaption)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                    ReviewKeyCaption(keyCaption)
                 }
             }
             Spacer(minLength: 0)

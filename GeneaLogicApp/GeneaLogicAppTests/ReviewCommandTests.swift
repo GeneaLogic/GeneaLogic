@@ -1,5 +1,6 @@
 import Foundation
 import GeneaLogicArchive
+import GeneaLogicMatch
 import GeneaLogicModel
 import Testing
 
@@ -71,6 +72,34 @@ import Testing
         #expect(try onlyRow(of: model).candidates.count == 1)
     }
 
+    /// Review's keys wait for Review's own writes, not for any write: an import or a wait
+    /// on another process's lock is no reason to refuse a verdict.
+    @Test func anUnrelatedWriteDoesNotHoldUpADecision() async throws {
+        let (model, root) = try await makeReview()
+        defer { AppTestSupport.remove(root) }
+        let row = try onlyRow(of: model)
+
+        await model.act {
+            model.createPerson(given: "Marcus", surname: "Hanner")
+            #expect(model.hasMutationsInFlight)
+            model.perform(.acceptSuggestion, on: .review(row.target))
+        }
+
+        #expect(model.reviewItems.isEmpty)
+        #expect(model.reviewDecisionsInFlight == 0)
+    }
+
+    /// Two records with one name, as a duplicate pair usually is, are told apart.
+    @Test func aSameNamedPairIsToldApart() {
+        let pair = DuplicateCandidateFixture.item(firstName: "Anna Roe", secondName: "Anna Roe")
+        let names = pair.distinguishedNames
+        #expect(names.first != names.second)
+        #expect(names.first.hasPrefix("“Anna Roe” ("))
+
+        let distinct = DuplicateCandidateFixture.item(firstName: "Anna Roe", secondName: "Ann Roe")
+        #expect(distinct.distinguishedNames == ("“Anna Roe”", "“Ann Roe”"))
+    }
+
     /// A command a sheet answers is left for `ReviewCommandHost`, which is there whichever
     /// pane is showing, so a row's context menu can name an unselected row.
     @Test func aSheetCommandIsLeftForTheHost() async throws {
@@ -94,5 +123,27 @@ import Testing
 
         model.selectedReviewID = "a row since resolved"
         #expect(model.commandContext.selectedReview == nil)
+    }
+}
+
+/// A duplicates row with chosen names, for what a merge dialog calls the two records.
+private enum DuplicateCandidateFixture {
+    static func item(firstName: String, secondName: String) -> DuplicateReviewItem {
+        let breakdown = MatchBreakdown(
+            name: MatchDimension(kind: .exact, score: 100), nameAlgo: "daitch-mokotoff",
+            birthYear: MatchDimension(kind: .none, score: 0),
+            birthPlace: MatchDimension(kind: .none, score: 0),
+            spouseName: MatchDimension(kind: .none, score: 0),
+            parents: MatchDimension(kind: .none, score: 0), conflicts: [])
+        let first = PersonID("PER-1")
+        let second = PersonID("PER-2")
+        return DuplicateReviewItem(
+            candidate: DuplicateCandidate(
+                person1: first, person2: second,
+                match: DuplicateScore(breakdown: breakdown, aggregateConfidence: 90)),
+            first: PersonSummary(
+                uid: first, displayName: firstName, primaryDate: nil, factCount: 2),
+            second: PersonSummary(
+                uid: second, displayName: secondName, primaryDate: nil, factCount: 0))
     }
 }

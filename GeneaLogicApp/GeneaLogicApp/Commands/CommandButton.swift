@@ -31,7 +31,8 @@ struct CommandMenuItem: View {
         // The subject is the selection *now*, not when the menu was last drawn: SwiftUI can
         // redraw the menu bar after a key equivalent has already fired.
         guard let model, !NSApp.keyWindowIsUnderModal,
-            let subject = model.commandContext(for: command).selectionSubject(for: command)
+            let subject = model.commandContext(for: command).selectionSubject(for: command),
+            model.canPerform(command, on: subject)
         else {
             NSSound.beep()
             return

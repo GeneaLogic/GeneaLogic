@@ -83,7 +83,9 @@ struct ArchiveContainerView: View {
     var body: some View {
         @Bindable var model = model
         content(model)
-            .frame(minWidth: Layout.ArchiveWindow.minWidth, minHeight: Layout.ArchiveWindow.minHeight)
+            .frame(
+                minWidth: Layout.ArchiveWindow.minWidth, minHeight: Layout.ArchiveWindow.minHeight
+            )
             .environment(model)
             .focusedSceneValue(\.archiveModel, model)
             .navigationTitle(url.deletingPathExtension().lastPathComponent)
@@ -542,16 +544,24 @@ private struct OpenArchiveView: View {
 
     /// Two lanes share one sidebar and one selection, so the pane is chosen by which
     /// worklist claims the selected id (the ids are lane-prefixed — `ReviewSelection`).
+    ///
+    /// **Each pane is identified by its row** (`.id`), so a new row gets a new pane at the
+    /// top of its scroll view. Reused, a pane kept the last row's offset, and the next row
+    /// could open scrolled past its header and the top candidate the keys act on.
     @ViewBuilder
     private var reviewDetail: some View {
         if let selectedReviewItem {
             ReviewDetailView(item: selectedReviewItem)
+                .id(selectedReviewItem.id)
         } else if let selectedFactItem {
             ReviewFactsDetailView(item: selectedFactItem)
+                .id(selectedFactItem.id)
         } else if let selectedRelationshipItem {
             ReviewRelationshipDetailView(item: selectedRelationshipItem)
+                .id(selectedRelationshipItem.id)
         } else if let selectedDuplicateItem {
             ReviewDuplicateDetailView(item: selectedDuplicateItem)
+                .id(selectedDuplicateItem.id)
         } else {
             ReviewDetailPlaceholder(
                 hasWork: !model.reviewItems.isEmpty || !model.factItems.isEmpty
@@ -592,32 +602,32 @@ private struct OpenArchiveView: View {
 
     /// Resolves the selected worklist row against the current worklist. A row whose
     /// mention has since been resolved (by a confirm here, or by the resolve sheet on the
-    /// Artifacts side) simply isn't there any more, and the pane falls back to the
-    /// placeholder rather than rendering a decision that has already been made.
+    /// Artifacts side) simply isn't there any more, so it is never rendered as a decision
+    /// still to make. `ReviewCommandHost` usually moves the selection to the next row
+    /// first; the placeholder shows at the end of the list, before Possible Duplicates, or
+    /// for a selection whose row hasn't been computed yet.
     private var selectedReviewItem: ReviewItem? {
         guard let reviewSelection else { return nil }
         return model.reviewItems.first { $0.id == reviewSelection }
     }
 
     /// The facts lane's half of the same resolution: a person whose last suggestion has
-    /// just been recorded simply isn't in the list any more, and the pane falls back to the
-    /// placeholder rather than showing an empty section.
+    /// just been recorded simply isn't in the list any more, so their pane never shows an
+    /// empty section.
     private var selectedFactItem: FactReviewItem? {
         guard let reviewSelection else { return nil }
         return model.factItems.first { $0.id == reviewSelection }
     }
 
     /// The relationships lane's half. An edge that has since been recorded (or declined)
-    /// leaves the list, and the pane falls back to the placeholder rather than offering a
-    /// conclusion the archive already holds.
+    /// leaves the list, so its pane never offers a conclusion the archive already holds.
     private var selectedRelationshipItem: RelationshipReviewItem? {
         guard let reviewSelection else { return nil }
         return model.relationshipItems.first { $0.id == reviewSelection }
     }
 
     /// The duplicates lane's half. A pair that has since been merged or dismissed leaves
-    /// the list, and the pane falls back to the placeholder rather than offering a merge
-    /// of a record that no longer exists.
+    /// the list, so its pane never offers a merge of a record that no longer exists.
     private var selectedDuplicateItem: DuplicateReviewItem? {
         guard let reviewSelection else { return nil }
         return model.duplicateItems.first { $0.id == reviewSelection }

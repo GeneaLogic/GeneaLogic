@@ -606,6 +606,16 @@ final class ArchiveModel {
     /// of them being slow, not of a particular one.
     private var mutationsInFlight = 0
 
+    /// How many of the in-flight mutations are a Review decision run by its command
+    /// (slice 83). Review's two verbs wait for these, and for nothing else: an import or a
+    /// wait on another process's lock is no reason to refuse a verdict.
+    private(set) var reviewDecisionsInFlight = 0
+
+    /// Set while a Review command runs its verb, so the one `mutate` that verb starts is
+    /// counted in `reviewDecisionsInFlight`. Cleared straight after, so a verb that
+    /// writes nothing can't tag a later, unrelated mutation.
+    var marksNextMutationAsReviewDecision = false
+
     /// Whether any mutation is still on the write queue.
     var hasMutationsInFlight: Bool { mutationsInFlight > 0 }
 
@@ -689,8 +699,14 @@ final class ArchiveModel {
             return
         }
         beginMutation()
+        let isReviewDecision = marksNextMutationAsReviewDecision
+        marksNextMutationAsReviewDecision = false
+        if isReviewDecision { reviewDecisionsInFlight += 1 }
         Task { @MainActor in
-            defer { endMutation() }
+            defer {
+                if isReviewDecision { reviewDecisionsInFlight -= 1 }
+                endMutation()
+            }
             do {
                 let result = try await onWriteQueue { try work(archive) }
                 commit(result)

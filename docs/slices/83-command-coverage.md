@@ -30,8 +30,8 @@ commands.
 
 - **A held key decides once.** Every other key in the app undoes or opens something; these
   two write a human verdict and, with fork 7, move to the next row. So they ignore
-  `NSEvent.isARepeat`, and a held ⌘↩ can't confirm a queue. A quick second press waits for
-  the first write, because the row stays until it lands.
+  `NSEvent.isARepeat`, and a held ⌘↩ can't confirm a queue. A quick second press is refused
+  with a beep until the first write lands, because the row stays until then.
 - **`ReviewCommandHost`** sits on the detail column and owns This Is Somebody New…'s sheet,
   the sheet ⌘↩ opens and Merge People…'s dialog. A row's context menu can name an
   unselected row, so a pane can't own them: it may be another row's. It also keeps the
@@ -196,7 +196,7 @@ key, and the menu is what shows it. A shared key has one live item per tab, as 8
 
 - **A second press was missed by the spec.** Writes are asynchronous and the row stays
   until one lands, so ⌘⌫ then ⌘↩ in quick succession would confirm the candidate just
-  rejected. Review's verbs do nothing while a write is in flight.
+  rejected.
 - **The selection moves wherever the row went:** the host watches the worklist rather than
   each verb, so a pane's button, a sheet, a merge and another window all move on alike. At
   the end of the list it goes to the placeholder, not back up: rows left above were left on
@@ -207,3 +207,22 @@ key, and the menu is what shows it. A shared key has one live item per tab, as 8
 - **A Review row's context menu hides what its lane lacks** rather than dimming it.
 - `canOffer` is the rule without the sheet, shared by the in-pane affordances and the
   toolbar.
+
+**Revised on `/code-review`:**
+
+- **Review's keys wait for Review's own write, not for any write.** Refusing while any
+  mutation was in flight swallowed a verdict during an import or a wait on another
+  process's lock. The command's write is counted (`reviewDecisionsInFlight`), the two
+  items are off until it lands, and the menu beeps on a refused press instead of doing
+  nothing.
+- **Merge People…'s dialog tells a same-named pair apart.** A pair usually shares a name,
+  so it read "Keep “Anna Roe”" twice. Each record now carries its subtitle, or its uid
+  when that matches too (`distinguishedNames`).
+- **Only a row that was there and left moves the selection.** A selection restored at
+  launch, before the asynchronous duplicates scan delivers its row, was cleared.
+- **A new row gets a new pane** (`.id`), at the top of its scroll view. A reused pane kept
+  the last row's offset, and the next could open scrolled past the candidate the keys act
+  on.
+- A row's context menu asks the rule (`canOffer`) rather than restating the lane table,
+  and doesn't resolve the selection it doesn't use. The merge wording is one constant
+  (`MergeWording`), the caption one view (`ReviewKeyCaption`).

@@ -89,10 +89,7 @@ struct PersonListView: View {
                     model.mergePersons(merge.absorbed.uid, into: merge.survivor)
                 }
             } message: { _ in
-                Text(
-                    "Names and facts are combined, and every relationship and evidence link "
-                        + "moves to the record you keep. The other record is removed. You can "
-                        + "undo it with ⌘Z.")
+                Text(MergeWording.explanation)
             }
             .reportsModal(pendingMerge != nil)
     }

@@ -33,11 +33,10 @@ struct ReviewCommandHost: ViewModifier {
             .onDisappear { model.selectedReviewID = nil }
             // On any way out, not only ⌘↩: the same verb from a pane's button, a sheet or
             // a merge moves on the same, and a row that stays keeps the selection.
+            // Only a row that was there and left moves it (`ReviewTarget.selection`).
             .onChange(of: model.reviewRows) { before, after in
-                guard let selection, !after.contains(where: { $0.id == selection }) else {
-                    return
-                }
-                self.selection = ReviewTarget.rowAfter(selection, before: before, after: after)
+                let moved = ReviewTarget.selection(selection, before: before, after: after)
+                if moved != selection { selection = moved }
             }
             .onChange(of: model.pendingCommand) {
                 guard
@@ -60,23 +59,27 @@ struct ReviewCommandHost: ViewModifier {
             .reportsModal(factRequest != nil)
             // One dialog, which is also the confirmation. The pane's two Keep buttons ask
             // for less because their label has already said which record survives.
+            //
+            // The names are told apart (`distinguishedNames`): a pair usually shares one,
+            // and from a row's context menu the pane behind may show another pair.
             .confirmationDialog(
-                mergeChoice.map { "Merge “\($0.firstName)” and “\($0.secondName)”?" } ?? "",
+                mergeChoice.map {
+                    let names = $0.distinguishedNames
+                    return "Merge \(names.first) and \(names.second)?"
+                } ?? "",
                 isPresented: Binding(
                     get: { mergeChoice != nil }, set: { if !$0 { mergeChoice = nil } }),
                 titleVisibility: .visible, presenting: mergeChoice
             ) { item in
-                Button("Keep “\(item.firstName)”") {
+                let names = item.distinguishedNames
+                Button("Keep \(names.first)") {
                     model.mergePersons(item.candidate.person2, into: item.candidate.person1)
                 }
-                Button("Keep “\(item.secondName)”") {
+                Button("Keep \(names.second)") {
                     model.mergePersons(item.candidate.person1, into: item.candidate.person2)
                 }
             } message: { _ in
-                Text(
-                    "Names and facts are combined, and every relationship and evidence link "
-                        + "moves to the record you keep. The other record is removed. You can "
-                        + "undo it with ⌘Z.")
+                Text(MergeWording.explanation)
             }
             .reportsModal(mergeChoice != nil)
     }

@@ -353,6 +353,9 @@ struct CommandContext: Equatable {
     /// The person the Tree is drawn around, while it shows.
     var treeFocus: PersonID?
     var treeDepths = TreeDepths()
+    /// A Review decision is still being written. Its row stays until the write lands, so
+    /// Review's two verbs wait rather than decide that row a second time.
+    var isDecidingReview = false
 
     /// The subject the menu bar acts on, taken from the selection, or `nil` when there is
     /// nothing selected for the command to act on.
@@ -387,8 +390,10 @@ struct CommandContext: Equatable {
         case .mergePerson: return personCount > 1
         // The two tabs with a search field.
         case .find: return activeTab == .artifacts || activeTab == .people
-        case .acceptSuggestion: return subject.reviewLane?.canAccept == true
-        case .declineSuggestion: return subject.reviewLane?.canDecline == true
+        case .acceptSuggestion:
+            return !isDecidingReview && subject.reviewLane?.canAccept == true
+        case .declineSuggestion:
+            return !isDecidingReview && subject.reviewLane?.canDecline == true
         case .mergeDuplicate: return subject.reviewLane == .duplicate
         case .somebodyNew: return subject.reviewLane?.isName == true
         // Tree has no controls with nobody in it.

@@ -167,8 +167,9 @@ struct TreeTab: View {
             )
             // `NSHostingView` starts a fresh SwiftUI environment rather than inheriting
             // this one, so anything the content reads must be injected here — the same
-            // hazard as a `.sheet` attached outside the injection point. The content
-            // takes its data as parameters, so this is belt-and-braces for its subviews.
+            // hazard as a `.sheet` attached outside the injection point. **Required:** a
+            // card's context menu is `CommandButton`s, which read the model from the
+            // environment, and without this the tree crashes when it draws (slice 83).
             .environment(model)
         }
     }

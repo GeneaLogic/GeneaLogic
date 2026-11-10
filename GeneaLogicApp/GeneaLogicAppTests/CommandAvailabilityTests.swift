@@ -184,6 +184,28 @@ import Testing
         #expect(ReviewTarget.rowAfter("gone", before: [name1], after: [name1]) == nil)
     }
 
+    /// A selection restored at launch waits for its lane, which may not be computed yet.
+    @Test func aSelectionWaitingForItsRowStays() {
+        #expect(ReviewTarget.selection("d1", before: [], after: [name1]) == "d1")
+        #expect(ReviewTarget.selection("d1", before: [name1], after: [name1, duplicate1]) == "d1")
+    }
+
+    @Test func onlyARowThatLeftMovesTheSelection() {
+        #expect(
+            ReviewTarget.selection("n1", before: [name1, name2], after: [name1, name2]) == "n1")
+        #expect(ReviewTarget.selection("n1", before: [name1, name2], after: [name2]) == "n2")
+        #expect(ReviewTarget.selection(nil, before: [name1], after: []) == nil)
+    }
+
+    /// While a decision is being written its row stays, so the two verbs wait for it.
+    @Test func theKeysWaitForADecisionBeingWritten() {
+        var context = context(on: .review)
+        context.isDecidingReview = true
+        #expect(!context.isAvailable(.acceptSuggestion))
+        #expect(!context.isAvailable(.declineSuggestion))
+        #expect(context.isAvailable(.somebodyNew))
+    }
+
     // MARK: - Tree (slice 83)
 
     @Test func theDepthItemsGreyAtTheEnds() {
@@ -305,12 +327,15 @@ import Testing
                     model.inspectorVisible = selected
                     model.treeFocus = selected ? person : nil
                     model.selectedReviewID = selected ? "row" : nil
+                    model.marksNextMutationAsReviewDecision = false
                     model.setModal(modal, presented: isModal)
                     let whole = model.commandContext
                     for command in ArchiveCommand.allCases {
                         let own = model.commandContext(for: command)
                         #expect(own.isAvailable(command) == whole.isAvailable(command))
-                        #expect(own.selectionSubject(for: command) == whole.selectionSubject(for: command))
+                        #expect(
+                            own.selectionSubject(for: command)
+                                == whole.selectionSubject(for: command))
                         #expect(command.title(in: own) == command.title(in: whole))
                         #expect(own.ownsShortcut(command) == whole.ownsShortcut(command))
                     }
