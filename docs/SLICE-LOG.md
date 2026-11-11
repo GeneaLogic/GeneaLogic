@@ -4395,9 +4395,11 @@ been two slices.
   disagree; none is on the menu bar, because a pane's rows have no selection. **Decided:**
   cases, not row-local verbs; rows that only edit and remove stay as they are; the
   candidate cards and the rows' jumps are in. A row command belongs to no tab, so one
-  suggested-fact row serves the person pane and Review. **Gotcha:** the suggestion rows'
-  values aren't `Hashable`, so a write looks its suggestion up afresh through the code the
-  pane read, rather than trusting a copy on the subject.
+  suggested-fact row serves the person pane and Review. **Gotchas:** a subject carries its
+  row's value, hashed by the row's identity since the values are only `Equatable`; looking
+  the row up again (the first build) repeated a reload per click, could miss, and found
+  the wrong mention under a repeated `localRef`. A row's Record is a Review decision, or
+  ⌘↩ on the same suggestion records it twice.
 
 ## Carryovers and parked work
 
