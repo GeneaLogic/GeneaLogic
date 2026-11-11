@@ -158,6 +158,22 @@ extension ArchiveModel {
         decide { decline(target) }
     }
 
+    /// A candidate card's Confirm or Reject (slice 83b), on that card's candidate rather
+    /// than the top one. Counted as a Review decision, so the keys wait for it.
+    func decideCandidate(_ target: CandidateTarget, confirming: Bool) {
+        guard let item = reviewItems.first(where: { $0.id == target.row.id }),
+            let candidate = item.candidates.first(where: { $0.suggestion.personID == target.person }
+            )
+        else { return }
+        decide {
+            if confirming {
+                confirmSuggestion(candidate.suggestion)
+            } else {
+                rejectSuggestion(candidate.suggestion)
+            }
+        }
+    }
+
     private func accept(_ target: ReviewTarget) {
         switch target.lane {
         case .name:

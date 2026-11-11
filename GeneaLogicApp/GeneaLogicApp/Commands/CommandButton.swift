@@ -55,7 +55,7 @@ struct CommandButton: View {
 
     var body: some View {
         Button(
-            command.title, systemImage: command.systemImage,
+            command.title(on: subject), systemImage: command.systemImage(on: subject),
             role: command.isDestructive ? .destructive : nil
         ) {
             model.perform(command, on: subject)

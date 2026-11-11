@@ -49,6 +49,10 @@ extension ArchiveModel {
         case .person: context.selectedPerson = selectedPerson
         case .review:
             if resolvingSelection { context.selectedReview = selectedReviewRow }
+        // A row names its own subject, and its state rides on it (slice 83b).
+        case .mention, .metadataEntry, .factSuggestion, .relationshipSuggestion, .source,
+            .relationship, .candidate:
+            break
         }
         switch command {
         case .toggleInspector:
@@ -59,7 +63,7 @@ extension ArchiveModel {
             context.personCount = persons.count
             context.treeDepths = treeDepths
         case .showInPeople: context.treeFocus = treeFocus
-        case .acceptSuggestion, .declineSuggestion:
+        case .acceptSuggestion, .declineSuggestion, .confirmCandidate, .rejectCandidate:
             context.isDecidingReview = reviewDecisionsInFlight > 0
         default: break
         }
@@ -122,6 +126,7 @@ extension ArchiveModel {
             refreshReviewWorklist()
             refreshDuplicateCandidates()
         default:
+            if command.subjectKind.isRow, performRowCommand(command, on: subject) { return }
             pendingCommand = PendingCommand(command: command, subject: subject)
         }
     }
@@ -132,6 +137,18 @@ extension ArchiveModel {
         _ handles: (ArchiveCommand) -> Bool
     ) -> (command: ArchiveCommand, subject: CommandSubject)? {
         guard let pending = pendingCommand, handles(pending.command) else { return nil }
+        pendingCommand = nil
+        return (pending.command, pending.subject)
+    }
+
+    /// Takes the pending command if `handles` says the calling view runs it on that
+    /// subject: for a row's command (slice 83b), which the pane that drew the row runs.
+    func claimPendingCommand(
+        where handles: (ArchiveCommand, CommandSubject) -> Bool
+    ) -> (command: ArchiveCommand, subject: CommandSubject)? {
+        guard let pending = pendingCommand, handles(pending.command, pending.subject) else {
+            return nil
+        }
         pendingCommand = nil
         return (pending.command, pending.subject)
     }

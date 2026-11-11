@@ -31,61 +31,69 @@ struct PersonMentionRow: View {
                 .imageScale(.large)
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 4) {
-                // The name + role/quality/age subtitle tap to edit the mention (the same
-                // tap-to-edit affordance the People-tab name/fact rows use). The
-                // resolution control and recorded facts below have their own actions and
-                // stay outside this button.
-                Button {
-                    sheet = ArtifactSheet.editMention(mention)
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(mention.nameAsRecorded)
-                            .fontWeight(.medium)
-                        if let subtitle {
-                            Text(subtitle)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityHint("Edit")
-                StatedRelationshipsLine(
-                    localRef: mention.localRef, statedRelationships: statedRelationships,
-                    allMentions: allMentions)
-                MentionResolutionControl(
-                    mention: mention, link: link, resolvedPerson: resolvedPerson,
-                    sheet: $sheet)
+                header
                 MentionRecordedFacts(
-                    artifactID: artifactID, mention: mention,
-                    canRelate: allMentions.count > 1, sheet: $sheet)
+                    artifactID: artifactID, mention: mention, subject: subject, sheet: $sheet)
             }
             Spacer(minLength: 0)
             RowRemoveButton(
                 isHovering: isHovering,
-                accessibilityLabel: "Remove Mention",
-                help: "Remove this mention (⌘Z to undo)",
-                action: deleteMention)
+                accessibilityLabel: ArchiveCommand.removeMention.title,
+                help: ArchiveCommand.removeMention.help(on: subject) ?? "",
+                action: { model.perform(.removeMention, on: subject) })
         }
         .hoverRowBackground(isHovering: isHovering)
         .onHover { isHovering = $0 }
     }
 
-    /// Removes this mention (undoable). It is found by `localRef`, starting at the row's
-    /// index, in the record the write reads: a list that shifted since removes this
-    /// mention or nothing (79b). Any `EvidenceLink` pointing at the removed `localRef` is
-    /// left dangling — that's `verifyIntegrity()`'s job (§2.3).
-    private func deleteMention() {
-        let ref = mention.localRef
-        model.updateMetadata(of: artifactID, actionName: "Remove Person Mentioned") {
-            guard
-                let position = $0.personsMentioned.position(
-                    near: index, where: { $0.localRef == ref })
-            else { return }
-            $0.personsMentioned.remove(at: position)
+    /// What the row's commands act on (slice 83b).
+    private var subject: CommandSubject {
+        let state: MentionTarget.Link =
+            if let link {
+                resolvedPerson == nil
+                    ? .stale(link.uid) : .linked(link.uid, to: link.personUid)
+            } else {
+                .none
+            }
+        return .mention(
+            MentionTarget(
+                artifact: artifactID, localRef: mention.localRef, index: index, link: state,
+                namesOthers: allMentions.count > 1))
+    }
+
+    /// The name, what the record states, and the resolution: the part of the row that is
+    /// about the mention, so it carries the mention's context menu. The recorded facts
+    /// below are rows of their own, and a right-click on one shouldn't offer to remove
+    /// the mention.
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // The name + role/quality/age subtitle tap to edit the mention (the same
+            // tap-to-edit affordance the People-tab name/fact rows use). The resolution
+            // control below has its own actions and stays outside this button.
+            Button {
+                model.perform(.editMention, on: subject)
+            } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(mention.nameAsRecorded)
+                        .fontWeight(.medium)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Edit")
+            StatedRelationshipsLine(
+                localRef: mention.localRef, statedRelationships: statedRelationships,
+                allMentions: allMentions)
+            MentionResolutionControl(link: link, resolvedPerson: resolvedPerson, subject: subject)
         }
+        .contentShape(Rectangle())
+        .rowCommandMenu(subject)
     }
 
     /// "Subject · primary · age 45 · ru/Cyrl" — role always shown; quality omitted when
@@ -140,19 +148,18 @@ private struct StatedRelationshipsLine: View {
 /// The mention's resolution state: **Resolve…** when unlinked; a chip to the concluded
 /// person, with **Why?** and **Unlink**, when linked; and a "Missing person" state with
 /// **Re-resolve…** when the link points at a person that no longer exists (§2.3, no
-/// cascade).
+/// cascade). The verbs are the row's commands (slice 83b), which read the same state.
 private struct MentionResolutionControl: View {
     @Environment(ArchiveModel.self) private var model
-    let mention: PersonMention
     let link: EvidenceLink?
     let resolvedPerson: PersonSummary?
-    @Binding var sheet: ArtifactSheet?
+    let subject: CommandSubject
 
     /// Whether the link's **stored** match reasoning is expanded (slice 45e).
     @State private var isShowingReasoning = false
 
     var body: some View {
-        if staleLink != nil {
+        if let link, resolvedPerson == nil {
             HStack(spacing: 8) {
                 // Not a button: there is nothing to navigate to, and rendering it as one
                 // is the bug — it looked live and then selected nothing.
@@ -168,23 +175,16 @@ private struct MentionResolutionControl: View {
                 .background(Color.secondary.opacity(0.12), in: Capsule())
                 .help("This mention is linked to a person that was deleted")
 
-                Button("Re-resolve…", action: resolve)
-                    .buttonStyle(.plain)
-                    .font(.caption)
-                    .foregroundStyle(Color.accentColor)
-                    .help("Point this citation at a person that still exists")
-
-                Button("Unlink", action: unlink)
-                    .buttonStyle(.plain)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .help("Drop the stale link, leaving the mention unresolved (⌘Z to undo)")
+                // A re-resolve replaces the stale link rather than adding a second one: the
+                // subject's link state is what both the title and the payload read.
+                RowCommandButton(.resolveMention, on: subject)
+                RowCommandButton(.unlinkMention, on: subject, emphasis: .secondary)
             }
         } else if let link {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     Button {
-                        model.navigateToPerson(link.personUid)
+                        model.perform(.showMentionedPerson, on: subject)
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.right")
@@ -200,7 +200,7 @@ private struct MentionResolutionControl: View {
                         .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
-                    .help("Show this person in the People tab")
+                    .help(ArchiveCommand.showMentionedPerson.help(on: subject) ?? "")
 
                     Button(isShowingReasoning ? "Hide Reasoning" : "Why?") {
                         isShowingReasoning.toggle()
@@ -210,43 +210,15 @@ private struct MentionResolutionControl: View {
                     .foregroundStyle(Color.accentColor)
                     .help("The match reasoning stored on this link")
 
-                    Button("Unlink", action: unlink)
-                        .buttonStyle(.plain)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .help("Remove the link to this person (⌘Z to undo)")
+                    RowCommandButton(.unlinkMention, on: subject, emphasis: .secondary)
                 }
                 if isShowingReasoning {
                     StoredReasoning(link: link)
                 }
             }
         } else {
-            Button(action: resolve) {
-                Label("Resolve…", systemImage: "link")
-                    .font(.caption)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(Color.accentColor)
-            .help("Link this mention to a concluded person")
+            RowCommandButton(.resolveMention, on: subject, showsSymbol: true)
         }
-    }
-
-    /// The link, when it points at a person that no longer exists. One predicate, used
-    /// for both the rendering and the payload: if they could disagree, a "Re-resolve…"
-    /// that passed `nil` would *add* a second link to the same mention rather than
-    /// replacing the stale one (the engine's `link` has no one-per-localRef guard),
-    /// leaving two wrong citations.
-    private var staleLink: EvidenceLink? {
-        resolvedPerson == nil ? link : nil
-    }
-
-    /// Opens the resolve sheet: a first resolve, or a re-resolve replacing `staleLink`.
-    private func resolve() {
-        sheet = ArtifactSheet(.resolve(mention: mention, replacing: staleLink?.uid))
-    }
-
-    private func unlink() {
-        if let link { model.unlinkMention(link.uid) }
     }
 
     /// The chip text: the concluded person's display name, plus its primary date
@@ -330,8 +302,8 @@ private struct MentionRecordedFacts: View {
     @Environment(ArchiveModel.self) private var model
     let artifactID: ArtifactID
     let mention: PersonMention
-    /// Whether there is anyone on this record to relate this mention *to*.
-    let canRelate: Bool
+    /// The mention, for its Add Fact… and Add Relationship… (slice 83b).
+    let subject: CommandSubject
     @Binding var sheet: ArtifactSheet?
 
     @FocusState private var focusedFact: AnyHashable?
@@ -351,48 +323,22 @@ private struct MentionRecordedFacts: View {
                 ) { deleteFact(row.element, near: row.index) }
             }
             HStack(spacing: 12) {
-                Button {
-                    addFact()
-                } label: {
-                    Label("Add Fact…", systemImage: "plus")
-                        .font(.caption)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
-                .help("Record what this document states about this person")
-
+                RowCommandButton(.addMentionFact, on: subject, showsSymbol: true)
                 // Slice 45k's editing lives in the mention sheet, and until this button
                 // existed the only way to reach it was to know that clicking the name
                 // opened it. The affordance names the feature; the sheet is still its one
                 // owner (an edge belongs to the record, not to either end, so editing it
-                // from two places would give one statement two owners). Hidden when the
-                // record names nobody else — there is then no one to relate this person to.
-                if canRelate {
-                    Button {
-                        sheet = ArtifactSheet.editMention(mention)
-                    } label: {
-                        Label("Add Relationship…", systemImage: "person.2")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
-                    .help("State how this document relates this person to another it names")
-                }
+                // from two places would give one statement two owners). Not offered when
+                // the record names nobody else — there is then no one to relate this
+                // person to.
+                RowCommandButton(.addMentionRelationship, on: subject, showsSymbol: true)
             }
         }
         .padding(.top, 2)
         .returnsRowFocus($focusReturn, rowIDs: rows.map { AnyHashable($0.id) }, focus: $focusedFact)
     }
 
-    /// Opens the fact editor to add a fact to this mention, addressed by its stable
-    /// `localRef`; its name rides along for the editor's heading.
-    private func addFact() {
-        sheet = ArtifactSheet(
-            .mentionFact(
-                mentionRef: mention.localRef, mentionName: mention.nameAsRecorded, mode: .add))
-    }
-
-    /// Opens the fact editor on `row`, like `addFact`. When the row has keyboard focus,
+    /// Opens the fact editor on `row`, as Add Fact… does. When the row has keyboard focus,
     /// focus comes back to it once the editor's change lands (79b).
     private func editFact(_ row: KeyedRow<RecordedFact, RecordedFact>) {
         let report = RowFocusReturn.request(

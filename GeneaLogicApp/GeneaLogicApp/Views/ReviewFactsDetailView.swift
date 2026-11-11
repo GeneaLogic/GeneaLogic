@@ -38,6 +38,20 @@ struct ReviewFactsDetailView: View {
                 .environment(model)
         }
         .reportsModal(factEditorRequest != nil)
+        // A row's Edit… or Apply… (slice 83b).
+        .onChange(of: model.pendingCommand) {
+            guard
+                let (_, subject) = model.claimPendingCommand(where: { command, subject in
+                    guard command == .editSuggestedFact,
+                        case .factSuggestion(let target) = subject
+                    else { return false }
+                    return target.person == item.person.uid
+                }),
+                factEditorRequest == nil, case .factSuggestion(let target) = subject,
+                let suggestion = item.suggestions.first(where: { $0.id == target.id })
+            else { return }
+            factEditorRequest = FactEditorRequest(mode: .fromEvidence(suggestion))
+        }
     }
 
     private var header: some View {
@@ -89,14 +103,8 @@ struct ReviewFactsDetailView: View {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(item.suggestions) { suggestion in
                     FactSuggestionRow(
-                        suggestion: suggestion,
-                        keyCaption: keyCaption(for: suggestion),
-                        onRecord: {
-                            model.recordSuggestedFact(suggestion, for: item.person.uid)
-                        },
-                        onApply: {
-                            factEditorRequest = FactEditorRequest(mode: .fromEvidence(suggestion))
-                        })
+                        suggestion: suggestion, person: item.person.uid,
+                        keyCaption: keyCaption(for: suggestion))
                 }
             }
         }

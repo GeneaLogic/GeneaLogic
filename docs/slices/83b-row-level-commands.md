@@ -25,7 +25,7 @@ of them, because a pane's rows have no selection for a menu item to act on (82).
 | A metadata entry | inspector | Apply… |
 | A suggested fact | person, Review facts lane | Record Fact (Record) · Edit… (Apply… when it can't be recorded as-is) |
 | A suggested relationship | inspector, person | Record Relationship (Record) · Not This Relationship (Not This) |
-| A source | person | Show Artifact · Add as Name · Unlink |
+| A source | person | Show in Artifacts · Add as Name · Unlink |
 | A relationship | person | Show in People · Replace Person… · Remove Relationship |
 | A candidate | Review names lane | Confirm · Reject |
 
@@ -81,7 +81,7 @@ of them, because a pane's rows have no selection for a menu item to act on (82).
    is the mismatch this slice exists to remove, and a card is a row of the pane like the
    rest.
    *Alternative:* leave them; only the top card's verbs have a key, and those are 83's.
-4. **The jumps in the context menu** (Show in People, Show Artifact). **Agreed:** in.
+4. **The jumps in the context menu** (Show in People, Show in Artifacts). **Agreed:** in.
    A row's menu without the row's main action reads as incomplete, and Finder and Mail put
    Open first.
    *Alternative:* verbs only; the chip and the title link stay the only way across.
@@ -110,3 +110,18 @@ of them, because a pane's rows have no selection for a menu item to act on (82).
 - A stale mention shows Re-resolve…, and a dangling relationship Replace Person…, in both
   places.
 - The inspector at its narrowest still fits its rows' buttons.
+
+**Settled in the build:**
+
+- **Writes run in the model even where only the pane held the row.** A suggestion's
+  write looks it up afresh through the code the pane read (`SuggestedFacts`,
+  `suggestedRelationships`), so it records what the row showed. Only the sheets go to
+  the pane, which claims a row command by its subject (`claimPendingCommand(where:)`).
+- **A row's inline verb shows only while its row offers it** (`RowCommandButton`), as
+  the panes did by hand, so the button and the menu agree by construction. The candidate
+  cards' buttons dim instead: they wait on a write, and vanishing would shift the card.
+- **A candidate's verdict counts as a Review decision**, so the keys wait for it.
+- **Where the menus sit:** a mention's on its name, statement and resolution, not its
+  recorded facts, which are rows of their own; a metadata entry's on its key and Apply…,
+  not its value, which is selectable text with its own Copy.
+- **Show in Artifacts**, not Show Artifact, to pair with Show in People.

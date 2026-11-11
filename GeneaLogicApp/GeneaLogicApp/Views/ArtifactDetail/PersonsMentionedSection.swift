@@ -102,6 +102,8 @@ private struct SuggestedRelationships: View {
                 ForEach(items) { item in
                     SuggestedRelationshipRow(
                         item: item,
+                        subject: .relationshipSuggestion(
+                            RelationshipSuggestionTarget(id: item.id, owner: .artifact(artifactID))),
                         // **This record's** basis, not the archive-wide `isStated` — a row
                         // here speaks for the document it sits on, and a suggestion another
                         // record states outright may only be *implied* by this one.
@@ -121,8 +123,8 @@ private struct SuggestedRelationships: View {
 /// says that your conclusions don't), and giving them two different marks would imply a
 /// distinction that isn't there.
 private struct SuggestedRelationshipRow: View {
-    @Environment(ArchiveModel.self) private var model
     let item: RelationshipReviewItem
+    let subject: CommandSubject
     /// How **this** record supports the claim. `nil` only if the record dropped out of the
     /// evidence between the sweep and the render, in which case the row says nothing about
     /// a basis rather than guessing one.
@@ -153,19 +155,14 @@ private struct SuggestedRelationshipRow: View {
                 // owner of what is still owed — the same reason the inspector filters
                 // the lane's answer instead of computing its own.
                 HStack(spacing: 12) {
-                    Button("Record") { model.confirmSuggestedRelationship(item) }
-                        .buttonStyle(.plain)
-                        .font(.caption)
-                        .foregroundStyle(Color.accentColor)
-                        .help("Add this relationship to your conclusions (⌘Z to undo)")
-                    Button("Not This") { model.dismissSuggestedRelationship(item) }
-                        .buttonStyle(.plain)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .help("Stop offering this relationship, here and in Review")
+                    RowCommandButton(.recordSuggestedRelationship, on: subject)
+                    RowCommandButton(
+                        .dismissSuggestedRelationship, on: subject, emphasis: .secondary)
                 }
             }
             Spacer(minLength: 0)
         }
+        .contentShape(Rectangle())
+        .rowCommandMenu(subject)
     }
 }

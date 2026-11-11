@@ -30,6 +30,22 @@ enum ArchiveCommand: Hashable, CaseIterable {
     // card's, with no menu-bar subject.
     case focusHere, moreAncestors, fewerAncestors, moreDescendants, fewerDescendants
     case chooseFocus
+    // Rows inside panes (slice 83b). No menu-bar item: a pane's rows have no selection
+    // for one to act on. Their buttons and context menus draw from here.
+    // A mention, in the inspector
+    case resolveMention, showMentionedPerson, editMention, addMentionFact
+    case addMentionRelationship, unlinkMention, removeMention
+    // An embedded-metadata entry
+    case applyMetadata
+    // A suggested fact, on a person and in Review's facts lane
+    case recordSuggestedFact, editSuggestedFact
+    // A suggested relationship, in the inspector and on a person
+    case recordSuggestedRelationship, dismissSuggestedRelationship
+    // A person's source, and a person's relationship
+    case showSource, addSourceName, unlinkSource
+    case showRelative, replaceRelative, removeRelationship
+    // A candidate in Review's names lane
+    case confirmCandidate, rejectCandidate
 
     /// The command that shows `tab` (View ▸ ⌘1–⌘4).
     nonisolated static func showTab(_ tab: ArchiveTab) -> ArchiveCommand {
@@ -66,7 +82,22 @@ enum ArchiveCommand: Hashable, CaseIterable {
     }
 
     /// What a command acts on.
-    enum SubjectKind { case archive, artifact, file, person, review }
+    enum SubjectKind {
+        case archive, artifact, file, person, review
+        // A pane's rows (slice 83b)
+        case mention, metadataEntry, factSuggestion, relationshipSuggestion, source
+        case relationship, candidate
+
+        /// A row inside a pane, which the menu bar can't name.
+        var isRow: Bool {
+            switch self {
+            case .archive, .artifact, .file, .person, .review: false
+            case .mention, .metadataEntry, .factSuggestion, .relationshipSuggestion, .source,
+                .relationship, .candidate:
+                true
+            }
+        }
+    }
 
     var subjectKind: SubjectKind {
         switch self {
@@ -84,11 +115,24 @@ enum ArchiveCommand: Hashable, CaseIterable {
             .person
         case .acceptSuggestion, .declineSuggestion, .mergeDuplicate, .somebodyNew:
             .review
+        case .resolveMention, .showMentionedPerson, .editMention, .addMentionFact,
+            .addMentionRelationship, .unlinkMention, .removeMention:
+            .mention
+        case .applyMetadata: .metadataEntry
+        case .recordSuggestedFact, .editSuggestedFact: .factSuggestion
+        case .recordSuggestedRelationship, .dismissSuggestedRelationship: .relationshipSuggestion
+        case .showSource, .addSourceName, .unlinkSource: .source
+        case .showRelative, .replaceRelative, .removeRelationship: .relationship
+        case .confirmCandidate, .rejectCandidate: .candidate
         }
     }
 
     /// The tab a command belongs to, or `nil` for one that works from any tab. A create
     /// belongs to no tab: it switches to its own first (fork 2), so the result is in view.
+    ///
+    /// Nor does a row's command (slice 83b): it is drawn only on its row, which is on
+    /// screen, and owns no key, so the check (which exists for the menu bar) adds nothing.
+    /// A suggested fact's then serve the person pane and Review's lane alike.
     var tab: ArchiveTab? {
         switch self {
         case .toggleInspector: .artifacts
@@ -102,6 +146,9 @@ enum ArchiveCommand: Hashable, CaseIterable {
             case .artifact, .file: .artifacts
             case .person: .people
             case .review: .review
+            case .mention, .metadataEntry, .factSuggestion, .relationshipSuggestion, .source,
+                .relationship, .candidate:
+                nil
             }
         }
     }
@@ -150,6 +197,24 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .moreDescendants: "Show More Descendants"
         case .fewerDescendants: "Show Fewer Descendants"
         case .chooseFocus: "Choose Focus…"
+        case .resolveMention: "Resolve…"
+        case .showMentionedPerson, .showRelative: "Show in People"
+        case .editMention: "Edit Mention…"
+        case .addMentionFact: "Add Fact…"
+        case .addMentionRelationship: "Add Relationship…"
+        case .unlinkMention, .unlinkSource: "Unlink"
+        case .removeMention: "Remove Mention"
+        case .applyMetadata: "Apply…"
+        case .recordSuggestedFact: "Record Fact"
+        case .editSuggestedFact: "Edit…"
+        case .recordSuggestedRelationship: "Record Relationship"
+        case .dismissSuggestedRelationship: "Not This Relationship"
+        case .showSource: "Show in Artifacts"
+        case .addSourceName: "Add as Name"
+        case .replaceRelative: "Replace Person…"
+        case .removeRelationship: "Remove Relationship"
+        case .confirmCandidate: "Confirm"
+        case .rejectCandidate: "Reject"
         }
     }
 
@@ -160,11 +225,35 @@ enum ArchiveCommand: Hashable, CaseIterable {
         return title
     }
 
+    /// The title on `subject`, where the row's state changes the verb: a stale link is
+    /// re-resolved, and a suggestion that can't be recorded as-is can only be applied.
+    func title(on subject: CommandSubject) -> String {
+        switch (self, subject) {
+        case (.resolveMention, .mention(let target)) where target.link.isStale:
+            "Re-resolve…"
+        case (.editSuggestedFact, .factSuggestion(let target)) where !target.isDirectlyRecordable:
+            "Apply…"
+        default: title
+        }
+    }
+
     /// The title an in-pane button uses under a section heading that already says what
-    /// it adds to. Only the mention differs: "Add Person…" under *Persons Mentioned* is
-    /// unambiguous, and the longer menu title doesn't fit the inspector at its narrowest.
+    /// it is about. "Add Person…" under *Persons Mentioned* is unambiguous, and the longer
+    /// menu title doesn't fit the inspector at its narrowest; the suggestion rows' short
+    /// verbs sit under *Suggested Facts* and *Suggested Relationships*.
     var paneTitle: String {
-        self == .addMention ? "Add Person…" : title
+        switch self {
+        case .addMention: "Add Person…"
+        case .recordSuggestedFact, .recordSuggestedRelationship: "Record"
+        case .dismissSuggestedRelationship: "Not This"
+        default: title
+        }
+    }
+
+    /// `paneTitle`, on `subject` (`title(on:)`).
+    func paneTitle(on subject: CommandSubject) -> String {
+        let title = title(on: subject)
+        return title == self.title ? paneTitle : title
     }
 
     /// The in-pane title while there is nothing yet to act on: the transcript's button
@@ -243,13 +332,74 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .refreshReview: "arrow.clockwise"
         case .moreAncestors, .moreDescendants: "plus"
         case .fewerAncestors, .fewerDescendants: "minus"
+        case .resolveMention: "link"
+        case .showMentionedPerson, .showRelative: "person.2"
+        case .editMention: "square.and.pencil"
+        case .addMentionFact: "calendar.badge.plus"
+        case .addMentionRelationship: "person.2.badge.plus"
+        case .unlinkMention, .unlinkSource: "xmark.circle"
+        case .removeMention, .removeRelationship: "trash"
+        case .applyMetadata: "arrow.down.doc"
+        case .recordSuggestedFact, .recordSuggestedRelationship: "checkmark.circle"
+        case .editSuggestedFact: "square.and.pencil"
+        case .dismissSuggestedRelationship, .rejectCandidate: "xmark"
+        case .showSource: "doc.text"
+        case .addSourceName: "person.text.rectangle"
+        case .replaceRelative: "arrow.triangle.2.circlepath"
+        case .confirmCandidate: "checkmark"
         }
+    }
+
+    /// The symbol on `subject`: a suggestion that can only be applied takes Apply…'s.
+    func systemImage(on subject: CommandSubject) -> String {
+        if self == .editSuggestedFact, case .factSuggestion(let target) = subject,
+            !target.isDirectlyRecordable
+        {
+            return ArchiveCommand.applyMetadata.systemImage
+        }
+        return systemImage
     }
 
     var isDestructive: Bool {
         switch self {
-        case .deleteArtifact, .deleteFile, .deletePerson: true
+        case .deleteArtifact, .deleteFile, .deletePerson, .removeMention, .removeRelationship:
+            true
         default: false
+        }
+    }
+
+    /// The tooltip a row's button shows, said once for every surface that draws it.
+    func help(on subject: CommandSubject) -> String? {
+        switch self {
+        case .resolveMention:
+            if case .mention(let target) = subject, target.link.isStale {
+                "Point this citation at a person that still exists"
+            } else {
+                "Link this mention to a concluded person"
+            }
+        case .showMentionedPerson, .showRelative: "Show this person on the People tab"
+        case .unlinkMention:
+            if case .mention(let target) = subject, target.link.isStale {
+                "Drop the stale link, leaving the mention unresolved (⌘Z to undo)"
+            } else {
+                "Remove the link to this person (⌘Z to undo)"
+            }
+        case .addMentionFact: "Record what this document states about this person"
+        case .addMentionRelationship:
+            "State how this document relates this person to another it names"
+        case .removeMention: "Remove this mention (⌘Z to undo)"
+        case .applyMetadata: "Review this value, then record it as an event or place"
+        case .recordSuggestedFact: "Record this fact as-recorded (⌘Z to undo)"
+        case .editSuggestedFact: "Correct this evidence before recording it"
+        case .recordSuggestedRelationship:
+            "Add this relationship to your conclusions (⌘Z to undo)"
+        case .dismissSuggestedRelationship: "Stop offering this relationship, here and in Review"
+        case .showSource: "Show this artifact on the Artifacts tab"
+        case .addSourceName: "Add this recorded name to the person"
+        case .unlinkSource: "Remove the link to this artifact (⌘Z to undo)"
+        case .replaceRelative: "Point this relationship at a person that still exists"
+        case .removeRelationship: "Remove this relationship (⌘Z to undo)"
+        default: nil
         }
     }
 
@@ -313,6 +463,15 @@ enum CommandSubject: Hashable {
     case file(FileID, in: ArtifactID)
     case person(PersonID)
     case review(ReviewTarget)
+    // A pane's rows (slice 83b): each carries the ids its command needs and the state its
+    // availability reads, so the rule stays a pure function. See `RowCommands.swift`.
+    case mention(MentionTarget)
+    case metadataEntry(EmbeddedMetadataKey, in: ArtifactID)
+    case factSuggestion(FactSuggestionTarget)
+    case relationshipSuggestion(RelationshipSuggestionTarget)
+    case source(SourceTarget)
+    case relationship(RelationshipTarget)
+    case candidate(CandidateTarget)
 
     var kind: ArchiveCommand.SubjectKind {
         switch self {
@@ -321,6 +480,13 @@ enum CommandSubject: Hashable {
         case .file: .file
         case .person: .person
         case .review: .review
+        case .mention: .mention
+        case .metadataEntry: .metadataEntry
+        case .factSuggestion: .factSuggestion
+        case .relationshipSuggestion: .relationshipSuggestion
+        case .source: .source
+        case .relationship: .relationship
+        case .candidate: .candidate
         }
     }
 }
@@ -375,6 +541,9 @@ struct CommandContext: Equatable {
             default: selectedPerson.map(CommandSubject.person)
             }
         case .review: selectedReview.map(CommandSubject.review)
+        case .mention, .metadataEntry, .factSuggestion, .relationshipSuggestion, .source,
+            .relationship, .candidate:
+            nil
         }
     }
 
@@ -406,7 +575,10 @@ struct CommandContext: Equatable {
             return personCount > 0 && treeDepths.descendants < TreeDepths.range.upperBound
         case .fewerDescendants:
             return personCount > 0 && treeDepths.descendants > TreeDepths.range.lowerBound
-        default: return true
+        // A candidate's verdict is a Review decision like the keys', so it waits as they do.
+        case .confirmCandidate, .rejectCandidate: return !isDecidingReview
+        default:
+            return command.subjectKind.isRow ? subject.offers(command) : true
         }
     }
 

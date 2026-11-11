@@ -75,7 +75,7 @@ struct ArtifactInspector: View {
 
                 FilesSection(artifactID: artifactID, files: files, selectedFileID: $selectedFileID)
 
-                EmbeddedMetadataSection(artifactID: artifactID, sheet: $sheet)
+                EmbeddedMetadataSection(artifactID: artifactID)
 
                 // UID/slug are internal addressing — useful for support, but not
                 // the first thing a researcher wants, so they sit de-emphasized

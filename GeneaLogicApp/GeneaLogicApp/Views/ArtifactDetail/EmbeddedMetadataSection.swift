@@ -17,7 +17,6 @@ import SwiftUI
 struct EmbeddedMetadataSection: View {
     @Environment(ArchiveModel.self) private var model
     let artifactID: ArtifactID
-    @Binding var sheet: ArtifactSheet?
 
     var body: some View {
         if let metadata = model.capturedMetadata[artifactID], !metadata.isEmpty {
@@ -35,7 +34,7 @@ struct EmbeddedMetadataSection: View {
                     alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 4
                 ) {
                     ForEach(metadata.entries, id: \.key) { entry in
-                        EmbeddedMetadataRow(entry: entry, sheet: $sheet)
+                        EmbeddedMetadataRow(entry: entry, artifactID: artifactID)
                     }
                 }
             }
@@ -47,20 +46,23 @@ struct EmbeddedMetadataSection: View {
 /// A single `namespace:name` → value row, with an Apply action to promote it.
 private struct EmbeddedMetadataRow: View {
     let entry: EmbeddedMetadataKeyValue
-    @Binding var sheet: ArtifactSheet?
+    let artifactID: ArtifactID
 
     var body: some View {
+        let subject = CommandSubject.metadataEntry(entry.key, in: artifactID)
         GridRow {
+            // The menu is on the key and the verb, not the value: the value is selectable
+            // text, whose own menu has Copy.
             Text(entry.key.description)
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
                 .gridColumnAlignment(.trailing)
+                .rowCommandMenu(subject)
             Text(entry.value.displayString)
                 .font(.caption.monospaced())
                 .textSelection(.enabled)
-            Button("Apply…") { sheet = ArtifactSheet(.assertion(.suggestion(entry))) }
-                .font(.caption)
-                .buttonStyle(.link)
+            RowCommandButton(.applyMetadata, on: subject)
+                .rowCommandMenu(subject)
         }
     }
 }

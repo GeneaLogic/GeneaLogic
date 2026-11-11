@@ -10,15 +10,15 @@ import SwiftUI
 /// inspector's embedded-metadata suggestion rows.
 ///
 /// Shared by the two surfaces that show suggestions (slice 45i): a person's own detail
-/// pane, and the Review section's cross-person lane. One row means one thing in both.
+/// pane, and the Review section's cross-person lane. One row means one thing in both:
+/// its verbs are the row's commands (slice 83b), and the pane that drew it opens the
+/// editor.
 struct FactSuggestionRow: View {
     let suggestion: FactSuggestion
+    /// The person the suggestion would be recorded on.
+    let person: PersonID
     /// The keys that act on this row, on Review's top suggestion (slice 83).
     var keyCaption: String?
-    /// Record the un-edited fact in one click (only shown when `isDirectlyRecordable`).
-    let onRecord: () -> Void
-    /// Open the editor prefilled from the evidence to correct it before recording.
-    let onApply: () -> Void
 
     @State private var isHovering = false
 
@@ -41,33 +41,25 @@ struct FactSuggestionRow: View {
             }
             Spacer(minLength: 0)
             HStack(spacing: 12) {
-                if suggestion.isDirectlyRecordable {
-                    Button(action: onRecord) {
-                        Label("Record", systemImage: "checkmark.circle")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
-                    .help("Record this fact as-recorded (⌘Z to undo)")
-                }
-                // "Edit…" when a one-click Record is also offered (it's the correct-first
-                // path); "Apply…" when the sheet is the only way (couple fact / age).
-                Button(action: onApply) {
-                    Label(
-                        suggestion.isDirectlyRecordable ? "Edit…" : "Apply…",
-                        systemImage: suggestion.isDirectlyRecordable
-                            ? "square.and.pencil" : "arrow.down.doc"
-                    )
-                    .font(.caption)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(
-                    suggestion.isDirectlyRecordable ? Color.secondary : Color.accentColor
-                )
-                .help("Correct this evidence before recording it")
+                // Record when the fact can be affirmed as-recorded; then Edit… is the
+                // correct-first path, and Apply… when the sheet is the only way (a couple
+                // fact, an age).
+                RowCommandButton(.recordSuggestedFact, on: subject, showsSymbol: true)
+                RowCommandButton(
+                    .editSuggestedFact, on: subject,
+                    emphasis: suggestion.isDirectlyRecordable ? .secondary : .primary,
+                    showsSymbol: true)
             }
         }
         .hoverRowBackground(isHovering: isHovering)
         .onHover { isHovering = $0 }
+        .rowCommandMenu(subject)
+    }
+
+    private var subject: CommandSubject {
+        .factSuggestion(
+            FactSuggestionTarget(
+                person: person, id: suggestion.id,
+                isDirectlyRecordable: suggestion.isDirectlyRecordable))
     }
 }
