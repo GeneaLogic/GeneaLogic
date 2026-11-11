@@ -147,10 +147,7 @@ struct PersonDetailView: View {
         else { return }
         switch subject {
         case .factSuggestion(let target):
-            guard let suggestion = suggestions.first(where: { $0.id == target.id }) else {
-                return
-            }
-            factEditorRequest = FactEditorRequest(mode: .fromEvidence(suggestion))
+            factEditorRequest = FactEditorRequest(mode: .fromEvidence(target.suggestion))
         case .source(let target):
             if let name = target.newName { addRecordedName(name) }
         case .relationship(let target):
@@ -420,7 +417,7 @@ struct PersonDetailView: View {
     }
 
     /// Whether `recorded` (a mention's name-as-recorded) is not yet one of this person's
-    /// names — the gate for offering "Add as name" on a Sources row. Compared trimmed and
+    /// names — the gate for offering Add as Name… on a Sources row. Compared trimmed and
     /// case-insensitively against each name's resolved text, so an exact re-spelling isn't
     /// re-offered while a genuinely different form (a Yiddish spelling, a married name) is.
     private func recordedNameIsNew(_ recorded: String) -> Bool {
@@ -736,8 +733,7 @@ private struct PersonRelationshipSuggestionRow: View {
     }
 
     private var subject: CommandSubject {
-        .relationshipSuggestion(
-            RelationshipSuggestionTarget(id: item.id, owner: .person(person)))
+        .relationshipSuggestion(RelationshipSuggestionTarget(item: item))
     }
 }
 
@@ -962,7 +958,7 @@ private struct RelativeRowView: View {
 private struct PersonSourceRow: View {
     @Environment(ArchiveModel.self) private var model
     let source: PersonSource
-    /// The source, for its row commands (slice 83b). Its Add as Name is offered only when
+    /// The source, for its row commands (slice 83b). Its Add as Name… is offered only when
     /// the recorded name isn't already one of the person's names (slice 44i).
     let subject: CommandSubject
 

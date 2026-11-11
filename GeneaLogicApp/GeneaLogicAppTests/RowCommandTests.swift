@@ -16,18 +16,30 @@ import Testing
 
     private static let rowCommands = ArchiveCommand.allCases.filter(\.subjectKind.isRow)
 
+    private static func personMention(_ name: String = "Ann Roe") -> PersonMention {
+        PersonMention(
+            localRef: "p1", nameAsRecorded: name, role: .subject, informationQuality: .primary)
+    }
+
     private func mention(
         _ link: MentionTarget.Link, namesOthers: Bool = true
     ) -> CommandSubject {
         .mention(
             MentionTarget(
-                artifact: artifact, localRef: "p1", index: 0, link: link,
+                artifact: artifact, mention: Self.personMention(), index: 0, link: link,
                 namesOthers: namesOthers))
     }
 
+    /// A suggestion that can be recorded as-is (an occupation), or only applied (an age).
     private func suggestedFact(recordable: Bool) -> CommandSubject {
         .factSuggestion(
-            FactSuggestionTarget(person: person, id: "s", isDirectlyRecordable: recordable))
+            FactSuggestionTarget(
+                person: person,
+                suggestion: FactSuggestion(
+                    id: "s", link: link, artifactID: artifact, artifactTitle: "Census",
+                    evidence: recordable
+                        ? .recordedFact(RecordedFact(type: .occupation, value: "tailor"))
+                        : .recordedAge("45"))))
     }
 
     private func source(exists: Bool = true, newName: String? = "Chana") -> CommandSubject {
@@ -183,7 +195,12 @@ import Testing
             .metadataEntry(
                 EmbeddedMetadataKey(namespace: "exif", name: "DateTimeOriginal"), in: artifact),
             suggestedFact(recordable: true),
-            .relationshipSuggestion(RelationshipSuggestionTarget(id: "r", owner: .person(person))),
+            .relationshipSuggestion(
+                RelationshipSuggestionTarget(
+                    item: RelationshipReviewItem(
+                        suggestion: SuggestedRelationship(
+                            type: .couple, person1: person, person2: other, evidence: []),
+                        first: nil, second: nil, sourceTitles: []))),
             source(), relationship(dangling: false),
             .candidate(CandidateTarget(row: ReviewTarget(id: "row", lane: .facts), person: person)),
         ]
@@ -197,39 +214,59 @@ import Testing
         #expect(seen.sorted { "\($0)" < "\($1)" } == Self.rowCommands.sorted { "\($0)" < "\($1)" })
     }
 
-    // MARK: - Against a window
-
     /// The menu as a row shows it: in order, what the state lacks left out, and an empty
     /// group dropped with its divider.
-    @MainActor @Test func aRowsMenuHidesWhatItsStateLacks() throws {
-        let (model, root) = try AppTestSupport.makeModel()
-        defer { AppTestSupport.remove(root) }
-
+    @Test func aRowsMenuHidesWhatItsStateLacks() {
         #expect(
-            model.rowMenu(for: mention(.none))
+            mention(.none).offeredRowMenu
                 == [
                     [.resolveMention, .editMention, .addMentionFact, .addMentionRelationship],
                     [.removeMention],
                 ])
         #expect(
-            model.rowMenu(for: mention(.linked(link, to: person), namesOthers: false))
+            mention(.linked(link, to: person), namesOthers: false).offeredRowMenu
                 == [
                     [.showMentionedPerson, .editMention, .addMentionFact],
                     [.unlinkMention, .removeMention],
                 ])
         #expect(
-            model.rowMenu(for: relationship(dangling: true))
+            relationship(dangling: true).offeredRowMenu
                 == [[.replaceRelative], [.removeRelationship]])
-        #expect(model.rowMenu(for: suggestedFact(recordable: false)) == [[.editSuggestedFact]])
+        #expect(suggestedFact(recordable: false).offeredRowMenu == [[.editSuggestedFact]])
     }
 
-    /// The menu is drawn on a right-click, which a sheet over the window can't take, so it
-    /// isn't emptied by one.
-    @MainActor @Test func aRowsMenuIsOfferedUnderASheet() throws {
+    /// A verb waiting on a write stays in the menu, dimmed, so the menu keeps its shape.
+    @Test func aVerbWaitingOnAWriteIsDimmedNotDropped() {
+        var context = context(on: .review)
+        context.isDecidingReview = true
+        let subject = suggestedFact(recordable: true)
+        #expect(subject.offeredRowMenu == [[.recordSuggestedFact, .editSuggestedFact]])
+        #expect(!context.canPerform(.recordSuggestedFact, on: subject))
+        #expect(context.canPerform(.editSuggestedFact, on: subject))
+    }
+
+    /// Two mentions sharing a `localRef`, as a hand-edited record can, are two subjects,
+    /// so a row's sheet opens on its own one (79b).
+    @Test func aRepeatedLocalRefIsTwoMentions() {
+        let first = MentionTarget(
+            artifact: artifact, mention: Self.personMention("Ann Roe"), index: 0, link: .none,
+            namesOthers: true)
+        let second = MentionTarget(
+            artifact: artifact, mention: Self.personMention("Chana Roe"), index: 0,
+            link: .none, namesOthers: true)
+        #expect(first != second)
+        #expect(first.localRef == second.localRef)
+    }
+
+    // MARK: - Against a window
+
+    /// The menu is drawn on a right-click, which a sheet over the window can't take; an
+    /// in-pane surface isn't greyed by one, while the rule itself still waits.
+    @MainActor @Test func aRowIsOfferedUnderASheet() throws {
         let (model, root) = try AppTestSupport.makeModel()
         defer { AppTestSupport.remove(root) }
         model.setModal(UUID(), presented: true)
-        #expect(model.rowMenu(for: source()) == [[.showSource, .addSourceName], [.unlinkSource]])
+        #expect(model.canOffer(.unlinkSource, on: source()))
         #expect(!model.canPerform(.unlinkSource, on: source()))
     }
 
@@ -322,10 +359,30 @@ import Testing
         await model.act {
             model.perform(
                 .recordSuggestedFact,
-                on: .factSuggestion(
-                    FactSuggestionTarget(
-                        person: personID, id: suggestion.id,
-                        isDirectlyRecordable: suggestion.isDirectlyRecordable)))
+                on: .factSuggestion(FactSuggestionTarget(person: personID, suggestion: suggestion)))
+        }
+
+        let facts = try #require(model.fullPerson(personID)).facts
+        #expect(facts.map(\.value) == ["tailor"])
+    }
+
+    /// A row's Record is a Review decision, so ⌘↩ on the same suggestion, Review's top row,
+    /// waits for it rather than recording the fact twice.
+    @Test func aRecordInFlightHoldsOffTheKeys() async throws {
+        let (model, root, row) = try await makeArchive()
+        defer { AppTestSupport.remove(root) }
+        let top = try #require(row.candidates.first)
+        await model.act { model.confirmSuggestion(top.suggestion) }
+        model.refreshReviewWorklist()
+        let lane = try #require(model.factItems.first)
+        let suggestion = try #require(lane.suggestions.first)
+        let personID = top.suggestion.personID
+
+        await model.act {
+            model.perform(
+                .recordSuggestedFact,
+                on: .factSuggestion(FactSuggestionTarget(person: personID, suggestion: suggestion)))
+            model.perform(.acceptSuggestion, on: .review(lane.target))
         }
 
         let facts = try #require(model.fullPerson(personID)).facts
@@ -339,7 +396,8 @@ import Testing
         let artifactID = row.mention.artifact
         let subject = CommandSubject.mention(
             MentionTarget(
-                artifact: artifactID, localRef: "p1", index: 0, link: .none, namesOthers: false))
+                artifact: artifactID, mention: row.recordedMention, index: 0, link: .none,
+                namesOthers: false))
 
         await model.act { model.perform(.removeMention, on: subject) }
         #expect(model.fullArtifact(artifactID)?.personsMentioned.isEmpty == true)

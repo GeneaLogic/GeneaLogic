@@ -57,9 +57,6 @@ struct FactSuggestionRow: View {
     }
 
     private var subject: CommandSubject {
-        .factSuggestion(
-            FactSuggestionTarget(
-                person: person, id: suggestion.id,
-                isDirectlyRecordable: suggestion.isDirectlyRecordable))
+        .factSuggestion(FactSuggestionTarget(person: person, suggestion: suggestion))
     }
 }

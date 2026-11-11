@@ -258,7 +258,7 @@ struct DuplicateReviewItem: Identifiable {
 ///
 /// Either summary may be `nil`: a person removed between the sweep and the render is a
 /// normal state (§2.3 — removals don't cascade), not an error.
-struct RelationshipReviewItem: Identifiable {
+struct RelationshipReviewItem: Identifiable, Equatable {
     /// The proposal and its supporting records — handed to `confirm`/`dismiss` unchanged.
     let suggestion: SuggestedRelationship
 

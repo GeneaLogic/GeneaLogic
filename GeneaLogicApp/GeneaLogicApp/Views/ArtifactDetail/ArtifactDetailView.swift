@@ -187,11 +187,9 @@ struct ArtifactDetailView: View {
     private static func runs(_ command: ArchiveCommand) -> Bool {
         switch command.subjectKind {
         case .artifact: command != .deleteArtifact
-        case .file, .mention, .metadataEntry: true
+        case .file, .row(.mention), .row(.metadataEntry): true
         case .archive: command == .toggleInspector
-        case .person, .review, .factSuggestion, .relationshipSuggestion, .source, .relationship,
-            .candidate:
-            false
+        case .person, .review, .row: false
         }
     }
 
@@ -222,20 +220,16 @@ struct ArtifactDetailView: View {
             guard id == artifact.uid, let entry = files.first(where: { $0.uid == fileID })
             else { return }
             performFileCommand(command, on: entry)
+        // On the mention the row drew, which a repeated `localRef` couldn't find (79b).
         case .mention(let target):
-            guard target.artifact == artifact.uid, sheet == nil,
-                let mention = detail?.personsMentioned.first(where: {
-                    $0.localRef == target.localRef
-                })
-            else { return }
-            sheet = Self.sheet(for: command, on: mention, link: target.link)
+            guard target.artifact == artifact.uid, sheet == nil else { return }
+            sheet = Self.sheet(for: command, on: target.mention, link: target.link)
         case .metadataEntry(let key, let id):
             guard id == artifact.uid, sheet == nil, command == .applyMetadata,
                 let entry = model.capturedMetadata[id]?.entries.first(where: { $0.key == key })
             else { return }
             sheet = ArtifactSheet(.assertion(.suggestion(entry)))
-        case .person, .review, .factSuggestion, .relationshipSuggestion, .source, .relationship,
-            .candidate:
+        default:
             break
         }
     }

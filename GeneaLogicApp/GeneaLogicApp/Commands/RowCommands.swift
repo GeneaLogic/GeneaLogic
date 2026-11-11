@@ -5,9 +5,14 @@ import SwiftUI
 // Apply…, a suggestion's Record. A pane's rows have no selection, so these have no
 // menu-bar item; the row's buttons and its context menu draw from the one source.
 //
-// Each subject carries the ids its command needs and the row state its availability
-// reads, as `ReviewTarget`'s lane does for Review, so availability stays a pure function.
-// None of the rows' values is `Hashable`, so whatever runs a command looks its row up.
+// Each subject carries the row's state its availability reads, as `ReviewTarget`'s lane
+// does for Review, so availability stays a pure function. It also carries the row's own
+// value where a command needs one (the mention, the suggestion), so what runs it acts on
+// exactly what the row showed rather than looking the row up again, which costs a reload
+// and can miss.
+//
+// Those values are only `Equatable`, so a subject that carries one hashes by the row's
+// identity alone: equal subjects still hash alike, as `Hashable` requires.
 
 /// A mention in the inspector's *Persons Mentioned*.
 struct MentionTarget: Hashable {
@@ -31,33 +36,41 @@ struct MentionTarget: Hashable {
     }
 
     let artifact: ArtifactID
-    let localRef: String
+    /// The mention as the row drew it: what its sheets open on. A `localRef` repeated in
+    /// a hand-edited record names two mentions, and this is the row's one (79b).
+    let mention: PersonMention
     /// Where the row was drawn: the hint a remove starts from (79b).
     let index: Int
     let link: Link
     /// Whether the record names anyone else, for Add Relationship… to relate it to.
     let namesOthers: Bool
+
+    var localRef: String { mention.localRef }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(artifact)
+        hasher.combine(mention.localRef)
+        hasher.combine(index)
+    }
 }
 
 /// A suggested fact, on a person's pane or in Review's facts lane.
 struct FactSuggestionTarget: Hashable {
     let person: PersonID
-    /// `FactSuggestion.id`, stable across reloads.
-    let id: String
-    let isDirectlyRecordable: Bool
+    /// The suggestion as the row drew it: what Record records and Edit… opens.
+    let suggestion: FactSuggestion
+
+    var isDirectlyRecordable: Bool { suggestion.isDirectlyRecordable }
 }
 
 /// A suggested relationship, in the inspector or on a person's pane.
 struct RelationshipSuggestionTarget: Hashable {
-    /// The surface's own list the suggestion is found in.
-    enum Owner: Hashable {
-        case artifact(ArtifactID)
-        case person(PersonID)
-    }
+    /// The suggestion as the row drew it: what Record and Not This are handed.
+    let item: RelationshipReviewItem
 
-    /// `RelationshipReviewItem.id`.
-    let id: String
-    let owner: Owner
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(item.id)
+    }
 }
 
 /// One of a person's sources.
@@ -132,26 +145,24 @@ extension CommandSubject {
     }
 }
 
-extension ArchiveModel {
-    /// The row's context menu as it shows now: `rowMenu` with what the rule won't offer
-    /// taken out, and empty groups dropped.
-    func rowMenu(for subject: CommandSubject) -> [[ArchiveCommand]] {
-        subject.rowMenu
-            .map { $0.filter { canOffer($0, on: subject) } }
-            .filter { !$0.isEmpty }
+extension CommandSubject {
+    /// The row's context menu as it shows: `rowMenu` with what the row's state doesn't
+    /// offer taken out, and empty groups dropped. A verb waiting on a write is dimmed by
+    /// its item rather than left out, so the menu doesn't change shape under the pointer.
+    var offeredRowMenu: [[ArchiveCommand]] {
+        rowMenu.map { $0.filter(offers) }.filter { !$0.isEmpty }
     }
 }
 
-/// A row's context menu (`rowMenu`).
+/// A row's context menu (`offeredRowMenu`).
 struct RowCommandMenu: View {
-    @Environment(ArchiveModel.self) private var model
     let subject: CommandSubject
 
     var body: some View {
-        let groups = model.rowMenu(for: subject)
+        let groups = subject.offeredRowMenu
         ForEach(groups.indices, id: \.self) { index in
             if index > 0 { Divider() }
-            ForEach(groups[index], id: \.self) { CommandButton($0, on: subject) }
+            ForEach(groups[index], id: \.self) { CommandButton($0, on: subject, inPane: true) }
         }
     }
 }
@@ -164,7 +175,9 @@ extension View {
 }
 
 /// A row's small inline verb (Resolve…, Unlink, Record), drawn from the command and shown
-/// only while the row offers it, so the button and the context menu can't disagree.
+/// only while the row's state offers it, so the button and the context menu can't
+/// disagree. Dimmed, not hidden, while a write it waits for is in flight, so the row
+/// doesn't reflow.
 struct RowCommandButton: View {
     /// How the verb reads beside the row's text.
     enum Emphasis {
@@ -191,7 +204,7 @@ struct RowCommandButton: View {
     }
 
     var body: some View {
-        if model.canOffer(command, on: subject) {
+        if subject.offers(command) {
             Button {
                 model.perform(command, on: subject)
             } label: {
@@ -206,6 +219,7 @@ struct RowCommandButton: View {
             .font(.caption)
             .foregroundStyle(emphasis == .primary ? Color.accentColor : Color.secondary)
             .help(command.help(on: subject) ?? "")
+            .disabled(!model.canOffer(command, on: subject))
         }
     }
 }

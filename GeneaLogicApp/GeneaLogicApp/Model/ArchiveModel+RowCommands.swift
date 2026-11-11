@@ -15,14 +15,15 @@ extension ArchiveModel {
             if let link = target.link.id { unlinkMention(link) }
         case (.removeMention, .mention(let target)):
             removeMention(target)
+        // A suggestion's verdict is a Review decision wherever its row is drawn: the same
+        // suggestion can be Review's top row, so ⌘↩ waits for it rather than recording it
+        // twice, and so does a second click.
         case (.recordSuggestedFact, .factSuggestion(let target)):
-            if let suggestion = factSuggestion(target) {
-                recordSuggestedFact(suggestion, for: target.person)
-            }
+            decide { recordSuggestedFact(target.suggestion, for: target.person) }
         case (.recordSuggestedRelationship, .relationshipSuggestion(let target)):
-            if let item = relationshipSuggestion(target) { confirmSuggestedRelationship(item) }
+            decide { confirmSuggestedRelationship(target.item) }
         case (.dismissSuggestedRelationship, .relationshipSuggestion(let target)):
-            if let item = relationshipSuggestion(target) { dismissSuggestedRelationship(item) }
+            decide { dismissSuggestedRelationship(target.item) }
         case (.showSource, .source(let target)):
             navigateToArtifact(target.artifact)
         case (.unlinkSource, .source(let target)):
@@ -54,26 +55,5 @@ extension ArchiveModel {
             else { return }
             $0.personsMentioned.remove(at: position)
         }
-    }
-
-    /// The suggestion `target` names, read afresh by the code the person pane and Review's
-    /// lane both read (`SuggestedFacts`), so the write records what the row showed.
-    func factSuggestion(_ target: FactSuggestionTarget) -> FactSuggestion? {
-        let recordedFacts = SuggestedFacts.recordedFacts(
-            of: fullPerson(target.person), relationships: relationships(of: target.person))
-        return linkedEvidence(for: target.person, recordedFacts: recordedFacts)
-            .suggestions.first { $0.id == target.id }
-    }
-
-    /// The suggested relationship `target` names, from its surface's own list.
-    func relationshipSuggestion(
-        _ target: RelationshipSuggestionTarget
-    ) -> RelationshipReviewItem? {
-        let items =
-            switch target.owner {
-            case .artifact(let id): suggestedRelationships(forArtifact: id)
-            case .person(let id): suggestedRelationships(for: id)
-            }
-        return items.first { $0.id == target.id }
     }
 }

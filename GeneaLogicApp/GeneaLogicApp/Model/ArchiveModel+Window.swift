@@ -33,13 +33,15 @@ extension ArchiveModel {
     ///
     /// `resolvingSelection: false` leaves out the Review row the menu bar would act on,
     /// for a surface that names its own (a row's context menu), so it neither pays for the
-    /// lookup nor redraws when the selection moves.
+    /// lookup nor redraws when the selection moves. `readingModal: false` leaves out
+    /// whether a sheet is up, for a surface inside the window (`canOffer`), so opening one
+    /// doesn't redraw every row behind it.
     func commandContext(
-        for command: ArchiveCommand, resolvingSelection: Bool = true
+        for command: ArchiveCommand, resolvingSelection: Bool = true, readingModal: Bool = true
     ) -> CommandContext {
         var context = CommandContext(
             hasArchive: archive != nil, activeTab: activeTab,
-            isPresentingModal: isPresentingModal)
+            isPresentingModal: readingModal && isPresentingModal)
         switch command.subjectKind {
         case .archive: break
         case .artifact: context.selectedArtifact = selectedArtifact
@@ -50,9 +52,7 @@ extension ArchiveModel {
         case .review:
             if resolvingSelection { context.selectedReview = selectedReviewRow }
         // A row names its own subject, and its state rides on it (slice 83b).
-        case .mention, .metadataEntry, .factSuggestion, .relationshipSuggestion, .source,
-            .relationship, .candidate:
-            break
+        case .row: break
         }
         switch command {
         case .toggleInspector:
@@ -63,7 +63,8 @@ extension ArchiveModel {
             context.personCount = persons.count
             context.treeDepths = treeDepths
         case .showInPeople: context.treeFocus = treeFocus
-        case .acceptSuggestion, .declineSuggestion, .confirmCandidate, .rejectCandidate:
+        case .acceptSuggestion, .declineSuggestion, .confirmCandidate, .rejectCandidate,
+            .recordSuggestedFact, .recordSuggestedRelationship, .dismissSuggestedRelationship:
             context.isDecidingReview = reviewDecisionsInFlight > 0
         default: break
         }
@@ -80,10 +81,10 @@ extension ArchiveModel {
     /// without the sheet, which can't be clicked through and would only flicker the window
     /// behind it.
     func canOffer(_ command: ArchiveCommand, on subject: CommandSubject) -> Bool {
-        var context = commandContext(
-            for: command, resolvingSelection: subject.kind != .review)
-        context.isPresentingModal = false
-        return context.canPerform(command, on: subject)
+        commandContext(
+            for: command, resolvingSelection: subject.kind != .review, readingModal: false
+        )
+        .canPerform(command, on: subject)
     }
 
     /// Whether a sheet, dialog, alert or panel is up in this window: the ones this model

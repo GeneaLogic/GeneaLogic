@@ -278,8 +278,8 @@ private struct CandidateCard: View {
                 // which is the one thing this card must not claim. The caption says where
                 // the keys land. They act on this card's candidate, which on any card but
                 // the top is not the one the keys would (slice 83b).
-                CommandButton(.confirmCandidate, on: subject)
-                CommandButton(.rejectCandidate, on: subject)
+                CommandButton(.confirmCandidate, on: subject, inPane: true)
+                CommandButton(.rejectCandidate, on: subject, inPane: true)
                 Spacer()
                 ReviewKeyCaption(
                     [keyCaption, "⌘Z undoes either"].compactMap(\.self)

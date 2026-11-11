@@ -57,7 +57,7 @@ struct PersonMentionRow: View {
             }
         return .mention(
             MentionTarget(
-                artifact: artifactID, localRef: mention.localRef, index: index, link: state,
+                artifact: artifactID, mention: mention, index: index, link: state,
                 namesOthers: allMentions.count > 1))
     }
 

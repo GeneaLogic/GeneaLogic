@@ -136,8 +136,9 @@ extension ArchiveModel {
     }
 
     /// Runs one Review verb, counting the write it starts as a Review decision, which the
-    /// two commands wait for (`CommandContext.isDecidingReview`).
-    private func decide(_ verb: () -> Void) {
+    /// two commands wait for (`CommandContext.isDecidingReview`). A row's verdict on a
+    /// suggestion or a candidate counts too (slice 83b): its row is Review's as well.
+    func decide(_ verb: () -> Void) {
         marksNextMutationAsReviewDecision = true
         verb()
         marksNextMutationAsReviewDecision = false

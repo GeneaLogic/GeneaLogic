@@ -25,18 +25,16 @@ of them, because a pane's rows have no selection for a menu item to act on (82).
 | A metadata entry | inspector | Apply… |
 | A suggested fact | person, Review facts lane | Record Fact (Record) · Edit… (Apply… when it can't be recorded as-is) |
 | A suggested relationship | inspector, person | Record Relationship (Record) · Not This Relationship (Not This) |
-| A source | person | Show in Artifacts · Add as Name · Unlink |
+| A source | person | Show in Artifacts · Add as Name… · Unlink |
 | A relationship | person | Show in People · Replace Person… · Remove Relationship |
 | A candidate | Review names lane | Confirm · Reject |
 
-- **Subjects carry ids and the row's state, not the row.** `.mention` has the artifact,
-  the `localRef` and the link state (none, linked, stale), and whether anyone else is
-  named; a suggested fact has its person, its id and whether it can be recorded as-is. So
-  availability stays a pure function, as `ReviewTarget`'s lane made Review's. None of the
-  row values is `Hashable`, and the view that runs a command looks its row up by id.
+- **Subjects carry the row's state**, so availability stays a pure function, as
+  `ReviewTarget`'s lane made Review's: `.mention` has the link state (none, linked, stale)
+  and whether anyone else is named; a suggested fact, whether it can be recorded as-is.
 - **Availability follows the row's state**: Resolve… only without a live link, Unlink only
   with one, Add Relationship… only with someone else named, Record Fact only on a fact
-  that can be recorded as-is, Add as Name only when it isn't already a name, Replace
+  that can be recorded as-is, Add as Name… only when it isn't already a name, Replace
   Person… only on a dangling relationship, and the jumps only to a record that exists. A
   candidate waits on a Review write in flight, as the keys do.
 - **A row command belongs to no tab.** It is drawn only on its row, which is on screen,
@@ -113,15 +111,31 @@ of them, because a pane's rows have no selection for a menu item to act on (82).
 
 **Settled in the build:**
 
-- **Writes run in the model even where only the pane held the row.** A suggestion's
-  write looks it up afresh through the code the pane read (`SuggestedFacts`,
-  `suggestedRelationships`), so it records what the row showed. Only the sheets go to
-  the pane, which claims a row command by its subject (`claimPendingCommand(where:)`).
-- **A row's inline verb shows only while its row offers it** (`RowCommandButton`), as
-  the panes did by hand, so the button and the menu agree by construction. The candidate
-  cards' buttons dim instead: they wait on a write, and vanishing would shift the card.
+- **Writes run in the model; sheets go to the pane** that drew the row, which claims a
+  row command by its subject (`claimPendingCommand(where:)`).
+- **A row's inline verb shows only while its row's state offers it** (`RowCommandButton`),
+  as the panes did by hand, so the button and the menu agree by construction.
 - **A candidate's verdict counts as a Review decision**, so the keys wait for it.
 - **Where the menus sit:** a mention's on its name, statement and resolution, not its
   recorded facts, which are rows of their own; a metadata entry's on its key and Apply…,
   not its value, which is selectable text with its own Copy.
 - **Show in Artifacts**, not Show Artifact, to pair with Show in People.
+
+**Revised on `/code-review`:**
+
+- **A subject carries its row's value** (the mention, the suggestion), compared by value
+  and hashed by the row's identity, since the values are only `Equatable`. The build
+  looked a suggestion up again on each click, which repeated the pane's whole reload on
+  the main actor and could miss; and found a mention by `localRef`, which a repeated ref
+  makes ambiguous (79b), so Edit Mention… could open another row's.
+- **A suggestion's Record and Not This count as Review decisions** wherever the row is.
+  Recording Review's top suggestion from its row and pressing ⌘↩ before the write
+  landed recorded the fact twice. They dim while one is in flight, and the menu keeps
+  the item rather than changing shape.
+- **In-pane surfaces don't grey under a sheet**: the candidate cards' buttons asked the
+  menu bar's rule, and `canOffer` no longer reads the modal state at all, so a sheet
+  opening doesn't redraw every row.
+- Review's facts lane opens Edit… in `ReviewCommandHost`, which already hosted that
+  sheet, rather than a second copy in the pane. The row kinds are one `.row(RowKind)`
+  case, so a switch names them once. Add as Name… opens an editor, so it has an
+  ellipsis. A state's verb is one explicit override for both titles.

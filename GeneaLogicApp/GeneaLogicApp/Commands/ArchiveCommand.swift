@@ -82,21 +82,20 @@ enum ArchiveCommand: Hashable, CaseIterable {
     }
 
     /// What a command acts on.
-    enum SubjectKind {
+    enum SubjectKind: Hashable {
         case archive, artifact, file, person, review
-        // A pane's rows (slice 83b)
+        /// A row inside a pane, which the menu bar can't name (slice 83b).
+        case row(RowKind)
+
+        var isRow: Bool {
+            if case .row = self { true } else { false }
+        }
+    }
+
+    /// Which of a pane's rows a command acts on.
+    enum RowKind: Hashable {
         case mention, metadataEntry, factSuggestion, relationshipSuggestion, source
         case relationship, candidate
-
-        /// A row inside a pane, which the menu bar can't name.
-        var isRow: Bool {
-            switch self {
-            case .archive, .artifact, .file, .person, .review: false
-            case .mention, .metadataEntry, .factSuggestion, .relationshipSuggestion, .source,
-                .relationship, .candidate:
-                true
-            }
-        }
     }
 
     var subjectKind: SubjectKind {
@@ -117,13 +116,14 @@ enum ArchiveCommand: Hashable, CaseIterable {
             .review
         case .resolveMention, .showMentionedPerson, .editMention, .addMentionFact,
             .addMentionRelationship, .unlinkMention, .removeMention:
-            .mention
-        case .applyMetadata: .metadataEntry
-        case .recordSuggestedFact, .editSuggestedFact: .factSuggestion
-        case .recordSuggestedRelationship, .dismissSuggestedRelationship: .relationshipSuggestion
-        case .showSource, .addSourceName, .unlinkSource: .source
-        case .showRelative, .replaceRelative, .removeRelationship: .relationship
-        case .confirmCandidate, .rejectCandidate: .candidate
+            .row(.mention)
+        case .applyMetadata: .row(.metadataEntry)
+        case .recordSuggestedFact, .editSuggestedFact: .row(.factSuggestion)
+        case .recordSuggestedRelationship, .dismissSuggestedRelationship:
+            .row(.relationshipSuggestion)
+        case .showSource, .addSourceName, .unlinkSource: .row(.source)
+        case .showRelative, .replaceRelative, .removeRelationship: .row(.relationship)
+        case .confirmCandidate, .rejectCandidate: .row(.candidate)
         }
     }
 
@@ -146,9 +146,7 @@ enum ArchiveCommand: Hashable, CaseIterable {
             case .artifact, .file: .artifacts
             case .person: .people
             case .review: .review
-            case .mention, .metadataEntry, .factSuggestion, .relationshipSuggestion, .source,
-                .relationship, .candidate:
-                nil
+            case .row: nil
             }
         }
     }
@@ -210,7 +208,7 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .recordSuggestedRelationship: "Record Relationship"
         case .dismissSuggestedRelationship: "Not This Relationship"
         case .showSource: "Show in Artifacts"
-        case .addSourceName: "Add as Name"
+        case .addSourceName: "Add as Name…"
         case .replaceRelative: "Replace Person…"
         case .removeRelationship: "Remove Relationship"
         case .confirmCandidate: "Confirm"
@@ -225,15 +223,21 @@ enum ArchiveCommand: Hashable, CaseIterable {
         return title
     }
 
-    /// The title on `subject`, where the row's state changes the verb: a stale link is
-    /// re-resolved, and a suggestion that can't be recorded as-is can only be applied.
+    /// The title on `subject`, where the row's state changes the verb.
     func title(on subject: CommandSubject) -> String {
+        titleOverride(on: subject) ?? title
+    }
+
+    /// The verb a row's state puts in place of the usual one, on every surface: a stale
+    /// link is re-resolved, and a suggestion that can't be recorded as-is can only be
+    /// applied. `nil` where the state changes nothing.
+    private func titleOverride(on subject: CommandSubject) -> String? {
         switch (self, subject) {
         case (.resolveMention, .mention(let target)) where target.link.isStale:
             "Re-resolve…"
         case (.editSuggestedFact, .factSuggestion(let target)) where !target.isDirectlyRecordable:
             "Apply…"
-        default: title
+        default: nil
         }
     }
 
@@ -250,10 +254,9 @@ enum ArchiveCommand: Hashable, CaseIterable {
         }
     }
 
-    /// `paneTitle`, on `subject` (`title(on:)`).
+    /// `paneTitle`, on `subject`: the state's verb wins, as in `title(on:)`.
     func paneTitle(on subject: CommandSubject) -> String {
-        let title = title(on: subject)
-        return title == self.title ? paneTitle : title
+        titleOverride(on: subject) ?? paneTitle
     }
 
     /// The in-pane title while there is nothing yet to act on: the transcript's button
@@ -480,13 +483,13 @@ enum CommandSubject: Hashable {
         case .file: .file
         case .person: .person
         case .review: .review
-        case .mention: .mention
-        case .metadataEntry: .metadataEntry
-        case .factSuggestion: .factSuggestion
-        case .relationshipSuggestion: .relationshipSuggestion
-        case .source: .source
-        case .relationship: .relationship
-        case .candidate: .candidate
+        case .mention: .row(.mention)
+        case .metadataEntry: .row(.metadataEntry)
+        case .factSuggestion: .row(.factSuggestion)
+        case .relationshipSuggestion: .row(.relationshipSuggestion)
+        case .source: .row(.source)
+        case .relationship: .row(.relationship)
+        case .candidate: .row(.candidate)
         }
     }
 }
@@ -541,9 +544,7 @@ struct CommandContext: Equatable {
             default: selectedPerson.map(CommandSubject.person)
             }
         case .review: selectedReview.map(CommandSubject.review)
-        case .mention, .metadataEntry, .factSuggestion, .relationshipSuggestion, .source,
-            .relationship, .candidate:
-            nil
+        case .row: nil
         }
     }
 
@@ -575,8 +576,10 @@ struct CommandContext: Equatable {
             return personCount > 0 && treeDepths.descendants < TreeDepths.range.upperBound
         case .fewerDescendants:
             return personCount > 0 && treeDepths.descendants > TreeDepths.range.lowerBound
-        // A candidate's verdict is a Review decision like the keys', so it waits as they do.
-        case .confirmCandidate, .rejectCandidate: return !isDecidingReview
+        // A row's verdict is a Review decision like the keys', so it waits as they do.
+        case .confirmCandidate, .rejectCandidate, .recordSuggestedFact,
+            .recordSuggestedRelationship, .dismissSuggestedRelationship:
+            return !isDecidingReview && subject.offers(command)
         default:
             return command.subjectKind.isRow ? subject.offers(command) : true
         }

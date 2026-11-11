@@ -102,8 +102,7 @@ private struct SuggestedRelationships: View {
                 ForEach(items) { item in
                     SuggestedRelationshipRow(
                         item: item,
-                        subject: .relationshipSuggestion(
-                            RelationshipSuggestionTarget(id: item.id, owner: .artifact(artifactID))),
+                        subject: .relationshipSuggestion(RelationshipSuggestionTarget(item: item)),
                         // **This record's** basis, not the archive-wide `isStated` — a row
                         // here speaks for the document it sits on, and a suggestion another
                         // record states outright may only be *implied* by this one.

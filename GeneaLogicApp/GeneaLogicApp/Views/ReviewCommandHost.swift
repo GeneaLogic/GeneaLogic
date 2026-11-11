@@ -22,7 +22,8 @@ struct ReviewCommandHost: ViewModifier {
     /// measures its content once at open, so one that fills in afterwards is sized for
     /// content it doesn't have yet.
     @State private var creationRequest: CreationRequest?
-    /// ⌘↩ on a suggestion that can only be applied.
+    /// ⌘↩ on a suggestion that can only be applied, or a suggestion row's Edit… or
+    /// Apply… (slice 83b).
     @State private var factRequest: ReviewFactRequest?
     /// Review ▸ Merge People…, asking which record to keep.
     @State private var mergeChoice: DuplicateReviewItem?
@@ -46,6 +47,22 @@ struct ReviewCommandHost: ViewModifier {
                     case .review(let target) = subject
                 else { return }
                 perform(command, on: target)
+            }
+            // A suggestion row's Edit… or Apply…, which the facts pane draws. The People
+            // tab's own pane takes the same command there.
+            .onChange(of: model.pendingCommand) {
+                guard
+                    let (_, subject) = model.claimPendingCommand(where: { command, subject in
+                        if command == .editSuggestedFact, case .factSuggestion = subject {
+                            true
+                        } else {
+                            false
+                        }
+                    }),
+                    factRequest == nil, case .factSuggestion(let target) = subject
+                else { return }
+                factRequest = ReviewFactRequest(
+                    person: target.person, mode: .fromEvidence(target.suggestion))
             }
             .sheet(item: $creationRequest) { request in
                 SomebodyNewSheet(item: request.item, closest: request.closest)
