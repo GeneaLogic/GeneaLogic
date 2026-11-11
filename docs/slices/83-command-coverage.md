@@ -226,3 +226,15 @@ key, and the menu is what shows it. A shared key has one live item per tab, as 8
 - A row's context menu asks the rule (`canOffer`) rather than restating the lane table,
   and doesn't resolve the selection it doesn't use. The merge wording is one constant
   (`MergeWording`), the caption one view (`ReviewKeyCaption`).
+
+**From the hand-test:**
+
+- **A fast ⌘⌫ then ⌘↩ decides two candidates, and that is right.** A local write lands in
+  milliseconds, well before a second key, so ⌘↩ acts on the candidate the reject brought
+  to the top. The guard is for a write that overlaps the press, such as one behind
+  another process's lock, which a hand can't produce; `aSecondPressWaitsForTheFirstWrite`
+  covers it.
+- The sample's names have at most two candidates, so testing the keys and the scroll
+  position needed more look-alikes, added with the CLI.
+
+**Shipped 2026-11-11** (merged); **hand-test passed**.
