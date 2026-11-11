@@ -22,10 +22,17 @@ struct CommandMenuItem: View {
             NSApp.sendAction(action, to: nil, from: nil)
             return
         }
+        // Checked for type first: `isARepeat` raises on an event that isn't a key's.
+        if command.ignoresKeyRepeat, let event = NSApp.currentEvent, event.type == .keyDown,
+            event.isARepeat
+        {
+            return
+        }
         // The subject is the selection *now*, not when the menu was last drawn: SwiftUI can
         // redraw the menu bar after a key equivalent has already fired.
         guard let model, !NSApp.keyWindowIsUnderModal,
-            let subject = model.commandContext(for: command).selectionSubject(for: command)
+            let subject = model.commandContext(for: command).selectionSubject(for: command),
+            model.canPerform(command, on: subject)
         else {
             NSSound.beep()
             return
@@ -57,6 +64,25 @@ struct CommandButton: View {
     }
 }
 
+/// A toolbar item for `command`, on the archive (slice 83, G15). Not greyed while a sheet
+/// is up, for `CommandAffordance`'s reason.
+struct CommandToolbarButton: View {
+    @Environment(ArchiveModel.self) private var model
+    let command: ArchiveCommand
+    /// Runs in place of `perform`, for the + on Artifacts, which offers the scan options
+    /// here and can't anchor them to a menu item.
+    var action: (() -> Void)?
+
+    var body: some View {
+        let title = command.title(in: model.commandContext(for: command))
+        Button(title, systemImage: command.systemImage) {
+            if let action { action() } else { model.perform(command) }
+        }
+        .help(title)
+        .disabled(!model.canOffer(command, on: .archive))
+    }
+}
+
 /// A section heading's affordance for `command` (Add Name…, Attach File…), drawn as
 /// `AddAffordanceLabel` and gated by the same rule as every other surface (slice 82).
 ///
@@ -81,13 +107,7 @@ struct CommandAffordance: View {
                 opensMenu: opensMenu)
         }
         .buttonStyle(.plain)
-        .disabled(!isAvailable)
-    }
-
-    private var isAvailable: Bool {
-        var context = model.commandContext(for: command)
-        context.isPresentingModal = false
-        return context.canPerform(command, on: subject)
+        .disabled(!model.canOffer(command, on: subject))
     }
 }
 

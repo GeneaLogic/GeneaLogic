@@ -16,7 +16,8 @@ import SwiftUI
 ///
 /// The pane holds no state of its own. When a fact is recorded the sweep drops that
 /// suggestion, and when the person's last suggestion goes the row leaves the sidebar and
-/// the pane falls back to the placeholder — the same way a resolved mention does.
+/// the selection moves to the next row (`ReviewCommandHost`) — the same way a resolved
+/// mention's does.
 struct ReviewFactsDetailView: View {
     @Environment(ArchiveModel.self) private var model
     let item: FactReviewItem
@@ -89,6 +90,7 @@ struct ReviewFactsDetailView: View {
                 ForEach(item.suggestions) { suggestion in
                     FactSuggestionRow(
                         suggestion: suggestion,
+                        keyCaption: keyCaption(for: suggestion),
                         onRecord: {
                             model.recordSuggestedFact(suggestion, for: item.person.uid)
                         },
@@ -98,5 +100,13 @@ struct ReviewFactsDetailView: View {
                 }
             }
         }
+    }
+
+    /// ⌘↩ acts on the top suggestion, and opens its editor if it can only be applied.
+    private func keyCaption(for suggestion: FactSuggestion) -> String? {
+        guard suggestion.id == item.suggestions.first?.id else { return nil }
+        return ArchiveCommand.reviewKeyCaption(
+            for: item.target.lane,
+            acceptTitle: suggestion.isDirectlyRecordable ? nil : "Apply…")
     }
 }

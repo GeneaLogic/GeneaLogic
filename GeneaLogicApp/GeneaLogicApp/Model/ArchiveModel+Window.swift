@@ -20,7 +20,9 @@ extension ArchiveModel {
             hasArchive: archive != nil, activeTab: activeTab,
             selectedArtifact: selectedArtifact, selectedFile: selectedFile,
             selectedPerson: selectedPerson, personCount: persons.count,
-            isPresentingModal: isPresentingModal, inspectorVisible: inspectorVisible)
+            isPresentingModal: isPresentingModal, inspectorVisible: inspectorVisible,
+            selectedReview: selectedReviewRow, treeFocus: treeFocus, treeDepths: treeDepths,
+            isDecidingReview: reviewDecisionsInFlight > 0)
     }
 
     /// The part of `commandContext` that `command`'s availability depends on, and nothing
@@ -28,7 +30,13 @@ extension ArchiveModel {
     /// only when they change: selecting a file doesn't redraw every person command, and
     /// editing a person doesn't redraw every file row's ⋯ menu. `CommandAvailabilityTests`
     /// pins that it decides as the whole context does.
-    func commandContext(for command: ArchiveCommand) -> CommandContext {
+    ///
+    /// `resolvingSelection: false` leaves out the Review row the menu bar would act on,
+    /// for a surface that names its own (a row's context menu), so it neither pays for the
+    /// lookup nor redraws when the selection moves.
+    func commandContext(
+        for command: ArchiveCommand, resolvingSelection: Bool = true
+    ) -> CommandContext {
         var context = CommandContext(
             hasArchive: archive != nil, activeTab: activeTab,
             isPresentingModal: isPresentingModal)
@@ -39,12 +47,20 @@ extension ArchiveModel {
             context.selectedArtifact = selectedArtifact
             context.selectedFile = selectedFile
         case .person: context.selectedPerson = selectedPerson
+        case .review:
+            if resolvingSelection { context.selectedReview = selectedReviewRow }
         }
         switch command {
         case .toggleInspector:
             context.selectedArtifact = selectedArtifact
             context.inspectorVisible = inspectorVisible
-        case .mergePerson: context.personCount = persons.count
+        case .mergePerson, .chooseFocus: context.personCount = persons.count
+        case .moreAncestors, .fewerAncestors, .moreDescendants, .fewerDescendants:
+            context.personCount = persons.count
+            context.treeDepths = treeDepths
+        case .showInPeople: context.treeFocus = treeFocus
+        case .acceptSuggestion, .declineSuggestion:
+            context.isDecidingReview = reviewDecisionsInFlight > 0
         default: break
         }
         return context
@@ -52,7 +68,18 @@ extension ArchiveModel {
 
     /// Whether `command` can run on `subject` now (`CommandContext.canPerform`).
     func canPerform(_ command: ArchiveCommand, on subject: CommandSubject) -> Bool {
-        commandContext(for: command).canPerform(command, on: subject)
+        commandContext(for: command, resolvingSelection: subject.kind != .review)
+            .canPerform(command, on: subject)
+    }
+
+    /// Whether a surface inside the window can offer `command` on `subject`: the same rule,
+    /// without the sheet, which can't be clicked through and would only flicker the window
+    /// behind it.
+    func canOffer(_ command: ArchiveCommand, on subject: CommandSubject) -> Bool {
+        var context = commandContext(
+            for: command, resolvingSelection: subject.kind != .review)
+        context.isPresentingModal = false
+        return context.canPerform(command, on: subject)
     }
 
     /// Whether a sheet, dialog, alert or panel is up in this window: the ones this model
@@ -83,6 +110,17 @@ extension ArchiveModel {
         // (`beginAttachOrScan`), where the connected menu anchors correctly.
         case .attachFile:
             if case .artifact(let id) = subject { beginAttach(to: id) }
+        case .showInTree, .focusHere:
+            if case .person(let id) = subject { pendingTreeFocus = id }
+        case .showInPeople:
+            if case .person(let id) = subject { navigateToPerson(id) }
+        case .acceptSuggestion:
+            if case .review(let target) = subject { acceptReviewRow(target) }
+        case .declineSuggestion:
+            if case .review(let target) = subject { declineReviewRow(target) }
+        case .refreshReview:
+            refreshReviewWorklist()
+            refreshDuplicateCandidates()
         default:
             pendingCommand = PendingCommand(command: command, subject: subject)
         }

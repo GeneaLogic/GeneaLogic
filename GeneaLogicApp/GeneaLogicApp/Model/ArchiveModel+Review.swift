@@ -117,6 +117,94 @@ extension ArchiveModel {
         refreshRelationshipSuggestions(archive)
     }
 
+    // MARK: - Review's commands (slice 83)
+
+    /// The worklist in the sidebar's order: names, facts, relationships, duplicates.
+    var reviewRows: [ReviewTarget] {
+        reviewItems.map(\.target) + factItems.map(\.target)
+            + relationshipItems.map(\.target) + duplicateItems.map(\.target)
+    }
+
+    /// The selected row, if it is still on the worklist. Looked up lane by lane rather
+    /// than through `reviewRows`, which a menu item would rebuild on every draw.
+    var selectedReviewRow: ReviewTarget? {
+        guard let id = selectedReviewID else { return nil }
+        return reviewItems.first { $0.id == id }?.target
+            ?? factItems.first { $0.id == id }?.target
+            ?? relationshipItems.first { $0.id == id }?.target
+            ?? duplicateItems.first { $0.id == id }?.target
+    }
+
+    /// Runs one Review verb, counting the write it starts as a Review decision, which the
+    /// two commands wait for (`CommandContext.isDecidingReview`).
+    private func decide(_ verb: () -> Void) {
+        marksNextMutationAsReviewDecision = true
+        verb()
+        marksNextMutationAsReviewDecision = false
+    }
+
+    /// ⌘↩ on `target`: the top row's yes. A suggestion that can only be applied (a couple
+    /// fact, an age) opens its editor, so nothing writes unseen and no row is skipped.
+    ///
+    /// **One decision at a time.** The write is asynchronous and the row stays until it
+    /// lands, so a quick second press would otherwise decide the same row again. The
+    /// commands are off until it lands (`isDecidingReview`), and the menu beeps.
+    func acceptReviewRow(_ target: ReviewTarget) {
+        decide { accept(target) }
+    }
+
+    /// ⌘⌫ on `target`: the top row's no. See `acceptReviewRow`.
+    func declineReviewRow(_ target: ReviewTarget) {
+        decide { decline(target) }
+    }
+
+    private func accept(_ target: ReviewTarget) {
+        switch target.lane {
+        case .name:
+            guard let item = reviewItems.first(where: { $0.id == target.id }),
+                let top = item.candidates.first
+            else { return }
+            confirmSuggestion(top.suggestion)
+        case .facts:
+            guard let item = factItems.first(where: { $0.id == target.id }),
+                let top = item.suggestions.first
+            else { return }
+            if top.isDirectlyRecordable {
+                recordSuggestedFact(top, for: item.person.uid)
+            } else {
+                pendingCommand = PendingCommand(
+                    command: .acceptSuggestion, subject: .review(target))
+            }
+        case .relationship:
+            guard let item = relationshipItems.first(where: { $0.id == target.id }) else {
+                return
+            }
+            confirmSuggestedRelationship(item)
+        case .duplicate:
+            break
+        }
+    }
+
+    private func decline(_ target: ReviewTarget) {
+        switch target.lane {
+        case .name:
+            guard let item = reviewItems.first(where: { $0.id == target.id }),
+                let top = item.candidates.first
+            else { return }
+            rejectSuggestion(top.suggestion)
+        case .relationship:
+            guard let item = relationshipItems.first(where: { $0.id == target.id }) else {
+                return
+            }
+            dismissSuggestedRelationship(item)
+        case .duplicate:
+            guard let item = duplicateItems.first(where: { $0.id == target.id }) else { return }
+            dismissDuplicate(item)
+        case .facts:
+            break
+        }
+    }
+
     /// The Review section's **second lane**: every person with promotable evidence still
     /// un-promoted, ordered as the People sidebar orders them (slice 45i).
     ///

@@ -38,6 +38,74 @@ enum ReviewSelection {
     }
 }
 
+/// Which of the worklist's four lanes a row belongs to, and so what Review's two keys mean
+/// on it (slice 83, fork 2).
+enum ReviewLane: Hashable {
+    case name(hasCandidates: Bool)
+    case facts
+    case relationship
+    case duplicate
+
+    /// ⌘↩. A duplicate has none: its two Keep buttons are a choice rather than a yes.
+    var canAccept: Bool {
+        switch self {
+        case .name(let hasCandidates): hasCandidates
+        case .facts, .relationship: true
+        case .duplicate: false
+        }
+    }
+
+    /// ⌘⌫. The facts lane has no decline.
+    var canDecline: Bool {
+        switch self {
+        case .name(let hasCandidates): hasCandidates
+        case .relationship, .duplicate: true
+        case .facts: false
+        }
+    }
+
+    var isName: Bool {
+        if case .name = self { true } else { false }
+    }
+}
+
+/// A worklist row as the commands see it: a value, so availability stays a pure function
+/// (`CommandContext`). The model resolves `id` against the live lanes when a command runs.
+struct ReviewTarget: Hashable {
+    let id: String
+    let lane: ReviewLane
+
+    /// The selection once the worklist has gone from `before` to `after`: unchanged unless
+    /// the selected row was there and left, which moves it on (`rowAfter`).
+    ///
+    /// A selection restored at launch, before its lane has been computed (the duplicates
+    /// scan is asynchronous), is waiting for its row rather than past it, so it stays.
+    static func selection(
+        _ selected: String?, before: [ReviewTarget], after: [ReviewTarget]
+    ) -> String? {
+        guard let selected, before.contains(where: { $0.id == selected }),
+            !after.contains(where: { $0.id == selected })
+        else { return selected }
+        return rowAfter(selected, before: before, after: after)
+    }
+
+    /// The row that takes the selection after `selected` has left the worklist (slice 83,
+    /// fork 7): the next one down that is still there, so the keys work down the queue.
+    ///
+    /// Never from another lane into Possible Duplicates, the lane built to be read rather
+    /// than cleared, and never back up the list: rows left above were left on purpose.
+    static func rowAfter(
+        _ selected: String, before: [ReviewTarget], after: [ReviewTarget]
+    ) -> String? {
+        guard let index = before.firstIndex(where: { $0.id == selected }) else { return nil }
+        let remaining = Set(after.map(\.id))
+        guard let next = before[(index + 1)...].first(where: { remaining.contains($0.id) })
+        else { return nil }
+        if next.lane == .duplicate, before[index].lane != .duplicate { return nil }
+        return next.id
+    }
+}
+
 /// One row of the Review section's worklist: an **unresolved mention**, the record
 /// context needed to judge it, and everyone the matcher thinks it might be (slice 45e).
 ///
@@ -85,6 +153,10 @@ struct ReviewItem: Identifiable {
     /// because the facts lane shares this selection space.
     var id: String { ReviewSelection.mention(mention).id }
 
+    var target: ReviewTarget {
+        ReviewTarget(id: id, lane: .name(hasCandidates: !candidates.isEmpty))
+    }
+
     var recordedName: String { recordedMention.nameAsRecorded }
 
     /// What to say when there is nothing to offer — never "this is a new person".
@@ -121,6 +193,8 @@ struct FactReviewItem: Identifiable {
     var suggestions: [FactSuggestion]
 
     var id: String { ReviewSelection.person(person.uid).id }
+
+    var target: ReviewTarget { ReviewTarget(id: id, lane: .facts) }
     /// Same fallback as `ReviewCandidate`: a person with no name yet is a normal state
     /// (they exist, they're just unnamed), and reading their uid here would say nothing.
     var displayName: String { person.displayName ?? "Unnamed person" }
@@ -146,6 +220,24 @@ struct DuplicateReviewItem: Identifiable {
     let second: PersonSummary?
 
     var id: String { ReviewSelection.duplicate(candidate.person1, candidate.person2).id }
+
+    var target: ReviewTarget { ReviewTarget(id: id, lane: .duplicate) }
+
+    /// The two records as a merge dialog names them, told apart even when the names
+    /// aren't: a duplicate pair usually shares one, and two unnamed people share "Unnamed
+    /// person". The subtitle comes first, as the pane's columns show it, and the uid only
+    /// when that is the same too.
+    var distinguishedNames: (first: String, second: String) {
+        let first = "“\(firstName)”"
+        let second = "“\(secondName)”"
+        guard first == second else { return (first, second) }
+        let firstDetail = self.first?.browseSubtitle ?? candidate.person1.raw
+        let secondDetail = self.second?.browseSubtitle ?? candidate.person2.raw
+        guard firstDetail == secondDetail else {
+            return ("\(first) (\(firstDetail))", "\(second) (\(secondDetail))")
+        }
+        return ("\(first) (\(candidate.person1.raw))", "\(second) (\(candidate.person2.raw))")
+    }
 
     /// Same fallback as `ReviewCandidate`: an unnamed person is a normal state, and their
     /// uid would say nothing to a reader deciding whether two records are one human being.
@@ -183,6 +275,8 @@ struct RelationshipReviewItem: Identifiable {
             suggestion.type, suggestion.person1, suggestion.person2
         ).id
     }
+
+    var target: ReviewTarget { ReviewTarget(id: id, lane: .relationship) }
 
     var firstName: String { first?.displayName ?? "Unnamed person" }
     var secondName: String { second?.displayName ?? "Unnamed person" }

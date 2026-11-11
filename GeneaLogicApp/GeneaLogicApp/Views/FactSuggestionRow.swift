@@ -13,6 +13,8 @@ import SwiftUI
 /// pane, and the Review section's cross-person lane. One row means one thing in both.
 struct FactSuggestionRow: View {
     let suggestion: FactSuggestion
+    /// The keys that act on this row, on Review's top suggestion (slice 83).
+    var keyCaption: String?
     /// Record the un-edited fact in one click (only shown when `isDirectlyRecordable`).
     let onRecord: () -> Void
     /// Open the editor prefilled from the evidence to correct it before recording.
@@ -32,6 +34,9 @@ struct FactSuggestionRow: View {
                     Text("from \(title)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+                if let keyCaption {
+                    ReviewKeyCaption(keyCaption)
                 }
             }
             Spacer(minLength: 0)
