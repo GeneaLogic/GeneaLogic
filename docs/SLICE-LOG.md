@@ -4399,7 +4399,8 @@ been two slices.
   row's value, hashed by the row's identity since the values are only `Equatable`; looking
   the row up again (the first build) repeated a reload per click, could miss, and found
   the wrong mention under a repeated `localRef`. A row's Record is a Review decision, or
-  ⌘↩ on the same suggestion records it twice.
+  ⌘↩ on the same suggestion records it twice. A context menu belongs to one row, so it
+  says that row's verb; only the menu bar needs the stable "Accept Suggestion".
 
 ## Carryovers and parked work
 

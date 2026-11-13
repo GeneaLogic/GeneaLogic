@@ -258,6 +258,50 @@ import Testing
         #expect(first.localRef == second.localRef)
     }
 
+    // MARK: - Review's rows
+
+    /// A Review row's menu says its lane's word, and on a name row whose; the menu bar
+    /// keeps its stable title.
+    @Test func aReviewRowSaysItsLanesWord() {
+        func titles(_ target: ReviewTarget) -> [String] {
+            [ArchiveCommand.acceptSuggestion, .declineSuggestion].map {
+                $0.title(on: .review(target))
+            }
+        }
+        #expect(
+            titles(
+                ReviewTarget(id: "n", lane: .name(hasCandidates: true), topCandidate: "Ann Roe"))
+                == ["Confirm Ann Roe", "Reject Ann Roe"])
+        #expect(titles(ReviewTarget(id: "f", lane: .facts)).first == "Record")
+        #expect(titles(ReviewTarget(id: "f", lane: .facts, topOpensEditor: true)).first == "Apply…")
+        #expect(
+            titles(ReviewTarget(id: "r", lane: .relationship))
+                == ["Record Relationship", "Not This Relationship"])
+        #expect(titles(ReviewTarget(id: "d", lane: .duplicate)).last == "Not a Duplicate")
+        #expect(
+            ArchiveCommand.acceptSuggestion.title(in: context(on: .review)) == "Accept Suggestion")
+    }
+
+    /// Each lane's menu: the decision first, the declining verb after a divider, and what
+    /// the lane hasn't left out.
+    @Test(arguments: [
+        (
+            ReviewLane.name(hasCandidates: true),
+            [[ArchiveCommand.acceptSuggestion, .somebodyNew], [.declineSuggestion]]
+        ),
+        (.name(hasCandidates: false), [[.somebodyNew]]),
+        (.facts, [[.acceptSuggestion]]),
+        (.relationship, [[.acceptSuggestion], [.declineSuggestion]]),
+        (.duplicate, [[.mergeDuplicate], [.declineSuggestion]]),
+    ])
+    func eachLanesMenuIsInOrder(_ lane: ReviewLane, menu: [[ArchiveCommand]]) {
+        let subject = CommandSubject.review(ReviewTarget(id: "row", lane: lane))
+        let shown = ReviewTarget.rowMenu
+            .map { $0.filter { context(on: .review).canPerform($0, on: subject) } }
+            .filter { !$0.isEmpty }
+        #expect(shown == menu)
+    }
+
     // MARK: - Against a window
 
     /// The menu is drawn on a right-click, which a sheet over the window can't take; an
@@ -318,6 +362,14 @@ import Testing
 
     private func card(_ candidate: ReviewCandidate, on row: ReviewItem) -> CommandSubject {
         .candidate(CandidateTarget(row: row.target, person: candidate.suggestion.personID))
+    }
+
+    /// A name row's menu names its top candidate, which the row doesn't show.
+    @Test func aNameRowNamesItsTopCandidate() async throws {
+        let (model, root, row) = try await makeArchive()
+        defer { AppTestSupport.remove(root) }
+        let top = try #require(row.candidates.first)
+        #expect(row.target.topCandidate == top.displayName)
     }
 
     /// A card's Confirm acts on its own candidate, not the top one the keys would take.

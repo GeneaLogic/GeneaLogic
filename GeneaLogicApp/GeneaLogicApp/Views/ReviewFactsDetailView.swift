@@ -96,6 +96,6 @@ struct ReviewFactsDetailView: View {
         guard suggestion.id == item.suggestions.first?.id else { return nil }
         return ArchiveCommand.reviewKeyCaption(
             for: item.target.lane,
-            acceptTitle: suggestion.isDirectlyRecordable ? nil : "Apply…")
+            acceptTitle: suggestion.isDirectlyRecordable ? nil : ArchiveCommand.applyTitle)
     }
 }

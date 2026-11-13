@@ -74,6 +74,18 @@ enum ReviewLane: Hashable {
 struct ReviewTarget: Hashable {
     let id: String
     let lane: ReviewLane
+    /// The top candidate's name, on a name row: its context menu names who Confirm and
+    /// Reject would decide, which the row itself doesn't show (slice 83b).
+    var topCandidate: String? = nil
+    /// The top suggestion can only be applied, on a facts row, so accepting it opens its
+    /// editor.
+    var topOpensEditor = false
+
+    /// A row's context menu, as the panes' rows order theirs (slice 83b): the decision,
+    /// then, after a divider, the verb that declines. Each lane shows the ones it has.
+    static let rowMenu: [[ArchiveCommand]] = [
+        [.acceptSuggestion, .mergeDuplicate, .somebodyNew], [.declineSuggestion],
+    ]
 
     /// The selection once the worklist has gone from `before` to `after`: unchanged unless
     /// the selected row was there and left, which moves it on (`rowAfter`).
@@ -154,7 +166,9 @@ struct ReviewItem: Identifiable {
     var id: String { ReviewSelection.mention(mention).id }
 
     var target: ReviewTarget {
-        ReviewTarget(id: id, lane: .name(hasCandidates: !candidates.isEmpty))
+        ReviewTarget(
+            id: id, lane: .name(hasCandidates: !candidates.isEmpty),
+            topCandidate: candidates.first?.displayName)
     }
 
     var recordedName: String { recordedMention.nameAsRecorded }
@@ -194,7 +208,11 @@ struct FactReviewItem: Identifiable {
 
     var id: String { ReviewSelection.person(person.uid).id }
 
-    var target: ReviewTarget { ReviewTarget(id: id, lane: .facts) }
+    var target: ReviewTarget {
+        ReviewTarget(
+            id: id, lane: .facts,
+            topOpensEditor: suggestions.first.map { !$0.isDirectlyRecordable } ?? false)
+    }
     /// Same fallback as `ReviewCandidate`: a person with no name yet is a normal state
     /// (they exist, they're just unnamed), and reading their uid here would say nothing.
     var displayName: String { person.displayName ?? "Unnamed person" }

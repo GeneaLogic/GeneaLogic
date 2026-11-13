@@ -101,25 +101,8 @@ private struct FileRow: View {
             .buttonStyle(.plain)
             .help("Click to preview")
 
-            // The Artifact ▸ Selected File verbs, in the same order, on this row's file
-            // (slice 82). The detail view runs them, Delete File…'s confirm included.
             Menu {
-                let file = CommandSubject.file(entry.uid, in: artifactID)
-                CommandButton(.openFileInWindow, on: file)
-                CommandButton(.openFileInDefaultApp, on: file)
-                CommandButton(.saveFileCopy, on: file)
-                CommandButton(.scanFileForMetadata, on: file)
-                Divider()
-                // Change the file's archival role after the fact (slice 32). A
-                // Picker renders the four roles with a checkmark on the current one.
-                Picker("Role", selection: roleBinding) {
-                    ForEach(FileRole.allCases, id: \.self) { role in
-                        Text(role.displayName).tag(role)
-                    }
-                }
-                Divider()
-                CommandButton(.replaceFile, on: file)
-                CommandButton(.deleteFile, on: file)
+                fileMenu
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .imageScale(.large)
@@ -137,6 +120,31 @@ private struct FileRow: View {
         }
         .hoverRowBackground(isHovering: isHovering, isSelected: isSelected)
         .onHover { isHovering = $0 }
+        // The ⋯ menu's contents, on a right-click anywhere on the row (slice 83b).
+        .contextMenu { fileMenu }
+    }
+
+    /// The Artifact ▸ Selected File verbs, in the same order, on this row's file (slice
+    /// 82), for the ⋯ menu and the context menu alike. The detail view runs them, Delete
+    /// File…'s confirm included.
+    @ViewBuilder
+    private var fileMenu: some View {
+        let file = CommandSubject.file(entry.uid, in: artifactID)
+        CommandButton(.openFileInWindow, on: file)
+        CommandButton(.openFileInDefaultApp, on: file)
+        CommandButton(.saveFileCopy, on: file)
+        CommandButton(.scanFileForMetadata, on: file)
+        Divider()
+        // Change the file's archival role after the fact (slice 32). A Picker renders the
+        // four roles with a checkmark on the current one.
+        Picker("Role", selection: roleBinding) {
+            ForEach(FileRole.allCases, id: \.self) { role in
+                Text(role.displayName).tag(role)
+            }
+        }
+        Divider()
+        CommandButton(.replaceFile, on: file)
+        CommandButton(.deleteFile, on: file)
     }
 
     /// Bridges the file's current role to the Role picker: reads `entry.role`

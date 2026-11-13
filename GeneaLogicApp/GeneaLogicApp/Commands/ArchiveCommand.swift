@@ -228,15 +228,19 @@ enum ArchiveCommand: Hashable, CaseIterable {
         titleOverride(on: subject) ?? title
     }
 
-    /// The verb a row's state puts in place of the usual one, on every surface: a stale
-    /// link is re-resolved, and a suggestion that can't be recorded as-is can only be
-    /// applied. `nil` where the state changes nothing.
+    /// The verb a row's state puts in place of the usual one, on every surface but the
+    /// menu bar: a stale link is re-resolved, and a suggestion that can't be recorded
+    /// as-is can only be applied. A Review row says its lane's verb, where the menu bar
+    /// keeps the stable "Accept Suggestion" (slice 83b), and a name row says whose.
+    /// `nil` where the state changes nothing.
     private func titleOverride(on subject: CommandSubject) -> String? {
         switch (self, subject) {
+        case (.acceptSuggestion, .review(let target)), (.declineSuggestion, .review(let target)):
+            Self.reviewRowTitle(of: self, on: target)
         case (.resolveMention, .mention(let target)) where target.link.isStale:
             "Re-resolve…"
         case (.editSuggestedFact, .factSuggestion(let target)) where !target.isDirectlyRecordable:
-            "Apply…"
+            Self.applyTitle
         default: nil
         }
     }
@@ -276,6 +280,24 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case (.declineSuggestion, .duplicate): "Not a Duplicate"
         default: title
         }
+    }
+
+    /// What a suggestion that can only be applied offers: its editor, the one way to record
+    /// a couple fact or an age. Said once for the row, its menu and Review's caption.
+    static let applyTitle = "Apply…"
+
+    /// What a Review row's context menu calls `command`: its lane's word, the editor's on
+    /// a facts row whose top suggestion can only be applied, and on a name row the
+    /// candidate it would decide.
+    private static func reviewRowTitle(
+        of command: ArchiveCommand, on target: ReviewTarget
+    ) -> String {
+        if command == .acceptSuggestion, target.topOpensEditor { return applyTitle }
+        let word = command.paneTitle(in: target.lane)
+        if target.lane.isName, let name = target.topCandidate {
+            return "\(word) \(name)"
+        }
+        return word
     }
 
     /// The caption on the row Review's keys act on, naming only the keys `lane` has

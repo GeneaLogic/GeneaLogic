@@ -139,3 +139,16 @@ of them, because a pane's rows have no selection for a menu item to act on (82).
   sheet, rather than a second copy in the pane. The row kinds are one `.row(RowKind)`
   case, so a switch names them once. Add as Name… opens an editor, so it has an
   ellipsis. A state's verb is one explicit override for both titles.
+
+**From the hand-test:**
+
+- **A file row had no context menu**, only its ⋯ button. The spec's inventory missed it,
+  because the ⋯ menu already drew from the source. The row now carries the ⋯ menu's
+  contents on a right-click, Role picker included, from one shared view.
+- **Review's row menus read as having holes**: Suggested Facts showed only Accept
+  Suggestion, Possible Duplicates only Decline Suggestion. The lanes lack those verbs on
+  purpose (83's fork 2: a fact suggestion has no recorded decline, which would be a format
+  change, and a merge has to say which record survives). What made it jarring was the
+  menu bar's generic titles. A row's menu now says its lane's word (Record, Not a
+  Duplicate), names the candidate on a name row (Confirm Ann Roe), and puts the decision
+  first and the declining verb after a divider. The menu bar keeps its stable titles.
