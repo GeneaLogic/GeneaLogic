@@ -164,3 +164,5 @@ of them, because a pane's rows have no selection for a menu item to act on (82).
   have no menu-bar item (82), because the rows have no selection for one to act on. Each
   has an in-pane button, which meets the same page's "available in the main interface,
   too."
+
+**Shipped 2026-11-12** (merged); **hand-test passed**.
