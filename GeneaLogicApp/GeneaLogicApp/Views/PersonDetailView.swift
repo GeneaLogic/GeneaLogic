@@ -117,14 +117,44 @@ struct PersonDetailView: View {
         }
         .reportsModal(isAddingRelationship)
         // The Person menu's adds (slice 82); the section buttons run the same commands.
+        // And the sheets this pane's rows open (slice 83b).
         .onChange(of: model.pendingCommand) {
-            guard
-                let (command, subject) = model.claimPendingCommand({
-                    $0 == .addName || $0 == .addFact || $0 == .addRelationship
-                }),
-                subject == .person(personID)
-            else { return }
-            perform(command)
+            if let (command, subject) = model.claimPendingCommand({
+                $0 == .addName || $0 == .addFact || $0 == .addRelationship
+            }) {
+                if subject == .person(personID) { perform(command) }
+            } else if let (command, subject) = model.claimPendingCommand(where: ownsRow) {
+                performRowCommand(command, on: subject)
+            }
+        }
+    }
+
+    /// Whether `subject` is one of this pane's rows, for a row command it runs.
+    private func ownsRow(_ command: ArchiveCommand, _ subject: CommandSubject) -> Bool {
+        switch (command, subject) {
+        case (.editSuggestedFact, .factSuggestion(let target)): target.person == personID
+        case (.addSourceName, .source(let target)): target.person == personID
+        case (.replaceRelative, .relationship(let target)): target.person == personID
+        default: false
+        }
+    }
+
+    /// Opens the sheet a row's command asks for (slice 83b). Never over another sheet,
+    /// for `perform`'s reason.
+    private func performRowCommand(_ command: ArchiveCommand, on subject: CommandSubject) {
+        guard nameEditorRequest == nil, factEditorRequest == nil, replacingEndpoint == nil,
+            !isAddingRelationship
+        else { return }
+        switch subject {
+        case .factSuggestion(let target):
+            factEditorRequest = FactEditorRequest(mode: .fromEvidence(target.suggestion))
+        case .source(let target):
+            if let name = target.newName { addRecordedName(name) }
+        case .relationship(let target):
+            replacingEndpoint = EndpointReplacement(
+                relationshipID: target.relationship, missingID: target.other,
+                roleDescription: target.roleDescription)
+        default: break
         }
     }
 
@@ -336,16 +366,13 @@ struct PersonDetailView: View {
                     ForEach(relatives) { relative in
                         RelativeRowView(
                             relative: relative,
-                            onNavigate: { model.navigateToPerson(relative.otherID) },
-                            onRemove: { model.deleteRelationship(relative.relationshipID) },
+                            subject: .relationship(
+                                RelationshipTarget(
+                                    person: personID, relationship: relative.relationshipID,
+                                    other: relative.otherID, otherExists: relative.otherExists,
+                                    roleDescription: relative.role.label.lowercased())),
                             onSetQualifier: {
                                 model.setParentChildQualifier(relative.relationshipID, to: $0)
-                            },
-                            onReplacePerson: {
-                                replacingEndpoint = EndpointReplacement(
-                                    relationshipID: relative.relationshipID,
-                                    missingID: relative.otherID,
-                                    roleDescription: relative.role.label.lowercased())
                             })
                     }
                 }
@@ -375,12 +402,14 @@ struct PersonDetailView: View {
                     ForEach(sources) { source in
                         PersonSourceRow(
                             source: source,
-                            onNavigate: { model.navigateToArtifact(source.artifactID) },
-                            onUnlink: { model.unlinkMention(source.linkID) },
-                            onAddName: source.nameAsRecorded.flatMap { recorded in
-                                recordedNameIsNew(recorded) ? { addRecordedName(recorded) } : nil
-                            }
-                        )
+                            subject: .source(
+                                SourceTarget(
+                                    person: personID, link: source.linkID,
+                                    artifact: source.artifactID,
+                                    artifactExists: source.artifactTitle != nil,
+                                    newName: source.nameAsRecorded?.trimmedNonEmpty.flatMap {
+                                        recordedNameIsNew($0) ? $0 : nil
+                                    })))
                     }
                 }
             }
@@ -388,7 +417,7 @@ struct PersonDetailView: View {
     }
 
     /// Whether `recorded` (a mention's name-as-recorded) is not yet one of this person's
-    /// names — the gate for offering "Add as name" on a Sources row. Compared trimmed and
+    /// names — the gate for offering Add as Name… on a Sources row. Compared trimmed and
     /// case-insensitively against each name's resolved text, so an exact re-spelling isn't
     /// re-offered while a genuinely different form (a Yiddish spelling, a married name) is.
     private func recordedNameIsNew(_ recorded: String) -> Bool {
@@ -427,13 +456,7 @@ struct PersonDetailView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(suggestions) { suggestion in
-                        FactSuggestionRow(
-                            suggestion: suggestion,
-                            onRecord: { model.recordSuggestedFact(suggestion, for: personID) },
-                            onApply: {
-                                factEditorRequest = FactEditorRequest(
-                                    mode: .fromEvidence(suggestion))
-                            })
+                        FactSuggestionRow(suggestion: suggestion, person: personID)
                     }
                 }
             }
@@ -472,9 +495,7 @@ struct PersonDetailView: View {
                             item: item,
                             // From *this* person's side, so the row reads as a statement
                             // about them rather than one they have to re-orient.
-                            subject: personID,
-                            onRecord: { model.confirmSuggestedRelationship(item) },
-                            onDismiss: { model.dismissSuggestedRelationship(item) })
+                            person: personID)
                     }
                 }
             }
@@ -675,12 +696,9 @@ private struct NameEditorRequest: Identifiable {
 /// offer (here is something your records say that your conclusions don't), and marking them
 /// differently would imply a distinction that isn't there.
 private struct PersonRelationshipSuggestionRow: View {
-    @Environment(ArchiveModel.self) private var model
     let item: RelationshipReviewItem
     /// The person whose page this is — the referent of *their*.
-    let subject: PersonID
-    let onRecord: () -> Void
-    let onDismiss: () -> Void
+    let person: PersonID
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -688,7 +706,7 @@ private struct PersonRelationshipSuggestionRow: View {
                 .foregroundStyle(.secondary)
                 .imageScale(.small)
             VStack(alignment: .leading, spacing: 3) {
-                Text(item.phrase(from: subject))
+                Text(item.phrase(from: person))
                     .font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
                 if let citation = item.leadCitation {
@@ -703,20 +721,19 @@ private struct PersonRelationshipSuggestionRow: View {
                     .foregroundStyle(.secondary)
                 }
                 HStack(spacing: 12) {
-                    Button("Record", action: onRecord)
-                        .buttonStyle(.plain)
-                        .font(.caption)
-                        .foregroundStyle(Color.accentColor)
-                        .help("Add this relationship to your conclusions (⌘Z to undo)")
-                    Button("Not This", action: onDismiss)
-                        .buttonStyle(.plain)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .help("Stop offering this relationship, here and in Review")
+                    RowCommandButton(.recordSuggestedRelationship, on: subject)
+                    RowCommandButton(
+                        .dismissSuggestedRelationship, on: subject, emphasis: .secondary)
                 }
             }
             Spacer(minLength: 0)
         }
+        .contentShape(Rectangle())
+        .rowCommandMenu(subject)
+    }
+
+    private var subject: CommandSubject {
+        .relationshipSuggestion(RelationshipSuggestionTarget(item: item))
     }
 }
 
@@ -830,14 +847,12 @@ private struct RelativeRow: Identifiable {
 /// disabled but removal still live. Couple *facts* (marriage/divorce) aren't shown here —
 /// they live in the Facts timeline (slice 43b).
 private struct RelativeRowView: View {
+    @Environment(ArchiveModel.self) private var model
     let relative: RelativeRow
-    let onNavigate: () -> Void
-    let onRemove: () -> Void
+    /// The relationship, for its row commands (slice 83b).
+    let subject: CommandSubject
     /// Sets (or clears, with `nil`) the nature of a parent-child link.
     let onSetQualifier: (FactType?) -> Void
-    /// Opens the picker that repoints this relationship at a person who still exists.
-    /// Only offered while the row dangles.
-    let onReplacePerson: () -> Void
 
     @State private var isHovering = false
 
@@ -859,7 +874,9 @@ private struct RelativeRowView: View {
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
-                    Button(action: onNavigate) {
+                    Button {
+                        model.perform(.showRelative, on: subject)
+                    } label: {
                         HStack(spacing: 4) {
                             Text(otherLabel)
                                 .fontWeight(.medium)
@@ -876,17 +893,11 @@ private struct RelativeRowView: View {
                     .help(
                         isDangling
                             ? "This person's record was deleted"
-                            : "Show this person on the People tab")
+                            : ArchiveCommand.showRelative.help(on: subject) ?? "")
 
                     // Repairing beats removing: the relationship is still true, it just
-                    // names someone who is gone (slice 44g).
-                    if isDangling {
-                        Button("Replace Person…", action: onReplacePerson)
-                            .buttonStyle(.plain)
-                            .font(.caption)
-                            .foregroundStyle(Color.accentColor)
-                            .help("Point this relationship at a person that still exists")
-                    }
+                    // names someone who is gone (slice 44g). Offered only while it dangles.
+                    RowCommandButton(.replaceRelative, on: subject)
                 }
 
                 HStack(spacing: 4) {
@@ -905,11 +916,14 @@ private struct RelativeRowView: View {
             }
             Spacer(minLength: 0)
             RowRemoveButton(
-                isHovering: isHovering, accessibilityLabel: "Remove relationship",
-                help: "Remove this relationship (⌘Z to undo)", action: onRemove)
+                isHovering: isHovering,
+                accessibilityLabel: ArchiveCommand.removeRelationship.title,
+                help: ArchiveCommand.removeRelationship.help(on: subject) ?? "",
+                action: { model.perform(.removeRelationship, on: subject) })
         }
         .hoverRowBackground(isHovering: isHovering)
         .onHover { isHovering = $0 }
+        .rowCommandMenu(subject)
     }
 
     /// Shown on every parent/child row, including unqualified ones — an always-present
@@ -942,12 +956,11 @@ private struct RelativeRowView: View {
 /// artifact inspector's resolved-mention chip (slice 42b). A dangling link (deleted
 /// artifact) shows "Unknown artifact" with navigation disabled but Unlink still live.
 private struct PersonSourceRow: View {
+    @Environment(ArchiveModel.self) private var model
     let source: PersonSource
-    let onNavigate: () -> Void
-    let onUnlink: () -> Void
-    /// Add the mention's name-as-recorded to the person as a name — `nil` when there's
-    /// no recorded name, or it's already one of the person's names (slice 44i).
-    let onAddName: (() -> Void)?
+    /// The source, for its row commands (slice 83b). Its Add as Name… is offered only when
+    /// the recorded name isn't already one of the person's names (slice 44i).
+    let subject: CommandSubject
 
     @State private var isHovering = false
 
@@ -961,7 +974,9 @@ private struct PersonSourceRow: View {
                 .imageScale(.large)
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 4) {
-                Button(action: onNavigate) {
+                Button {
+                    model.perform(.showSource, on: subject)
+                } label: {
                     HStack(spacing: 4) {
                         Text(source.artifactTitle ?? "Unknown artifact")
                             .fontWeight(.medium)
@@ -975,7 +990,7 @@ private struct PersonSourceRow: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(isDangling)
-                .help("Show this artifact on the Artifacts tab")
+                .help(ArchiveCommand.showSource.help(on: subject) ?? "")
 
                 if let recorded = source.nameAsRecorded?.trimmedNonEmpty {
                     HStack(spacing: 8) {
@@ -985,25 +1000,16 @@ private struct PersonSourceRow: View {
                         // Offered only when this recorded name isn't already one of the
                         // person's names — a document's own spelling of them (a Yiddish
                         // form, a married name) captured as a name, human-reviewed.
-                        if let onAddName {
-                            Button("Add as name", action: onAddName)
-                                .buttonStyle(.plain)
-                                .font(.caption)
-                                .foregroundStyle(Color.accentColor)
-                                .help("Add this recorded name to the person")
-                        }
+                        RowCommandButton(.addSourceName, on: subject)
                     }
                 }
             }
             Spacer(minLength: 0)
-            Button("Unlink", action: onUnlink)
-                .buttonStyle(.plain)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .help("Remove the link to this artifact (⌘Z to undo)")
+            RowCommandButton(.unlinkSource, on: subject, emphasis: .secondary)
         }
         .hoverRowBackground(isHovering: isHovering)
         .onHover { isHovering = $0 }
+        .rowCommandMenu(subject)
     }
 }
 

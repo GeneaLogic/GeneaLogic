@@ -43,24 +43,31 @@ struct CommandMenuItem: View {
 
 /// A button for `command` acting on `subject`, for a context menu or an in-pane menu: the
 /// row it was opened on, not necessarily the selection (slice 82).
+///
+/// `inPane` is for one inside the window's content, which isn't greyed while a sheet is
+/// up, for `CommandAffordance`'s reason (`canOffer`).
 struct CommandButton: View {
     @Environment(ArchiveModel.self) private var model
     let command: ArchiveCommand
     let subject: CommandSubject
+    var inPane = false
 
-    init(_ command: ArchiveCommand, on subject: CommandSubject) {
+    init(_ command: ArchiveCommand, on subject: CommandSubject, inPane: Bool = false) {
         self.command = command
         self.subject = subject
+        self.inPane = inPane
     }
 
     var body: some View {
         Button(
-            command.title, systemImage: command.systemImage,
+            command.title(on: subject), systemImage: command.systemImage(on: subject),
             role: command.isDestructive ? .destructive : nil
         ) {
             model.perform(command, on: subject)
         }
-        .disabled(!model.canPerform(command, on: subject))
+        .disabled(
+            !(inPane
+                ? model.canOffer(command, on: subject) : model.canPerform(command, on: subject)))
     }
 }
 

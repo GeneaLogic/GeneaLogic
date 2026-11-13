@@ -4389,6 +4389,22 @@ been two slices.
   write, so they wait. A row's context menu names a row that may not be showing, so
   Review's sheets moved from the panes to `ReviewCommandHost` on the detail column.
 
+- **83b — row-level commands** (app only; no format change; #38). G1's last part. **The
+  invariant:** every verb on a pane's rows is an `ArchiveCommand` whose subject carries the
+  row's ids and state, so the row's buttons and its context menu ask one rule and can't
+  disagree; none is on the menu bar, because a pane's rows have no selection. **Decided:**
+  cases, not row-local verbs; rows that only edit and remove stay as they are; the
+  candidate cards and the rows' jumps are in. A row command belongs to no tab, so one
+  suggested-fact row serves the person pane and Review. **Gotchas:** a subject carries its
+  row's value, hashed by the row's identity since the values are only `Equatable`; looking
+  the row up again (the first build) repeated a reload per click, could miss, and found
+  the wrong mention under a repeated `localRef`. A row's Record is a Review decision, or
+  ⌘↩ on the same suggestion records it twice. A context menu belongs to one row, so it
+  says that row's verb. **The menu bar does too**, revising 83's fork 4: Review's two
+  items name what the key will do (Confirm Ann Roe ⌘↩), dimmed under the generic title
+  where there's nothing to decide. The HIG keeps a menu's *set* of items stable and asks a
+  title to clarify its target; fork 4 had read the first as fixed wording.
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the

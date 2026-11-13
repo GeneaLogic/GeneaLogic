@@ -136,8 +136,9 @@ extension ArchiveModel {
     }
 
     /// Runs one Review verb, counting the write it starts as a Review decision, which the
-    /// two commands wait for (`CommandContext.isDecidingReview`).
-    private func decide(_ verb: () -> Void) {
+    /// two commands wait for (`CommandContext.isDecidingReview`). A row's verdict on a
+    /// suggestion or a candidate counts too (slice 83b): its row is Review's as well.
+    func decide(_ verb: () -> Void) {
         marksNextMutationAsReviewDecision = true
         verb()
         marksNextMutationAsReviewDecision = false
@@ -156,6 +157,22 @@ extension ArchiveModel {
     /// ⌘⌫ on `target`: the top row's no. See `acceptReviewRow`.
     func declineReviewRow(_ target: ReviewTarget) {
         decide { decline(target) }
+    }
+
+    /// A candidate card's Confirm or Reject (slice 83b), on that card's candidate rather
+    /// than the top one. Counted as a Review decision, so the keys wait for it.
+    func decideCandidate(_ target: CandidateTarget, confirming: Bool) {
+        guard let item = reviewItems.first(where: { $0.id == target.row.id }),
+            let candidate = item.candidates.first(where: { $0.suggestion.personID == target.person }
+            )
+        else { return }
+        decide {
+            if confirming {
+                confirmSuggestion(candidate.suggestion)
+            } else {
+                rejectSuggestion(candidate.suggestion)
+            }
+        }
     }
 
     private func accept(_ target: ReviewTarget) {

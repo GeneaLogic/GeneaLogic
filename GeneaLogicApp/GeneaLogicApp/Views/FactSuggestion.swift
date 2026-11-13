@@ -14,8 +14,8 @@ import GeneaLogicModel
 /// (which aren't scoped to any one mentioned person — a census lists many) to the
 /// resolved mention's own `facts[]`, so a suggestion is now precisely "what this record
 /// states about this person" rather than a heuristic guess.
-struct FactSuggestion: Identifiable {
-    enum Evidence {
+struct FactSuggestion: Identifiable, Hashable {
+    enum Evidence: Hashable {
         /// A fact the linked artifact records **about this mention** (type/date/place).
         case recordedFact(RecordedFact)
         /// The mention's `ageAsRecorded` attribute.

@@ -22,8 +22,6 @@ struct ReviewFactsDetailView: View {
     @Environment(ArchiveModel.self) private var model
     let item: FactReviewItem
 
-    @State private var factEditorRequest: FactEditorRequest?
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -33,11 +31,8 @@ struct ReviewFactsDetailView: View {
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .sheet(item: $factEditorRequest) { request in
-            FactEditorSheet(personID: item.person.uid, mode: request.mode)
-                .environment(model)
-        }
-        .reportsModal(factEditorRequest != nil)
+        // A row's Edit… or Apply… opens its editor in `ReviewCommandHost`, with Review's
+        // other sheets (slice 83b).
     }
 
     private var header: some View {
@@ -89,14 +84,8 @@ struct ReviewFactsDetailView: View {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(item.suggestions) { suggestion in
                     FactSuggestionRow(
-                        suggestion: suggestion,
-                        keyCaption: keyCaption(for: suggestion),
-                        onRecord: {
-                            model.recordSuggestedFact(suggestion, for: item.person.uid)
-                        },
-                        onApply: {
-                            factEditorRequest = FactEditorRequest(mode: .fromEvidence(suggestion))
-                        })
+                        suggestion: suggestion, person: item.person.uid,
+                        keyCaption: keyCaption(for: suggestion))
                 }
             }
         }
@@ -107,6 +96,6 @@ struct ReviewFactsDetailView: View {
         guard suggestion.id == item.suggestions.first?.id else { return nil }
         return ArchiveCommand.reviewKeyCaption(
             for: item.target.lane,
-            acceptTitle: suggestion.isDirectlyRecordable ? nil : "Apply…")
+            acceptTitle: suggestion.isDirectlyRecordable ? nil : ArchiveCommand.applyTitle)
     }
 }

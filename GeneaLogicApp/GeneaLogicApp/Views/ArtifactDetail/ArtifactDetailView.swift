@@ -92,7 +92,8 @@ struct ArtifactDetailView: View {
             .modifier(
                 RememberedInspectorWidth(
                     saved: $inspectorWidth, isShown: inspectorShown,
-                    range: Self.inspectorWidthRange))
+                    range: Self.inspectorWidthRange)
+            )
             // **Keep this, even though it is half of #9's trigger** (slice 80). It is
             // the only API that sets the column's resize range: a content frame in its
             // place (tried) left the column a few points of play and ignored the ideal
@@ -181,14 +182,14 @@ struct ArtifactDetailView: View {
         // artifact's name is the heading above the document, in `DocumentHeader`.
     }
 
-    /// The commands this view runs: the ones that open its sheets, the file verbs, and
-    /// the inspector toggle.
+    /// The commands this view runs: the ones that open its sheets (a row's among them,
+    /// slice 83b), the file verbs, and the inspector toggle.
     private static func runs(_ command: ArchiveCommand) -> Bool {
         switch command.subjectKind {
         case .artifact: command != .deleteArtifact
-        case .file: true
+        case .file, .row(.mention), .row(.metadataEntry): true
         case .archive: command == .toggleInspector
-        case .person, .review: false
+        case .person, .review, .row: false
         }
     }
 
@@ -219,8 +220,37 @@ struct ArtifactDetailView: View {
             guard id == artifact.uid, let entry = files.first(where: { $0.uid == fileID })
             else { return }
             performFileCommand(command, on: entry)
-        case .person, .review:
+        // On the mention the row drew, which a repeated `localRef` couldn't find (79b).
+        case .mention(let target):
+            guard target.artifact == artifact.uid, sheet == nil else { return }
+            sheet = Self.sheet(for: command, on: target.mention, link: target.link)
+        case .metadataEntry(let key, let id):
+            guard id == artifact.uid, sheet == nil, command == .applyMetadata,
+                let entry = model.capturedMetadata[id]?.entries.first(where: { $0.key == key })
+            else { return }
+            sheet = ArtifactSheet(.assertion(.suggestion(entry)))
+        default:
             break
+        }
+    }
+
+    /// The sheet a mention's command opens (slice 83b). A re-resolve names the stale link,
+    /// so the resolve replaces it rather than adding a second citation beside it.
+    private static func sheet(
+        for command: ArchiveCommand, on mention: PersonMention, link: MentionTarget.Link
+    ) -> ArtifactSheet? {
+        switch command {
+        case .resolveMention:
+            let stale: EvidenceLinkID? = if case .stale(let id) = link { id } else { nil }
+            return ArtifactSheet(.resolve(mention: mention, replacing: stale))
+        // Add Relationship… opens the mention's editor, which owns its stated relationships.
+        case .editMention, .addMentionRelationship: return ArtifactSheet.editMention(mention)
+        case .addMentionFact:
+            return ArtifactSheet(
+                .mentionFact(
+                    mentionRef: mention.localRef, mentionName: mention.nameAsRecorded,
+                    mode: .add))
+        default: return nil
         }
     }
 
@@ -353,7 +383,9 @@ private struct RememberedInspectorWidth: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onGeometryChange(for: Double.self) { $0.size.width } action: { width in
+            .onGeometryChange(for: Double.self) {
+                $0.size.width
+            } action: { width in
                 guard isShown, range.contains(width) else { return }
                 live = width
             }

@@ -142,18 +142,20 @@ struct ReviewListView: View {
 
 /// A worklist row's context menu: the verbs of its lane, on that row, which needn't be the
 /// selected one. What the rule won't offer on it stays out, rather than dim; the rule is
-/// the menu bar's, so the two can't disagree.
+/// the menu bar's, so the two can't disagree. Each says its lane's word, and on a name row
+/// whose (slice 83b), so a row's menu reads complete in its own terms.
 private struct ReviewRowMenu: View {
     @Environment(ArchiveModel.self) private var model
     let target: ReviewTarget
 
-    private static let verbs: [ArchiveCommand] = [
-        .acceptSuggestion, .declineSuggestion, .mergeDuplicate, .somebodyNew,
-    ]
-
     var body: some View {
-        ForEach(Self.verbs.filter { model.canOffer($0, on: .review(target)) }, id: \.self) {
-            CommandButton($0, on: .review(target))
+        let groups = ReviewTarget.rowMenu.map {
+            $0.filter { model.canOffer($0, on: .review(target)) }
+        }
+        .filter { !$0.isEmpty }
+        ForEach(groups.indices, id: \.self) { index in
+            if index > 0 { Divider() }
+            ForEach(groups[index], id: \.self) { CommandButton($0, on: .review(target)) }
         }
     }
 }

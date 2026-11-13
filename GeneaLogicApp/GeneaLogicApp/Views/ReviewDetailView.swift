@@ -134,10 +134,11 @@ struct ReviewDetailView: View {
                     ForEach(item.candidates) { candidate in
                         CandidateCard(
                             candidate: candidate,
+                            subject: .candidate(
+                                CandidateTarget(
+                                    row: item.target, person: candidate.suggestion.personID)),
                             keyCaption: candidate.id == item.candidates.first?.id
-                                ? ArchiveCommand.reviewKeyCaption(for: item.target.lane) : nil,
-                            onConfirm: { model.confirmSuggestion(candidate.suggestion) },
-                            onReject: { model.rejectSuggestion(candidate.suggestion) })
+                                ? ArchiveCommand.reviewKeyCaption(for: item.target.lane) : nil)
                     }
                 }
             }
@@ -231,10 +232,10 @@ struct ReviewDetailPlaceholder: View {
 /// One candidate: who they are, what agreed, the full breakdown, and the two verdicts.
 private struct CandidateCard: View {
     let candidate: ReviewCandidate
+    /// This card's candidate, for its Confirm and Reject (slice 83b).
+    let subject: CommandSubject
     /// The keys, on the top candidate only: they act on it, and no other.
     let keyCaption: String?
-    let onConfirm: () -> Void
-    let onReject: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -275,15 +276,10 @@ private struct CandidateCard: View {
             HStack(spacing: 8) {
                 // Neither is prominent (slice 83, fork 3): that says "the likely answer",
                 // which is the one thing this card must not claim. The caption says where
-                // the keys land.
-                Button(
-                    ArchiveCommand.acceptSuggestion.paneTitle(in: lane),
-                    systemImage: ArchiveCommand.acceptSuggestion.systemImage,
-                    action: onConfirm)
-                Button(
-                    ArchiveCommand.declineSuggestion.paneTitle(in: lane),
-                    systemImage: ArchiveCommand.declineSuggestion.systemImage,
-                    action: onReject)
+                // the keys land. They act on this card's candidate, which on any card but
+                // the top is not the one the keys would (slice 83b).
+                CommandButton(.confirmCandidate, on: subject, inPane: true)
+                CommandButton(.rejectCandidate, on: subject, inPane: true)
                 Spacer()
                 ReviewKeyCaption(
                     [keyCaption, "⌘Z undoes either"].compactMap(\.self)
@@ -292,7 +288,7 @@ private struct CandidateCard: View {
         }
         .padding(12)
         .background(.quinary, in: RoundedRectangle(cornerRadius: 8))
+        .contentShape(Rectangle())
+        .rowCommandMenu(subject)
     }
-
-    private let lane = ReviewLane.name(hasCandidates: true)
 }
