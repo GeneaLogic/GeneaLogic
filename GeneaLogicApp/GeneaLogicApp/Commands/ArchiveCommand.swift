@@ -182,8 +182,9 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .showInTree: "Show in Tree"
         case .showInPeople: "Show in People"
         case .deletePerson: "Delete Person…"
-        // Stable, whichever lane is selected, as the HIG asks of a menu. The panes keep
-        // their lane's words (`paneTitle(in:)`).
+        // The titles while there is nothing to decide. With a row that has the verb, the
+        // menu bar says what the key will do (`title(in:)`), and the panes and context
+        // menus say their lane's words.
         case .acceptSuggestion: "Accept Suggestion"
         case .declineSuggestion: "Decline Suggestion"
         case .mergeDuplicate: "Merge People…"
@@ -217,10 +218,23 @@ enum ArchiveCommand: Hashable, CaseIterable {
     }
 
     func title(in context: CommandContext) -> String {
-        if self == .toggleInspector {
+        switch self {
+        case .toggleInspector:
             return context.inspectorVisible ? "Hide Inspector" : "Show Inspector"
+        // The two keys write a verdict on a row the sidebar doesn't spell out, so the menu
+        // names it before the key is pressed: Confirm Ann Roe ⌘↩, Not a Duplicate ⌘⌫
+        // (slice 83b). The HIG keeps the menu's *set* of items stable and asks a title to
+        // clarify its target, as Undo Typing does. A lane without the verb leaves the item
+        // dimmed under its generic title. A write in flight doesn't change the title, so
+        // it doesn't flicker on every decision.
+        case .acceptSuggestion, .declineSuggestion:
+            guard let target = context.selectedReview,
+                self == .acceptSuggestion ? target.lane.canAccept : target.lane.canDecline
+            else { return title }
+            return Self.reviewRowTitle(of: self, on: target)
+        default:
+            return title
         }
-        return title
     }
 
     /// The title on `subject`, where the row's state changes the verb.

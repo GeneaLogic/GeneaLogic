@@ -282,6 +282,41 @@ import Testing
             ArchiveCommand.acceptSuggestion.title(in: context(on: .review)) == "Accept Suggestion")
     }
 
+    /// The menu bar says what ⌘↩ and ⌘⌫ will do on the selected row, and keeps the
+    /// generic title, dimmed, where there is nothing for the key to decide.
+    @Test func theMenuBarNamesWhatTheKeysWillDo() {
+        func titles(_ selected: ReviewTarget?) -> [String] {
+            var context = context(on: .review)
+            context.selectedReview = selected
+            return [ArchiveCommand.acceptSuggestion, .declineSuggestion].map {
+                $0.title(in: context)
+            }
+        }
+        #expect(
+            titles(
+                ReviewTarget(id: "n", lane: .name(hasCandidates: true), topCandidate: "Ann Roe"))
+                == ["Confirm Ann Roe", "Reject Ann Roe"])
+        #expect(titles(nil) == ["Accept Suggestion", "Decline Suggestion"])
+        #expect(
+            titles(ReviewTarget(id: "d", lane: .duplicate))
+                == ["Accept Suggestion", "Not a Duplicate"])
+        #expect(
+            titles(ReviewTarget(id: "f", lane: .facts, topOpensEditor: true))
+                == ["Apply…", "Decline Suggestion"])
+        #expect(
+            titles(ReviewTarget(id: "n", lane: .name(hasCandidates: false)))
+                == ["Accept Suggestion", "Decline Suggestion"])
+    }
+
+    /// A decision being written leaves the title as it was, so the menu doesn't flicker.
+    @Test func aWriteInFlightKeepsTheTitle() {
+        var context = context(on: .review)
+        context.selectedReview = ReviewTarget(id: "r", lane: .relationship)
+        context.isDecidingReview = true
+        #expect(ArchiveCommand.acceptSuggestion.title(in: context) == "Record Relationship")
+        #expect(!context.isAvailable(.acceptSuggestion))
+    }
+
     /// Each lane's menu: the decision first, the declining verb after a divider, and what
     /// the lane hasn't left out.
     @Test(arguments: [

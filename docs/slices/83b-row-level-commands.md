@@ -152,3 +152,15 @@ of them, because a pane's rows have no selection for a menu item to act on (82).
   menu bar's generic titles. A row's menu now says its lane's word (Record, Not a
   Duplicate), names the candidate on a name row (Confirm Ann Roe), and puts the decision
   first and the declining verb after a divider. The menu bar keeps its stable titles.
+- **The menu bar names what Review's keys will do**, revising 83's fork 4. Its two items
+  read Confirm Ann Roe ⌘↩ and Reject Ann Roe ⌘⌫, Record or Apply…, Not a Duplicate, by the
+  selected row, and Accept Suggestion and Decline Suggestion, dimmed, where there's
+  nothing for the key to decide. Fork 4 cited the HIG's "always show the same set of menu
+  items" for fixed wording, but that rule is about the set. The HIG asks a title to
+  clarify its target ("Undo Typing"), and the keys write a verdict on a row the sidebar
+  doesn't spell out. A write in flight leaves the title as it was.
+- **Where this slice departs from the HIG, on purpose:** "an app's menu bar menus list
+  all the app's commands, including those in various context menus." A pane's row verbs
+  have no menu-bar item (82), because the rows have no selection for one to act on. Each
+  has an in-pane button, which meets the same page's "available in the main interface,
+  too."

@@ -4400,7 +4400,10 @@ been two slices.
   the row up again (the first build) repeated a reload per click, could miss, and found
   the wrong mention under a repeated `localRef`. A row's Record is a Review decision, or
   ⌘↩ on the same suggestion records it twice. A context menu belongs to one row, so it
-  says that row's verb; only the menu bar needs the stable "Accept Suggestion".
+  says that row's verb. **The menu bar does too**, revising 83's fork 4: Review's two
+  items name what the key will do (Confirm Ann Roe ⌘↩), dimmed under the generic title
+  where there's nothing to decide. The HIG keeps a menu's *set* of items stable and asks a
+  title to clarify its target; fork 4 had read the first as fixed wording.
 
 ## Carryovers and parked work
 
