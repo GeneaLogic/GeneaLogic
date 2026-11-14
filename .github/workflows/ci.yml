@@ -20,11 +20,15 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# The job names carry no versions: branch protection requires a check by its name, so a
+# name that changes with a toolchain bump would leave every PR waiting on a check that
+# no longer reports. The versions live in the steps (`swift --version`, `xcodebuild
+# -version`), where the log shows them.
 jobs:
   # `macos-26`, not `macos-15`: both packages declare a macOS 26 platform floor (matched
   # to the app's own deployment target), which an older runner cannot build.
   macos:
-    name: macOS (packages)
+    name: macOS packages
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
@@ -36,7 +40,7 @@ jobs:
         run: swift test --package-path GeneaLogicCLI
 
   linux:
-    name: Linux (swift:6.3)
+    name: Linux
     runs-on: ubuntu-latest
     container: swift:6.3
     steps:
@@ -63,7 +67,7 @@ jobs:
   # locally (`-` is the ad-hoc identity); `CODE_SIGNING_ALLOWED=NO` would leave an
   # unlaunchable host.
   mac-app:
-    name: macOS app (Xcode 26.5)
+    name: macOS app
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
