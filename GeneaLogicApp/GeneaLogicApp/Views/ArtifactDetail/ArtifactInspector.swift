@@ -25,25 +25,30 @@ struct ArtifactInspector: View {
     @Binding var sheet: ArtifactSheet?
 
     var body: some View {
-        // **Content stops at the toolbar's lower edge, as in Preview and Pages** (slice
-        // 80). SwiftUI lays the inspector column out full height, behind the toolbar,
-        // and lets the scroll view draw up into it. Whether the toolbar's edge effect
-        // then covers that content depends on how the inspector came to be shown (#9):
-        // sharp text under the toolbar at first, blurred after a hide and show. So the
-        // content never goes there. The scroll view's frame stops at the toolbar's
-        // lower edge even though it draws past it, so clipping to the frame cuts the
-        // overflow (the sides and bottom never draw past it), and the content shape
-        // keeps controls hidden under the toolbar from taking clicks.
+        // **Before macOS 27.2.1, content stops at the toolbar's lower edge** (slice 80).
+        // SwiftUI lays the inspector column out full height, behind the toolbar, and
+        // lets the scroll view draw up into it. Before 27.2.1, whether the toolbar's
+        // edge effect then covers that content depends on how the inspector came to be
+        // shown (#9): sharp text under the toolbar at first, blurred after a hide and
+        // show. So there the content never goes under the toolbar. The scroll view's
+        // frame stops at the toolbar's lower edge even though it draws past it, so
+        // clipping to the frame cuts the overflow (the sides and bottom never draw past
+        // it), and the content shape keeps controls hidden under the toolbar from
+        // taking clicks.
         //
-        // **The three lines are one workaround, removed together when the floor reaches
-        // macOS 27.2.** Apple fixed #9 there by stopping the inspector at the toolbar,
-        // so on 27.2 these lines change nothing, and on earlier releases they give the
-        // same look. Without the clip, the hidden edge effect would leave content under the
-        // toolbar with no backing at all.
-        content
-            .scrollEdgeEffectHidden(true, for: .top)
-            .clipped()
-            .contentShape(Rectangle())
+        // Apple fixed #9 by 27.2.1 (FB25320177): content under the toolbar is blurred
+        // every time, so from there the inspector scrolls under it as the system draws
+        // it. **The three lines are one workaround, kept together, and the `else` goes
+        // when the floor reaches 27.2.1.** Without the clip, the hidden edge effect
+        // would leave content under the toolbar with no backing at all.
+        if #available(macOS 27.2.1, *) {
+            content
+        } else {
+            content
+                .scrollEdgeEffectHidden(true, for: .top)
+                .clipped()
+                .contentShape(Rectangle())
+        }
     }
 
     private var content: some View {
