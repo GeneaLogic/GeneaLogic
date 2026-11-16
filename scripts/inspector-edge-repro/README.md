@@ -9,8 +9,8 @@ shows sharply under the toolbar.
 swift run --package-path scripts/inspector-edge-repro
 ```
 
-Scroll the inspector, then click the Inspector button twice and scroll again.
-Watch the text under the toolbar: sharp the first time, blurred the second. With
+Before 27.2.1: scroll the inspector, then click the Inspector button twice and scroll
+again. Watch the text under the toolbar: sharp the first time, blurred the second. With
 `INSPECTOR_WORKAROUND=1`, it is cut at the toolbar's lower edge both times. That is
 the workaround in `ArtifactInspector`.
 

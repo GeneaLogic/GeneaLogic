@@ -4341,7 +4341,11 @@ been two slices.
   seeing whether text is sharp, clipped or blurred under the toolbar can. Nothing
   reached the first appearance: presenting late, a `NavigationStack`, moving or removing
   toolbar items, `toolbarBackgroundVisibility`, an in-code re-show without animation,
-  or AppKit's `allowsFullHeightLayout` (kept off, ignored).
+  or AppKit's `allowsFullHeightLayout` (kept off, ignored). **Since:** macOS 27.2.1
+  fixes #9: content under the toolbar is blurred the same way before and after a re-show
+  (faint; seen only while scrolling). So from 27.2.1, on the user's call, the inspector
+  scrolls under the toolbar as the system draws it, and the workaround applies only
+  before (#60). Not checked on earlier 27 releases.
 
 - **81 — small ones** (app only; no format change; #37). G3, G9, G17, G21, G22 and G8's
   `0.1` part from the second UI audit. **The invariants:** an archive the app creates has
