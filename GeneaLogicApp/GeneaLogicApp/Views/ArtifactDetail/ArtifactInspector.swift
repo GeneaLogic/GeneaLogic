@@ -35,10 +35,11 @@ struct ArtifactInspector: View {
         // overflow (the sides and bottom never draw past it), and the content shape
         // keeps controls hidden under the toolbar from taking clicks.
         //
-        // **The three lines are one workaround, removed together** when the repro in
-        // `scripts/inspector-edge-repro/` shows Apple has fixed #9. With the clip gone,
-        // the hidden edge effect would leave content under the toolbar with no backing
-        // at all.
+        // **The three lines are one workaround, removed together when the floor reaches
+        // macOS 27.2.** Apple fixed #9 there by stopping the inspector at the toolbar,
+        // so on 27.2 these lines change nothing, and on earlier releases they give the
+        // same look. Without the clip, the hidden edge effect would leave content under the
+        // toolbar with no backing at all.
         content
             .scrollEdgeEffectHidden(true, for: .top)
             .clipped()
