@@ -1,8 +1,9 @@
 import SwiftUI
 
-// Run, scroll the inspector a little, and look at its text under the toolbar: it is sharp.
-// Click the Inspector button twice and scroll again: it is now blurred by the toolbar's
-// edge. Delete the `inspectorColumnWidth` line and it is sharp both times.
+// Before macOS 27.2.1, where Apple fixed it (FB25320177): run, scroll the inspector a
+// little, and look at its text under the toolbar: it is sharp. Click the Inspector button
+// twice and scroll again: it is now blurred by the toolbar's edge. Delete the
+// `inspectorColumnWidth` line and it is sharp both times.
 //
 // INSPECTOR_WORKAROUND=1 applies GeneaLogic's workaround (slice 80): content is cut at
 // the toolbar's lower edge, so it looks the same both times.
