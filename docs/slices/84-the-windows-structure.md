@@ -86,9 +86,11 @@ Over the sample and a 309-artifact, 412-person archive:
    artifact ▸ name. **Agreed: one Review section** (2026-11-19), its rows lane by lane with the
    lane's icon, a name's artifact as its subtitle. *Alternative:* a section per lane.
    Either way the duplicates scan runs before Review is visited, or isn't counted.
-4. **Icons.** Section headers stay plain text, as in Finder and Mail. **Recommended:**
-   icons on rows where they say something (an artifact's media type, a review item's
-   lane), none on people.
+4. **Icons. Agreed** (2026-11-19): section headers stay plain text, as in Finder and
+   Mail. Artifact rows carry their media type's symbol and review rows their lane's,
+   in one tint; people rows carry none. **Thumbnails are
+   [84b](84b-artifact-thumbnails.md)**, which replaces an artifact's symbol with its
+   first page where it has one.
 5. **What else the sidebar carries**: Trash (86's open question), counts, and in B,
    whether sections remember being collapsed.
 6. **Order with 85 and 86**: 85's restored state includes the structure's, and 86's

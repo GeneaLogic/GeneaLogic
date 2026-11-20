@@ -190,7 +190,8 @@ Each is specced in `docs/slices/` before it is built.
 | **82** — one source for commands | G1 (the command source, Artifact and Person menus, the shortcut table), G2 | `0.1` |
 | **83** — command coverage | G1 (Tree and Review, list-row and card context menus), G15 | `0.1` |
 | **83b** — row-level commands | G1 (verbs on rows inside panes: a mention's Resolve… and Unlink, a metadata entry's Apply…, a suggestion's Record and Edit…) | `0.1` |
-| **84** — the tab switcher stays put | G4 | `0.1` |
+| **84** — the window's structure (re-scoped from *the tab switcher stays put*) | G4 | `0.1` |
+| **84b** — artifact thumbnails | from 84 | `0.1` |
 | **85** — window and document lifecycle | G10, G11, G24; G12 investigated, split off if deep | `0.1` |
 | **86** — a visible trash | G7 | `0.1` |
 | **87** — copy and Quick Look | G6, G16 | `0.1` |
