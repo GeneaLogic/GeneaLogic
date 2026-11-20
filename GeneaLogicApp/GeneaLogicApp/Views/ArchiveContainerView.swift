@@ -27,6 +27,9 @@ struct ArchiveContainerView: View {
     /// The active window tab, persisted per window, so a relaunch restores the tab
     /// you were on. Stored as the enum's raw value; bridged by `tab`.
     @SceneStorage("selectedTab") private var selectedTabRaw: String = ArchiveTab.artifacts.rawValue
+    /// Whether People was last shown as a tree, per window, so a person row clicked from
+    /// another area returns to that view (slice 84). Kept by `tab`'s setter.
+    @SceneStorage("peopleShowsTree") private var peopleShowsTree = false
     /// This window's undo manager, handed to the model so its mutations register
     /// undo/redo on the window's own stack (undo is per-archive-window).
     @Environment(\.undoManager) private var undoManager
@@ -71,7 +74,10 @@ struct ArchiveContainerView: View {
     private var tab: Binding<ArchiveTab> {
         Binding(
             get: { ArchiveTab(rawValue: selectedTabRaw) ?? .artifacts },
-            set: { selectedTabRaw = $0.rawValue }
+            set: { tab in
+                selectedTabRaw = tab.rawValue
+                if tab.section == .people { peopleShowsTree = tab == .tree }
+            }
         )
     }
 
@@ -197,7 +203,7 @@ struct ArchiveContainerView: View {
         if model.archive != nil {
             OpenArchiveView(
                 selection: selection, personSelection: personSelection,
-                reviewSelection: reviewSelection, tab: tab)
+                reviewSelection: reviewSelection, tab: tab, peopleShowsTree: peopleShowsTree)
         } else if let openError = model.openError {
             ContentUnavailableView {
                 Label("Couldn't Open Archive", systemImage: "exclamationmark.triangle")
@@ -226,6 +232,7 @@ private struct OpenArchiveView: View {
     @Binding var personSelection: PersonID?
     @Binding var reviewSelection: ReviewItem.ID?
     @Binding var tab: ArchiveTab
+    let peopleShowsTree: Bool
     /// The window's Continuity Camera scanner. Owned here so its receiver lives in
     /// this window's responder chain (hosted zero-size below) and handed to the
     /// model so the toolbar/detail scan actions can reach it.
@@ -363,6 +370,10 @@ private struct OpenArchiveView: View {
                 model.selectedArtifact = newTab == .artifacts ? selectedArtifact?.uid : nil
                 model.selectedPerson = newTab == .people ? selectedPerson?.uid : nil
                 model.selectedFile = nil
+                // Re-scan the duplicates lane on entering Review, as before slice 84: its
+                // scores read records a person's summary doesn't show (a name added), so
+                // `refresh()`'s check on the people can't see every change that moves them.
+                if newTab == .review { model.refreshDuplicateCandidates() }
             }
             // Mirror the resolved artifact selection down for the menu bar (F6). Key
             // off `selectedArtifact` (not the raw id) so deleting the selection clears
@@ -402,16 +413,20 @@ private struct OpenArchiveView: View {
             // Auto-select a freshly-created artifact / person (slice 29 + its People
             // analog): the model publishes a one-shot intent; move the scene-stored
             // selection there and clear it.
+            // Revealed too: the switch to the area ran before the record existed, so a
+            // new row sorted off-screen would otherwise stay there.
             .onChange(of: model.lastCreatedArtifact) { _, created in
                 if let created {
                     selection = created
                     model.lastCreatedArtifact = nil
+                    if tab == .artifacts { revealRequest += 1 }
                 }
             }
             .onChange(of: model.lastCreatedPerson) { _, created in
                 if let created {
                     personSelection = created
                     model.lastCreatedPerson = nil
+                    if tab.section == .people { revealRequest += 1 }
                 }
             }
             // Cross-tab jump from a resolved-mention chip: switch to the People tab and
@@ -458,6 +473,7 @@ private struct OpenArchiveView: View {
         } detail: {
             detail
         }
+        .modifier(ReviewCommandHost(selection: $reviewSelection))
         // Drag-in ingest, from any area: the drop is a create, so like the File menu's
         // it switches to its own area first (slice 82, fork 2).
         .dropDestination(for: URL.self) { urls, _ in
@@ -473,7 +489,7 @@ private struct OpenArchiveView: View {
             get: {
                 SidebarSelection(
                     area: tab, artifact: selection, person: personSelection,
-                    review: reviewSelection)
+                    review: reviewSelection, peopleShowsTree: peopleShowsTree)
             },
             set: { new in
                 if new.area != tab { tab = new.area }
@@ -500,7 +516,6 @@ private struct OpenArchiveView: View {
             }
         case .review:
             reviewDetail
-                .modifier(ReviewCommandHost(selection: $reviewSelection))
         case .tree:
             // People as a tree: the people selection is its focus, so picking someone in
             // the sidebar refocuses it.

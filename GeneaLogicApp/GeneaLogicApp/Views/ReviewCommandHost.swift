@@ -3,12 +3,14 @@ import GeneaLogicMatch
 import GeneaLogicModel
 import SwiftUI
 
-/// What Review's commands need beyond any one pane, on the detail column (slice 83).
+/// What Review's commands need beyond any one pane, on the window's split view (slice 83;
+/// moved off Review's detail column in 84).
 ///
 /// **Here rather than on the panes,** because a command can name a row that isn't showing:
 /// a row's context menu doesn't select it, so a pane that owned This Is Somebody New…'s
-/// sheet would be another row's, and the request would be dropped. The detail column is
-/// there whichever pane is, and whether or not the sidebar is hidden.
+/// sheet would be another row's, and the request would be dropped. **And on every area**,
+/// because Review's rows are in the one sidebar on every area, and their context menus
+/// run from any of them.
 ///
 /// It also keeps the Review menu's mirror of the selection, and moves the selection on
 /// when the selected row leaves the worklist.
@@ -31,7 +33,6 @@ struct ReviewCommandHost: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onChange(of: selection, initial: true) { _, id in model.selectedReviewID = id }
-            .onDisappear { model.selectedReviewID = nil }
             // On any way out, not only ⌘↩: the same verb from a pane's button, a sheet or
             // a merge moves on the same, and a row that stays keeps the selection.
             // Only a row that was there and left moves it (`ReviewTarget.selection`).
@@ -49,9 +50,9 @@ struct ReviewCommandHost: ViewModifier {
                 perform(command, on: target)
             }
             // A suggestion row's Edit… or Apply…, which the facts pane draws. The People
-            // tab's own pane takes the same command there.
+            // tab's own pane takes the same command there, so this takes it only on Review.
             .onChange(of: model.pendingCommand) {
-                guard
+                guard model.activeTab == .review,
                     let (_, subject) = model.claimPendingCommand(where: { command, subject in
                         if command == .editSuggestedFact, case .factSuggestion = subject {
                             true

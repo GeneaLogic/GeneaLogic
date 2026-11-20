@@ -52,6 +52,24 @@ import Testing
         #expect(state.person == otherPerson)
     }
 
+    /// From another area, a person row returns to the view People was left in.
+    @Test func aPersonFromAnotherAreaReturnsToPeoplesView() {
+        var state = selection(on: .artifacts)
+        state.peopleShowsTree = true
+        state.select(.person(otherPerson))
+        #expect(state.area == .tree)
+
+        state.area = .review
+        state.peopleShowsTree = false
+        state.select(.person(person))
+        #expect(state.area == .people)
+
+        // On the list, a person stays on the list whatever People was before.
+        state.peopleShowsTree = true
+        state.select(.person(otherPerson))
+        #expect(state.area == .people)
+    }
+
     /// The list deselects when its row leaves it; the area keeps what it comes back to.
     @Test func aDeselectionIsIgnored() {
         for area in ArchiveTab.allCases {
@@ -157,7 +175,7 @@ import Testing
         return (model, root)
     }
 
-    private func rows(_ model: ArchiveModel, scanning: Bool = false) -> [ReviewSidebarRow] {
+    private func rows(_ model: ArchiveModel, scanning: Bool) -> [ReviewSidebarRow] {
         ReviewSidebarRow.rows(
             names: model.reviewItems, facts: model.factItems,
             relationships: model.relationshipItems, duplicates: model.duplicateItems,
@@ -174,8 +192,7 @@ import Testing
         #expect(!model.reviewItems.isEmpty)
         #expect(!model.factItems.isEmpty)
 
-        let rows = rows(model)
-        #expect(rows.map(\.id) == model.reviewRows.map(\.id))
+        let rows = model.reviewSidebarRows()
         #expect(rows.compactMap(\.target) == model.reviewRows)
 
         let lanes = rows.map(Self.lane)
@@ -208,4 +225,85 @@ import Testing
         case .scanningDuplicates, .duplicate: 3
         }
     }
+}
+
+/// A sidebar row's commands run from any area; the menu bar's stay scoped by area.
+@MainActor
+@Suite struct SidebarCommandTests {
+    private let artifact = ArtifactID("ART-a")
+    private let person = PersonID("PER-a")
+    private let reviewRow = ReviewTarget(id: "row", lane: .name(hasCandidates: true))
+
+    @Test(arguments: ArchiveTab.allCases)
+    func aRowsVerbRunsFromAnyArea(_ area: ArchiveTab) {
+        let context = CommandContext(hasArchive: true, activeTab: area, personCount: 2)
+        let rows: [(ArchiveCommand, CommandSubject)] = [
+            (.deleteArtifact, .artifact(artifact)), (.deletePerson, .person(person)),
+            (.mergePerson, .person(person)), (.showInTree, .person(person)),
+            (.acceptSuggestion, .review(reviewRow)), (.somebodyNew, .review(reviewRow)),
+            (.refreshReview, .archive),
+        ]
+        for (command, subject) in rows {
+            #expect(context.canPerform(command, on: subject, fromSidebar: true))
+            #expect(
+                context.canPerform(command, on: subject) == (command.tab == area),
+                "\(command) off the sidebar is scoped by area")
+        }
+    }
+
+    /// The rest of the rule still holds: a sheet up, or a merge with nobody to merge into.
+    @Test func fromTheSidebarIsOnlyTheArea() {
+        var context = CommandContext(hasArchive: true, activeTab: .review, personCount: 1)
+        #expect(!context.canPerform(.mergePerson, on: .person(person), fromSidebar: true))
+        context.personCount = 2
+        context.isPresentingModal = true
+        #expect(!context.canPerform(.deletePerson, on: .person(person), fromSidebar: true))
+    }
+
+    /// From another area the verb reaches the view that runs it.
+    @Test func aSidebarDeleteFromReviewIsLeftForTheSidebar() throws {
+        let (model, root) = try AppTestSupport.makeModel()
+        defer { AppTestSupport.remove(root) }
+        model.activeTab = .review
+
+        model.perform(.deleteArtifact, on: .artifact(artifact))
+        #expect(model.pendingCommand == nil)
+
+        model.perform(.deleteArtifact, on: .artifact(artifact), fromSidebar: true)
+        #expect(model.claimPendingCommand { $0 == .deleteArtifact } != nil)
+    }
+
+    /// The tree is People too, so a new person stays on it, as its new focus.
+    @Test func newPersonFromTheTreeStaysOnTheTree() throws {
+        let (model, root) = try AppTestSupport.makeModel()
+        defer { AppTestSupport.remove(root) }
+        model.activeTab = .tree
+        model.perform(.newPerson)
+        #expect(model.pendingTab == nil)
+        #expect(model.isCreatingPerson)
+
+        model.isCreatingPerson = false
+        model.activeTab = .review
+        model.perform(.newPerson)
+        #expect(model.pendingTab == .people)
+    }
+
+    /// Review's count shows on every area, so an edit to a person re-scans the duplicates.
+    /// An edit is not a create or a merge, which re-scanned before slice 84 too.
+    @Test func anEditToAPersonRescansTheDuplicates() async throws {
+        let (model, root) = try AppTestSupport.makeModel()
+        defer { AppTestSupport.remove(root) }
+        await model.act { model.createPerson(given: "Ann", surname: "Roe") }
+        model.refreshDuplicateCandidates()
+        await model.duplicateScanTask?.value
+        let before = try #require(model.duplicateScanTask)
+        let id = try #require(model.persons.first?.uid)
+
+        await model.act {
+            model.updatePerson(of: id) { $0.facts.append(PersonFact(type: .birth, date: "1888")) }
+        }
+
+        // A new scan, which may already have finished with one person to compare.
+        #expect(model.duplicateScanTask != before)
+}
 }

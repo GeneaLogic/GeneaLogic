@@ -68,6 +68,9 @@ struct SidebarSelection: Equatable {
     var artifact: ArtifactID?
     var person: PersonID?
     var review: ReviewItem.ID?
+    /// Whether People was last shown as a tree, so coming back to it through a person
+    /// row brings back the view it was left in.
+    var peopleShowsTree = false
 
     /// The row the list shows selected: the current area's selection.
     var item: SidebarItem? {
@@ -79,7 +82,8 @@ struct SidebarSelection: Equatable {
     }
 
     /// Selects `item`, moving the area to its section. A person keeps People's view:
-    /// picking someone while the tree shows refocuses the tree rather than leaving it.
+    /// picking someone while the tree shows refocuses the tree rather than leaving it, and
+    /// from another area returns to whichever view People was left in.
     ///
     /// **A deselection is ignored**, not applied. The list deselects when its selected
     /// row leaves it (a search filters it out, Review hides while searching), and the
@@ -95,7 +99,7 @@ struct SidebarSelection: Equatable {
             area = .artifacts
             artifact = id
         case .person(let id):
-            if area != .tree { area = .people }
+            if area.section != .people { area = peopleShowsTree ? .tree : .people }
             person = id
         case nil:
             break
@@ -153,8 +157,8 @@ enum SidebarCount {
 }
 
 /// One row of the sidebar's Review section. The lanes run one after another: names,
-/// facts, relationships, then duplicates, the order of `ArchiveModel.reviewRows` (the
-/// order Review's keys walk).
+/// facts, relationships, then duplicates. **`rows` is the one definition of that order**:
+/// `ArchiveModel.reviewRows`, which Review's keys walk, is drawn from it.
 enum ReviewSidebarRow: Identifiable {
     case name(ReviewItem)
     case fact(FactReviewItem)

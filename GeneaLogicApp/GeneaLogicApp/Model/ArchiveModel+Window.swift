@@ -71,20 +71,25 @@ extension ArchiveModel {
         return context
     }
 
-    /// Whether `command` can run on `subject` now (`CommandContext.canPerform`).
-    func canPerform(_ command: ArchiveCommand, on subject: CommandSubject) -> Bool {
+    /// Whether `command` can run on `subject` now (`CommandContext.canPerform`), from any
+    /// area if `fromSidebar`.
+    func canPerform(
+        _ command: ArchiveCommand, on subject: CommandSubject, fromSidebar: Bool = false
+    ) -> Bool {
         commandContext(for: command, resolvingSelection: subject.kind != .review)
-            .canPerform(command, on: subject)
+            .canPerform(command, on: subject, fromSidebar: fromSidebar)
     }
 
     /// Whether a surface inside the window can offer `command` on `subject`: the same rule,
     /// without the sheet, which can't be clicked through and would only flicker the window
     /// behind it.
-    func canOffer(_ command: ArchiveCommand, on subject: CommandSubject) -> Bool {
+    func canOffer(
+        _ command: ArchiveCommand, on subject: CommandSubject, fromSidebar: Bool = false
+    ) -> Bool {
         commandContext(
             for: command, resolvingSelection: subject.kind != .review, readingModal: false
         )
-        .canPerform(command, on: subject)
+        .canPerform(command, on: subject, fromSidebar: fromSidebar)
     }
 
     /// Whether a sheet, dialog, alert or panel is up in this window: the ones this model
@@ -97,14 +102,18 @@ extension ArchiveModel {
     /// Runs `command` on `subject`, if it can run now. Commands the model can run itself
     /// run here; one that opens a sheet a view owns is left for that view as
     /// `pendingCommand`.
-    func perform(_ command: ArchiveCommand, on subject: CommandSubject = .archive) {
-        guard canPerform(command, on: subject) else { return }
+    func perform(
+        _ command: ArchiveCommand, on subject: CommandSubject = .archive, fromSidebar: Bool = false
+    ) {
+        guard canPerform(command, on: subject, fromSidebar: fromSidebar) else { return }
         switch command {
         case .addArtifact:
             pendingTab = .artifacts
             beginAddMedia()
         case .newPerson:
-            pendingTab = .people
+            // To People, unless it is already showing: the tree is People too, and the
+            // new person becomes its focus there (slice 84).
+            if activeTab.section != .people { pendingTab = .people }
             isCreatingPerson = true
         case .verifyIntegrity: beginVerifyIntegrity()
         case .showTrash: beginShowTrash()

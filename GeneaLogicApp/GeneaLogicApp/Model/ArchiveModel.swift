@@ -539,7 +539,13 @@ final class ArchiveModel {
         let available = Set(artifacts.flatMap { $0.tags.map { $0.lowercased() } })
         selectedTags.formIntersection(available)
         if isFiltering { applyFilters() }
+        let personsBefore = persons
         reloadPersons()
+        // A person renamed, re-dated or given facts scores differently against everyone,
+        // and Review's count shows on every area (slice 84), so the duplicates lane
+        // re-scans when the people change. Off the main actor, and a newer scan cancels
+        // an older, so a run of edits costs one sweep's wait.
+        if persons != personsBefore { refreshDuplicateCandidatesIfShown() }
         // Cheap enough to ride every refresh, which is what makes damage arriving
         // from another writer (51's poll goes through here) visible without the
         // user thinking to run anything (slice 56).
@@ -547,9 +553,9 @@ final class ArchiveModel {
         // 57's half of the same idea, and the one that catches damage nothing has
         // recorded yet. Off the main actor, so it does not ride this call's cost.
         reloadFileDamage()
-        // After the people list, which the worklist's candidate names read. Only once the
-        // Review section has actually been opened — a window that never visits it never
-        // pays for a match sweep (see `refreshReviewWorklist`).
+        // After the people list, which the worklist's candidate names read. Every window
+        // loads the worklist at open since slice 84, for Review's count in the sidebar, so
+        // every mutation pays this sweep (see `refreshReviewWorklist`).
         if hasLoadedReviewWorklist { refreshReviewWorklist() }
     }
 

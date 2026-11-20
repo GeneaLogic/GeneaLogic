@@ -585,11 +585,18 @@ struct CommandContext: Equatable {
     }
 
     /// Whether `command` can run on `subject` right now. The one rule every surface asks.
-    func canPerform(_ command: ArchiveCommand, on subject: CommandSubject) -> Bool {
+    ///
+    /// `fromSidebar` is for a command on a sidebar row (its context menu, ⌫, a header's
+    /// button), which runs from any area (slice 84). The area check is the menu bar's: it
+    /// keeps a verb off a stale selection while another area shows. A sidebar row names
+    /// its own subject, and the sidebar shows every section's rows on every area.
+    func canPerform(
+        _ command: ArchiveCommand, on subject: CommandSubject, fromSidebar: Bool = false
+    ) -> Bool {
         guard hasArchive, !isPresentingModal, subject.kind == command.subjectKind else {
             return false
         }
-        if let tab = command.tab, tab != activeTab { return false }
+        if !fromSidebar, let tab = command.tab, tab != activeTab { return false }
         switch command {
         // The inspector belongs to the artifact detail, which shows only with a selection.
         case .toggleInspector: return selectedArtifact != nil

@@ -63,9 +63,9 @@ extension ArchiveModel {
 
     /// Rebuilds the worklist from the archive.
     ///
-    /// Runs on entering the section, from its Refresh button, and — once it has been
-    /// loaded at all — from `refresh()`, so a decision, an undo, or an edit made in
-    /// another section is reflected. **A recompute cannot reorder the queue**, which is
+    /// Runs when the window opens (slice 84: Review's count is in the sidebar on every
+    /// area), from Refresh, and from `refresh()`, so a decision, an undo, or an edit made
+    /// in another section is reflected. **A recompute cannot reorder the queue**, which is
     /// what makes wiring it to every mutation safe rather than disorienting: the engine
     /// returns document order (artifact `uid`, then the record's own mention order), and a
     /// decision on one pair moves nothing else. Patching the list in place instead would
@@ -119,10 +119,19 @@ extension ArchiveModel {
 
     // MARK: - Review's commands (slice 83)
 
-    /// The worklist in the sidebar's order: names, facts, relationships, duplicates.
+    /// The worklist in the sidebar's order, the order Review's keys walk. Drawn from the
+    /// sidebar's rows, so the two orders are one (`ReviewSidebarRow.rows`).
     var reviewRows: [ReviewTarget] {
-        reviewItems.map(\.target) + factItems.map(\.target)
-            + relationshipItems.map(\.target) + duplicateItems.map(\.target)
+        reviewSidebarRows(showingScan: false).compactMap(\.target)
+    }
+
+    /// The sidebar's Review rows: every lane, and the duplicates scan's place while its
+    /// first run is under way if `showingScan`.
+    func reviewSidebarRows(showingScan: Bool = true) -> [ReviewSidebarRow] {
+        ReviewSidebarRow.rows(
+            names: reviewItems, facts: factItems, relationships: relationshipItems,
+            duplicates: duplicateItems,
+            isScanningDuplicates: showingScan && isScanningDuplicates)
     }
 
     /// The selected row, if it is still on the worklist. Looked up lane by lane rather
@@ -405,10 +414,10 @@ extension ArchiveModel {
     /// behind that lock, so the scan is simply a detached read whose result is applied back
     /// here; the lock still serializes it against any concurrent write.
     ///
-    /// **Not wired into `refresh()`**, unlike the other two lanes. A quadratic sweep on
-    /// every mutation is the cost this indirection exists to avoid, and unlike the names
-    /// lane the answer does not change under an ordinary edit — so it runs on entering the
-    /// section and from Refresh. What *does* invalidate it immediately is a decision on one
+    /// **Not run on every `refresh()`**, unlike the other lanes. A quadratic sweep on every
+    /// mutation is the cost this indirection exists to avoid, and unlike the names lane the
+    /// answer does not change under an ordinary edit — so it runs when the window opens, on
+    /// entering Review, from Refresh, and from `refresh()` only when the people changed. What *does* invalidate it immediately is a decision on one
     /// of its own rows, and those drop the row locally rather than re-scanning.
     /// Re-scans **only if the lane has been shown**, for a change that invalidates it
     /// structurally — a person ceasing to exist, which every merge and every delete does.

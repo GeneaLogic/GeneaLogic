@@ -45,17 +45,23 @@ struct CommandMenuItem: View {
 /// row it was opened on, not necessarily the selection (slice 82).
 ///
 /// `inPane` is for one inside the window's content, which isn't greyed while a sheet is
-/// up, for `CommandAffordance`'s reason (`canOffer`).
+/// up, for `CommandAffordance`'s reason (`canOffer`). `fromSidebar` is for one on a
+/// sidebar row, which runs from any area (`CommandContext.canPerform`).
 struct CommandButton: View {
     @Environment(ArchiveModel.self) private var model
     let command: ArchiveCommand
     let subject: CommandSubject
     var inPane = false
+    var fromSidebar = false
 
-    init(_ command: ArchiveCommand, on subject: CommandSubject, inPane: Bool = false) {
+    init(
+        _ command: ArchiveCommand, on subject: CommandSubject, inPane: Bool = false,
+        fromSidebar: Bool = false
+    ) {
         self.command = command
         self.subject = subject
         self.inPane = inPane
+        self.fromSidebar = fromSidebar
     }
 
     var body: some View {
@@ -63,11 +69,12 @@ struct CommandButton: View {
             command.title(on: subject), systemImage: command.systemImage(on: subject),
             role: command.isDestructive ? .destructive : nil
         ) {
-            model.perform(command, on: subject)
+            model.perform(command, on: subject, fromSidebar: fromSidebar)
         }
         .disabled(
             !(inPane
-                ? model.canOffer(command, on: subject) : model.canPerform(command, on: subject)))
+                ? model.canOffer(command, on: subject, fromSidebar: fromSidebar)
+                : model.canPerform(command, on: subject, fromSidebar: fromSidebar)))
     }
 }
 

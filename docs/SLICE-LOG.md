@@ -4422,7 +4422,11 @@ been two slices.
   keeps the Refresh its strip had. **Gotchas:** the list deselects when its row leaves it
   (a search, Review hiding), so a deselection is ignored rather than losing the area's
   selection. Review's count would grow after the first visit, so the duplicates scan runs
-  at open and the count carries an ellipsis until it lands.
+  at open, carries an ellipsis until it lands, and re-runs when the people change.
+  **`/code-review`:** every section's rows show on every area, but the area check dimmed
+  their verbs off their own area. That check is the menu bar's, against a stale
+  selection; a sidebar row names its subject, so its verbs pass `fromSidebar` and run
+  anywhere, and `ReviewCommandHost` moved off Review's detail to run them.
 
 ## Carryovers and parked work
 

@@ -13,13 +13,16 @@ struct ReviewRowMenu: View {
     let target: ReviewTarget
 
     var body: some View {
+        // A sidebar row, so from any area (slice 84).
         let groups = ReviewTarget.rowMenu.map {
-            $0.filter { model.canOffer($0, on: .review(target)) }
+            $0.filter { model.canOffer($0, on: .review(target), fromSidebar: true) }
         }
         .filter { !$0.isEmpty }
         ForEach(groups.indices, id: \.self) { index in
             if index > 0 { Divider() }
-            ForEach(groups[index], id: \.self) { CommandButton($0, on: .review(target)) }
+            ForEach(groups[index], id: \.self) {
+                CommandButton($0, on: .review(target), fromSidebar: true)
+            }
         }
     }
 }

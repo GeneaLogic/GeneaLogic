@@ -35,9 +35,13 @@ struct ArchiveSidebar: View {
     @State private var uncataloguedOnly = false
 
     var body: some View {
+        // Filtered once per draw: the rows, the header's count, the Filter menu and the
+        // reveal all read the same answer.
+        let artifacts = ShownArtifacts(
+            displayed: model.displayedArtifacts, uncataloguedOnly: uncataloguedOnly)
         ScrollViewReader { proxy in
-            list
-                .onChange(of: revealRequest) { reveal(proxy) }
+            list(artifacts)
+                .onChange(of: revealRequest) { reveal(proxy, artifacts: artifacts) }
                 // Review's keys move the selection down a list the pointer isn't on, and
                 // `List` doesn't follow a selection set from outside.
                 .onChange(of: selection.review) { _, id in
@@ -49,12 +53,12 @@ struct ArchiveSidebar: View {
         // menu stops offering the toggle, which is the only way to turn it off — so the
         // state itself is reset. Left set, it would silently re-collapse the list on the
         // next import, with nothing on screen saying why.
-        .onChange(of: uncataloguedCount) { _, remaining in
+        .onChange(of: artifacts.uncataloguedCount) { _, remaining in
             if remaining == 0 { uncataloguedOnly = false }
         }
     }
 
-    private var list: some View {
+    private func list(_ artifacts: ShownArtifacts) -> some View {
         List(selection: listSelection) {
             if !isSearching {
                 Section(isExpanded: $reviewExpanded) {
@@ -62,7 +66,7 @@ struct ArchiveSidebar: View {
                 } header: {
                     header(.review, count: reviewCount) {
                         Button {
-                            model.perform(.refreshReview)
+                            model.perform(.refreshReview, fromSidebar: true)
                         } label: {
                             Image(systemName: ArchiveCommand.refreshReview.systemImage)
                         }
@@ -73,17 +77,17 @@ struct ArchiveSidebar: View {
                 }
             }
             Section(isExpanded: $artifactsExpanded) {
-                artifactRows
+                artifactRows(artifacts)
             } header: {
                 header(
                     .artifacts,
                     count: SidebarCount.text(
-                        shown: visibleArtifacts.count, of: model.artifacts.count)
+                        shown: artifacts.visible.count, of: model.artifacts.count)
                 ) {
                     if !model.artifacts.isEmpty {
                         ArtifactFilterMenu(
                             uncataloguedOnly: $uncataloguedOnly,
-                            uncataloguedCount: uncataloguedCount)
+                            uncataloguedCount: artifacts.uncataloguedCount)
                         SortMenu()
                     }
                 }
@@ -103,11 +107,14 @@ struct ArchiveSidebar: View {
         // leading column it becomes a toolbar field (seen in 84's prototype).
         .searchable(text: searchText, placement: .sidebar, prompt: "Search")
         .searchFocused(isSearchFocused)
-        // ⌫ raises the same confirm as the context menu, not a silent delete.
+        // ⌫ raises the same confirm as the context menu, not a silent delete. On the
+        // selected row, so from the tree too.
         .onDeleteCommand {
             switch selection.item {
-            case .artifact(let id): model.perform(.deleteArtifact, on: .artifact(id))
-            case .person(let id): model.perform(.deletePerson, on: .person(id))
+            case .artifact(let id):
+                model.perform(.deleteArtifact, on: .artifact(id), fromSidebar: true)
+            case .person(let id):
+                model.perform(.deletePerson, on: .person(id), fromSidebar: true)
             case .review, nil: break
             }
         }
@@ -138,20 +145,13 @@ struct ArchiveSidebar: View {
 
     // MARK: - Review
 
-    private var reviewItems: [ReviewSidebarRow] {
-        ReviewSidebarRow.rows(
-            names: model.reviewItems, facts: model.factItems,
-            relationships: model.relationshipItems, duplicates: model.duplicateItems,
-            isScanningDuplicates: model.isScanningDuplicates)
-    }
-
     private var reviewCount: String {
         SidebarCount.review(model.reviewRows.count, isScanning: model.isScanningDuplicates)
     }
 
     @ViewBuilder
     private var reviewRows: some View {
-        let rows = reviewItems
+        let rows = model.reviewSidebarRows()
         if rows.isEmpty {
             emptyRow("Nothing to review")
         }
@@ -170,25 +170,11 @@ struct ArchiveSidebar: View {
 
     // MARK: - Artifacts
 
-    /// The artifacts with no `sourceAuthorityTier` — uncatalogued, not broken — among the
-    /// search's results, so the count is the debt within what the list is showing.
-    private var uncataloguedCount: Int {
-        model.displayedArtifacts.filter { $0.sourceAuthorityTier == nil }.count
-    }
-
-    /// The guard is the same-frame half of releasing the filter: `onChange` resets the
-    /// state after this render, and without it the list would flash empty as the count
-    /// crossed zero.
-    private var visibleArtifacts: [ArtifactSummary] {
-        guard uncataloguedOnly, uncataloguedCount > 0 else { return model.displayedArtifacts }
-        return model.displayedArtifacts.filter { $0.sourceAuthorityTier == nil }
-    }
-
     private var isFilteringArtifacts: Bool { model.isFiltering || uncataloguedOnly }
 
     @ViewBuilder
-    private var artifactRows: some View {
-        let artifacts = visibleArtifacts
+    private func artifactRows(_ shown: ShownArtifacts) -> some View {
+        let artifacts = shown.visible
         // A damaged record is not a search result — it has no title to match on, so it
         // can neither match nor fail to match — and a filter that finds nothing must
         // still say so (review finding, 56). The banner still reports them meanwhile.
@@ -208,7 +194,7 @@ struct ArchiveSidebar: View {
                 .tag(SidebarItem.artifact(artifact.uid))
                 .id(SidebarRowID.item(.artifact(artifact.uid)))
                 .contextMenu {
-                    CommandButton(.deleteArtifact, on: .artifact(artifact.uid))
+                    CommandButton(.deleteArtifact, on: .artifact(artifact.uid), fromSidebar: true)
                 }
         }
     }
@@ -233,9 +219,9 @@ struct ArchiveSidebar: View {
                 .tag(SidebarItem.person(person.uid))
                 .id(SidebarRowID.item(.person(person.uid)))
                 .contextMenu {
-                    CommandButton(.showInTree, on: .person(person.uid))
-                    CommandButton(.mergePerson, on: .person(person.uid))
-                    CommandButton(.deletePerson, on: .person(person.uid))
+                    CommandButton(.showInTree, on: .person(person.uid), fromSidebar: true)
+                    CommandButton(.mergePerson, on: .person(person.uid), fromSidebar: true)
+                    CommandButton(.deletePerson, on: .person(person.uid), fromSidebar: true)
                 }
         }
     }
@@ -292,18 +278,18 @@ struct ArchiveSidebar: View {
         return sections
     }
 
-    private func isListed(_ item: SidebarItem) -> Bool {
+    private func isListed(_ item: SidebarItem, artifacts: ShownArtifacts) -> Bool {
         switch item {
         case .review(let id): model.reviewRows.contains { $0.id == id }
-        case .artifact(let id): visibleArtifacts.contains { $0.uid == id }
+        case .artifact(let id): artifacts.visible.contains { $0.uid == id }
         case .person(let id): model.displayedPersons.contains { $0.uid == id }
         }
     }
 
-    private func reveal(_ proxy: ScrollViewProxy) {
+    private func reveal(_ proxy: ScrollViewProxy, artifacts: ShownArtifacts) {
         let reveal = SidebarReveal(
-            for: selection, collapsed: collapsed, hidden: isSearching ? [.review] : [],
-            isListed: isListed)
+            for: selection, collapsed: collapsed, hidden: isSearching ? [.review] : []
+        ) { isListed($0, artifacts: artifacts) }
         switch reveal.expand {
         case .review: reviewExpanded = true
         case .artifacts: artifactsExpanded = true
@@ -315,5 +301,23 @@ struct ArchiveSidebar: View {
         // estimated heights, so a single animated scroll lands short (84's prototype).
         if reveal.expand == nil { proxy.scrollTo(target, anchor: .top) }
         Task { @MainActor in proxy.scrollTo(target, anchor: .top) }
+    }
+}
+
+/// The Artifacts section's rows after the uncatalogued filter, worked out once per draw.
+private struct ShownArtifacts {
+    /// The rows the section shows.
+    let visible: [ArtifactSummary]
+    /// The artifacts with no `sourceAuthorityTier` — uncatalogued, not broken — among the
+    /// search's results, so the count is the debt within what the list is showing.
+    let uncataloguedCount: Int
+
+    /// The `uncataloguedCount > 0` guard is the same-frame half of releasing the filter:
+    /// `onChange` resets the state after this render, and without it the list would
+    /// flash empty as the count crossed zero.
+    init(displayed: [ArtifactSummary], uncataloguedOnly: Bool) {
+        let uncatalogued = displayed.filter { $0.sourceAuthorityTier == nil }
+        uncataloguedCount = uncatalogued.count
+        visible = uncataloguedOnly && !uncatalogued.isEmpty ? uncatalogued : displayed
     }
 }
