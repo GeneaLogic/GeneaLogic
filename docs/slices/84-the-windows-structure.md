@@ -83,7 +83,7 @@ Over the sample and a 309-artifact, 412-person archive:
 1. **A, B, or neither. Agreed: B** (2026-11-19).
 2. **Tree: a People view, or an area of its own.**
 3. **Review's items in the sidebar.** The HIG's two levels rule out Review ▸ lane ▸
-   artifact ▸ name. **Recommended: one Review section**, its rows lane by lane with the
+   artifact ▸ name. **Agreed: one Review section** (2026-11-19), its rows lane by lane with the
    lane's icon, a name's artifact as its subtitle. *Alternative:* a section per lane.
    Either way the duplicates scan runs before Review is visited, or isn't counted.
 4. **Icons.** Section headers stay plain text, as in Finder and Mail. **Recommended:**
