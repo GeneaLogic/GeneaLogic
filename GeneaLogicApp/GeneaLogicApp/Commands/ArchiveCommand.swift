@@ -594,8 +594,7 @@ struct CommandContext: Equatable {
         // The inspector belongs to the artifact detail, which shows only with a selection.
         case .toggleInspector: return selectedArtifact != nil
         case .mergePerson: return personCount > 1
-        // The two tabs with a search field.
-        case .find: return activeTab == .artifacts || activeTab == .people
+        // The one sidebar's field is there from every area (slice 84).
         case .acceptSuggestion:
             return !isDecidingReview && subject.reviewLane?.canAccept == true
         case .declineSuggestion:

@@ -211,16 +211,15 @@ struct ArchiveContainerView: View {
     }
 }
 
-/// The open-archive window: **Artifacts / People / Tree / Review** over the one shared
-/// per-window `ArchiveModel` (Phase 3). The section switcher is a **segmented
-/// control in the toolbar** (Calendar-style), *not* a window-level `TabView` — a
-/// top `TabView` renders its tab bar in the title-bar region and displaces the
-/// `NavigationSplitView`'s title, sidebar toggle, and search field, and nesting a
-/// split view inside a `.sidebarAdaptable` `TabView` is layout-fragile (double
-/// sidebar). So Artifacts/People/Review share **one** `NavigationSplitView` whose sidebar
-/// and detail switch by `tab` (stable column state across the switch), and Tree is
-/// a full-width `NavigationStack` (it has no list). The active tab is mirrored to
-/// the model so the menu bar scopes its artifact commands to the Artifacts tab.
+/// The open-archive window: **one `NavigationSplitView`, sidebar | item, on every area**
+/// (slice 84). The sidebar's sections are Review, Artifacts and People
+/// (`ArchiveSidebar`); the area is where the selection is, and the detail shows that
+/// area's item. Tree is a view of People, switched by a List | Tree control in the
+/// toolbar, the tree taking the detail and the people selection its focus.
+///
+/// Not a window-level `TabView` (slice 41): a top `TabView` displaces the split view's
+/// title, sidebar toggle and search field. The area is mirrored to the model so the
+/// menu bar scopes its commands by area.
 private struct OpenArchiveView: View {
     @Environment(ArchiveModel.self) private var model
     @Binding var selection: ArtifactID?
@@ -241,6 +240,9 @@ private struct OpenArchiveView: View {
     /// there, so it comes back on the next open. The pinned placeholder rows
     /// stay regardless, which is what makes dismissing it safe at all.
     @State private var isDamageBannerDismissed = false
+    /// Bumped for each switch of area the sidebar didn't make (⌘1–⌘4, a jump), so it
+    /// brings the area's selection into view. A click in the sidebar needs no reveal.
+    @State private var revealRequest = 0
 
     var body: some View {
         @Bindable var model = model
@@ -307,19 +309,23 @@ private struct OpenArchiveView: View {
                 isDamageBannerDismissed = false
             }
             .toolbar {
-                // The section switcher, centered in the toolbar — reads like a tab
-                // bar but leaves the title bar's title/toggle/search intact.
-                ToolbarItem(placement: .principal) {
-                    Picker("View", selection: $tab) {
-                        ForEach(ArchiveTab.allCases) { section in
-                            Text(section.label).tag(section)
+                // No area switcher (slice 84): the sidebar is the areas. People's two
+                // views are one control, shown only on People.
+                if tab.section == .people {
+                    ToolbarItem(placement: .principal) {
+                        Picker("People View", selection: $tab) {
+                            Label("List", systemImage: "list.bullet").tag(ArchiveTab.people)
+                            Label("Tree", systemImage: ArchiveTab.tree.systemImage)
+                                .tag(ArchiveTab.tree)
                         }
+                        .pickerStyle(.segmented)
+                        .labelStyle(.titleAndIcon)
+                        .help("Show the people as a list or as a tree")
                     }
-                    .pickerStyle(.segmented)
                 }
-                // The per-section add button (Artifacts: Add/scan menu; People: New
-                // Person). Tree and Review have nothing to add here.
-                if tab == .artifacts || tab == .people {
+                // The area's add button (Artifacts: Add/scan menu; People: New Person).
+                // Review has nothing to add here.
+                if tab != .review {
                     ToolbarItem { addButton }
                 }
             }
@@ -343,10 +349,12 @@ private struct OpenArchiveView: View {
                 // the Artifacts tab), so the Artifact menu is correctly enabled.
                 model.selectedArtifact = tab == .artifacts ? selectedArtifact?.uid : nil
                 model.selectedPerson = tab == .people ? selectedPerson?.uid : nil
-                if tab == .review {
-                    model.refreshReviewWorklist()
-                    model.refreshDuplicateCandidates()
-                }
+                // Review's section is always in the sidebar, so its count is owed from
+                // the start (slice 84): the worklist now, and the duplicates scan in the
+                // background, the header showing an ellipsis until it lands. From here
+                // `refresh()` keeps the worklist current, and a merge or delete re-scans.
+                model.refreshReviewWorklist()
+                model.refreshDuplicateCandidates()
             }
             .onChange(of: tab) { _, newTab in
                 model.activeTab = newTab
@@ -355,16 +363,6 @@ private struct OpenArchiveView: View {
                 model.selectedArtifact = newTab == .artifacts ? selectedArtifact?.uid : nil
                 model.selectedPerson = newTab == .people ? selectedPerson?.uid : nil
                 model.selectedFile = nil
-                // Re-run the matcher on entering Review. Suggestions are computed, never
-                // stored, so this is what keeps the queue honest after work done in
-                // another section — and a window that never opens Review never pays for a
-                // sweep at all. The duplicates lane is scanned here too rather than from
-                // `refresh()`: it is quadratic, and unlike the names lane its answer does
-                // not change under an ordinary edit (see `refreshDuplicateCandidates`).
-                if newTab == .review {
-                    model.refreshReviewWorklist()
-                    model.refreshDuplicateCandidates()
-                }
             }
             // Mirror the resolved artifact selection down for the menu bar (F6). Key
             // off `selectedArtifact` (not the raw id) so deleting the selection clears
@@ -398,6 +396,7 @@ private struct OpenArchiveView: View {
                 if let target {
                     tab = target
                     model.pendingTab = nil
+                    revealRequest += 1
                 }
             }
             // Auto-select a freshly-created artifact / person (slice 29 + its People
@@ -423,6 +422,7 @@ private struct OpenArchiveView: View {
                     tab = .people
                     personSelection = target
                     model.pendingPersonNavigation = nil
+                    revealRequest += 1
                 }
             }
             // Show in Tree and Focus Here (slice 83). The focus is the person selection.
@@ -431,6 +431,7 @@ private struct OpenArchiveView: View {
                     tab = .tree
                     personSelection = target
                     model.pendingTreeFocus = nil
+                    revealRequest += 1
                 }
             }
             // The mirror jump: a person Sources row → switch to the Artifacts tab and
@@ -440,81 +441,46 @@ private struct OpenArchiveView: View {
                     tab = .artifacts
                     selection = target
                     model.pendingArtifactNavigation = nil
+                    revealRequest += 1
                 }
             }
     }
 
-    /// Artifacts/People share one `NavigationSplitView`, so switching *between them* is
-    /// a content swap (not a view-identity change) and the sidebar column width
-    /// persists. Tree is a sidebar-less full-width `NavigationStack`, so a round-trip
-    /// through Tree does cross the `if`/`else` identity boundary and re-creates the
-    /// split view (resetting the column width) — an accepted trade for giving the tree
-    /// the full width; the selection itself lives in `@SceneStorage`, so nothing is lost.
-    @ViewBuilder
     private var content: some View {
-        if tab == .tree {
-            NavigationStack { TreeTab(focus: $personSelection) }
-        } else {
-            NavigationSplitView(columnVisibility: $columnVisibility) {
-                // The column width is the same for both sections, so set it once here
-                // rather than per branch inside `sidebar`.
-                sidebar
-                    .navigationSplitViewColumnWidth(min: 220, ideal: 280)
-            } detail: {
-                detail
-            }
-            // Drag-in ingest is an Artifacts action; a drop on the People sidebar is a
-            // no-op (nothing to ingest a person from a file).
-            .dropDestination(for: URL.self) { urls, _ in
-                guard tab == .artifacts else { return false }
-                model.ingest(urls)
-                return true
-            }
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            ArchiveSidebar(
+                selection: sidebarSelection, revealRequest: revealRequest,
+                isSearchFocused: $isSearchFocused
+            )
+            .navigationSplitViewColumnWidth(
+                min: Layout.ArchiveWindow.sidebarMinWidth,
+                ideal: Layout.ArchiveWindow.sidebarIdealWidth)
+        } detail: {
+            detail
+        }
+        // Drag-in ingest, from any area: the drop is a create, so like the File menu's
+        // it switches to its own area first (slice 82, fork 2).
+        .dropDestination(for: URL.self) { urls, _ in
+            if tab != .artifacts { tab = .artifacts }
+            model.ingest(urls)
+            return true
         }
     }
 
-    @ViewBuilder
-    private var sidebar: some View {
-        @Bindable var model = model
-        switch tab {
-        case .artifacts:
-            ArtifactListView(
-                artifacts: model.displayedArtifacts, selection: $selection,
-                isFiltering: model.isFiltering,
-                onDelete: { model.deleteArtifact($0) }
-            )
-            .searchable(text: $model.searchText, placement: .sidebar, prompt: "Search artifacts")
-            .searchFocused($isSearchFocused)
-            // Re-query through the engine on each keystroke (title + inline transcript
-            // + notes), AND-combined with the tag filter; empty → the full list.
-            .onChange(of: model.searchText) { model.applyFilters() }
-            // The list-scoping cluster (Filter + Sort), pinned under the search field
-            // (UI audit F7/F14). Hidden when the archive is empty so the empty-state
-            // stands alone; kept when a filter yields nothing so it can be cleared.
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if !model.artifacts.isEmpty {
-                    ListControlsBar()
-                }
-            }
-        case .people:
-            PersonListView(
-                persons: model.displayedPersons, selection: $personSelection,
-                isFiltering: model.isFilteringPeople,
-                onDelete: { model.deletePerson($0) }
-            )
-            .searchable(text: $model.personSearchText, placement: .sidebar, prompt: "Search people")
-            .searchFocused($isSearchFocused)
-            .onChange(of: model.personSearchText) { model.applyPersonFilter() }
-        case .review:
-            // Deliberately not `.searchable`: the worklist is the archive's whole backlog
-            // of unresolved names, and it is short by construction — every row on it is
-            // work owed. Filtering a to-do list mainly hides items from the person
-            // responsible for them.
-            ReviewListView(selection: $reviewSelection)
-        case .tree:
-            // Tree is handled by `content` as a full-width pane; never reached.
-            EmptyView()
-        }
+    /// The area and its three selections as the sidebar's one value.
+    private var sidebarSelection: Binding<SidebarSelection> {
+        Binding(
+            get: {
+                SidebarSelection(
+                    area: tab, artifact: selection, person: personSelection,
+                    review: reviewSelection)
+            },
+            set: { new in
+                if new.area != tab { tab = new.area }
+                if new.artifact != selection { selection = new.artifact }
+                if new.person != personSelection { personSelection = new.person }
+                if new.review != reviewSelection { reviewSelection = new.review }
+            })
     }
 
     @ViewBuilder
@@ -536,9 +502,9 @@ private struct OpenArchiveView: View {
             reviewDetail
                 .modifier(ReviewCommandHost(selection: $reviewSelection))
         case .tree:
-            // Tree is a full-width pane handled by `content`, not a split-view detail;
-            // never reached (present only to keep the `switch` exhaustive).
-            EmptyView()
+            // People as a tree: the people selection is its focus, so picking someone in
+            // the sidebar refocuses it.
+            TreeTab(focus: $personSelection)
         }
     }
 
@@ -577,9 +543,9 @@ private struct OpenArchiveView: View {
             // the AppKit receiver — a plain SwiftUI `Menu` can't host the auto-inserted
             // scan items, so this button pops that menu.
             CommandToolbarButton(command: .addArtifact) { model.beginAddOrScan() }
-        case .people:
+        case .people, .tree:
             CommandToolbarButton(command: .newPerson)
-        case .tree, .review:
+        case .review:
             // Nothing is *added* in Review — every row is a mention that already exists,
             // and the only thing it can mint (a person) belongs to the row's own
             // somebody-new action, where the below-threshold check sits.

@@ -54,12 +54,13 @@ import Testing
         let reviewVerbs: Set<ArchiveCommand> = [
             .acceptSuggestion, .declineSuggestion, .somebodyNew, .refreshReview,
         ]
-        let everywhere = Self.creates.union(Self.tabs)
+        // Find is everywhere since slice 84: the one sidebar's field is there on every area.
+        let everywhere = Self.creates.union(Self.tabs).union([.find])
 
         #expect(
             available(in: context(on: .artifacts))
-                == everywhere.union(artifactVerbs).union([.toggleInspector, .find]))
-        #expect(available(in: context(on: .people)) == everywhere.union(personVerbs).union([.find]))
+                == everywhere.union(artifactVerbs).union([.toggleInspector]))
+        #expect(available(in: context(on: .people)) == everywhere.union(personVerbs))
         #expect(available(in: context(on: .tree)) == everywhere.union(treeVerbs))
         #expect(available(in: context(on: .review)) == everywhere.union(reviewVerbs))
     }

@@ -4409,6 +4409,21 @@ been two slices.
   where there's nothing to decide. The HIG keeps a menu's *set* of items stable and asks a
   title to clarify its target; fork 4 had read the first as fixed wording.
 
+- **84 — the window's structure** (app only; no format change; #39). G4, re-scoped: the
+  switcher moved because the area was a toolbar control over a sidebar holding its
+  collection. **Decided** (prototype on `spike-84`): one sidebar of Review, Artifacts and
+  People, two columns on every area; Tree a List | Tree view of People; Review one section,
+  lane by lane, hidden while searching; Filter and Sort in the Artifacts header.
+  **The invariant:** the area is where the selection is. `SidebarSelection` maps the
+  list's one selection to the area and that area's own, and a switch the sidebar didn't
+  make (⌘1–⌘4, a jump) reveals the area's selection, else its header. **Judgment calls:**
+  Find is on every area, since the field is (the one availability test that changed);
+  a drop ingests from any area, switching to Artifacts as a create does; Review's header
+  keeps the Refresh its strip had. **Gotchas:** the list deselects when its row leaves it
+  (a search, Review hiding), so a deselection is ignored rather than losing the area's
+  selection. Review's count would grow after the first visit, so the duplicates scan runs
+  at open and the count carries an ellipsis until it lands.
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the
