@@ -50,15 +50,28 @@ One `NavigationSplitView`, two columns, on every area: **sidebar | item**.
 - **Tree is a view of People**: a List | Tree control in the toolbar on People, the tree
   taking the detail, the people selection its focus. ⌘3 opens People as a tree. Tree's
   focus popover and Choose Focus… stay.
-- **One search field** filters Artifacts and People. Review is not filtered, for the
-  reason the worklist was never searchable: filtering work owed hides it. Edit ▸ Find
-  focuses it from any area.
+- **One search field** filters Artifacts and People. **Review's section hides while a
+  search is active**, so the results start at the top and nothing unfiltered sits among
+  them. Its rows aren't search results: the worklist was never searchable, because
+  filtering work owed hides it. Edit ▸ Find focuses the field from any area.
 - **The duplicates scan runs when the archive opens**, in the background, so Review's
   count is whole from the start; the header shows an ellipsis until it finishes.
 - **Collapsed sections are remembered per window**, like the selections. 85 decides
   where window state lives, and takes this with it.
 - **No area switcher in the toolbar.** The `+` button follows the area, and the
   inspector toggle stays at the trailing end on Artifacts.
+
+## From the spike
+
+`spike-84` (commits `e4d3340`…`9ac3c63`) has B working, roughly, in `Spike84.swift`.
+
+- **Scrolling to a row far down the sidebar lands short** when animated: rows below the
+  fold have estimated heights. Scroll unanimated, then again once the list has laid out.
+- **`.searchable(placement: .sidebar)` on a list that isn't the leading column** becomes a
+  toolbar field (seen in A). Keep it on the sidebar.
+- **A large archive to test with:** `genea sample`, then 300 `genea add` and 400
+  `genea person add` with made-up names. Open it with `open -a` on the built app: the
+  Open panel can't reach the scratchpad under `/private/tmp`.
 
 ## Design forks (agreed 2026-11-19)
 
@@ -95,7 +108,7 @@ One `NavigationSplitView`, two columns, on every area: **sidebar | item**.
   3. Search: Artifacts and People filter, Review doesn't, the counts say so; ⌘F.
   4. Filter and Sort from the Artifacts header; the uncatalogued filter.
   5. Review: decide by keyboard; the selection moves down the sidebar and stays in view.
-     The count is right before Review is first visited.
+     The count is right before Review is first visited. A search hides Review.
   6. List | Tree on People; refocus from a tree card and from the sidebar.
   7. Collapse a section, quit, relaunch.
   8. Delete, merge and the other row context menus; drag files onto the window.
