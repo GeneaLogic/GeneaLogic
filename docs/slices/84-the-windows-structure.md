@@ -60,13 +60,38 @@ the space; what happens at the minimum window width, with the inspector shown; h
 copes with hundreds of artifacts and people, its search, and where Artifacts' sort and
 filter go; and whether Tree as a People view loses anything.
 
-## Design forks (after the prototype)
+## What the prototype showed (2026-11-19)
 
-1. **A, B, or neither.**
+Over the sample and a 309-artifact, 412-person archive:
+
+- **A doesn't fit.** With an artifact and its inspector open, the document gets about
+  290 pt at the default 1100 pt width, and about 30 pt at the 800 pt minimum, where its
+  text wraps a letter per line. Its search field leaves the list for the toolbar, over
+  the inspector.
+- **B fits.** At 800 pt the document keeps about 160 pt, as today. One search filters
+  both sections ("15 of 309"), and a click on a header collapses its section.
+- **B's open problems.** Switching area by keyboard (⌘2) leaves the sidebar scrolled to
+  the artifacts, 300 rows above People. Artifacts' Filter and Sort have no place.
+  Review needs its own list column inside the detail.
+- **Tree as a People view** works in both: List | Tree holds still, and the tree takes
+  the detail.
+- **A Review count can't be trusted** while the duplicates scan only runs on entering
+  Review: the badge read 19, then 85.
+
+## Design forks
+
+1. **A, B, or neither. Agreed: B** (2026-11-19).
 2. **Tree: a People view, or an area of its own.**
-3. **What else the sidebar carries**: Trash (86's open question), counts, and in B,
+3. **Review's items in the sidebar.** The HIG's two levels rule out Review ▸ lane ▸
+   artifact ▸ name. **Recommended: one Review section**, its rows lane by lane with the
+   lane's icon, a name's artifact as its subtitle. *Alternative:* a section per lane.
+   Either way the duplicates scan runs before Review is visited, or isn't counted.
+4. **Icons.** Section headers stay plain text, as in Finder and Mail. **Recommended:**
+   icons on rows where they say something (an artifact's media type, a review item's
+   lane), none on people.
+5. **What else the sidebar carries**: Trash (86's open question), counts, and in B,
    whether sections remember being collapsed.
-4. **Order with 85 and 86**: 85's restored state includes the structure's, and 86's
+6. **Order with 85 and 86**: 85's restored state includes the structure's, and 86's
    trash may land in this sidebar.
 
 ## Out of scope
