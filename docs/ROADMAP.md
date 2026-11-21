@@ -152,8 +152,9 @@ Worked in this repo on slice branches as usual. The public repo starts from the 
 Every open issue now has a milestone, or is parked with the trigger that un-parks it. The
 ROADMAP's refactors and contributor-docs work were filed as issues. Two calls worth keeping:
 
-- **The trash is one slice in `0.2`:** [#2](https://github.com/GeneaLogic/GeneaLogic/issues/2) with [#10](https://github.com/GeneaLogic/GeneaLogic/issues/10) and [#11](https://github.com/GeneaLogic/GeneaLogic/issues/11), which are un-parked to be
-  decided beside it. Widening `TrashEntry.kind` is the format question it settles.
+- **The trash's format question is `0.3`'s:** [#10](https://github.com/GeneaLogic/GeneaLogic/issues/10) and [#11](https://github.com/GeneaLogic/GeneaLogic/issues/11), un-parked to be decided together.
+  Widening `TrashEntry.kind` is what they settle. [#2](https://github.com/GeneaLogic/GeneaLogic/issues/2) (a Trash button and auto-delete)
+  needs no format change and stays in `0.2`. *Re-triaged 2026-11-21; it was one `0.2` slice.*
 - **The gazetteer and the name-variant table became one `0.3` decision ([#23](https://github.com/GeneaLogic/GeneaLogic/issues/23))**, ahead of
   [#15](https://github.com/GeneaLogic/GeneaLogic/issues/15). The tables may live in the archive (a format change), and "nearby" may need a new
   match `kind` (a closed vocabulary). Both have to be settled before `1.0`, even if a real
@@ -215,7 +216,8 @@ matters. It absorbs the former Phase 5 (GEDCOM) and Phase 6's AI enrichment.
 and `genea` works in Terminal.*
 
 - **Scale before GEDCOM.** Import ([#75](https://github.com/GeneaLogic/GeneaLogic/issues/75)) is the first time persons arrive in thousands, so
-  the scale slice ([#74](https://github.com/GeneaLogic/GeneaLogic/issues/74)) goes first; export ([#76](https://github.com/GeneaLogic/GeneaLogic/issues/76)) follows import.
+  the scale slice ([#74](https://github.com/GeneaLogic/GeneaLogic/issues/74)) goes first; export ([#76](https://github.com/GeneaLogic/GeneaLogic/issues/76)) follows import. All three are `0.3`: marking
+  facts as imported may widen a closed vocabulary, and GEDCOM sources land on citations ([#7](https://github.com/GeneaLogic/GeneaLogic/issues/7)).
 - **`genea --json` ([#69](https://github.com/GeneaLogic/GeneaLogic/issues/69)) before `1.0`**, which makes it a stability surface. The agent skill
   ([#70](https://github.com/GeneaLogic/GeneaLogic/issues/70)) needs it and the CLI on the PATH ([#65](https://github.com/GeneaLogic/GeneaLogic/issues/65)).
 - **AI suggestions ([#72](https://github.com/GeneaLogic/GeneaLogic/issues/72)) settle their format question first**, as a `0.3` decision.
