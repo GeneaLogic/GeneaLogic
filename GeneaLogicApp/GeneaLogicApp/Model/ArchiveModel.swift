@@ -65,7 +65,7 @@ final class ArchiveModel {
     /// `ingest` to the last artifact it minted; the view observes it, moves the
     /// (scene-stored, view-owned) selection there, and clears it back to `nil`.
     /// Kept as an intent — not a direct selection write — because selection lives
-    /// in `@SceneStorage` in the container, which the model shouldn't touch.
+    /// in the window's state (`ArchiveWindowState`), which the model shouldn't touch.
     var lastCreatedArtifact: ArtifactID?
 
     /// Session cache of embedded metadata captured during ingest, keyed by the
@@ -291,13 +291,13 @@ final class ArchiveModel {
     // MARK: Window state (the macOS-shaped part; its methods are in `+Window`)
     //
     // The menu bar lives in `ArchiveCommands` (a `Commands`, not a view), so it
-    // can't see the window's view-owned selection (`@SceneStorage` in the
+    // can't see the window's view-owned selection (`ArchiveWindowState` in the
     // container / local `@State` in the detail view). These mirrors reflect that
     // selection **down** into the model purely so the File/Artifact/View menus can
     // enable and target their commands; the views remain the source of truth and
     // the model never writes selection back up. The paired one-shot intents let a
     // menu ask a view to run a verb it owns (a sheet, an export panel, the
-    // inspector's `@SceneStorage`); the view observes the intent, performs it, and
+    // inspector's visibility); the view observes the intent, performs it, and
     // clears it back to `nil`/`false` so picking the same command twice re-fires.
 
     /// The selected artifact, mirrored from the container's selection. Drives menu
@@ -326,10 +326,10 @@ final class ArchiveModel {
     var treeDepths = TreeDepths()
 
     /// Whether the detail inspector is currently shown, mirrored from the view's
-    /// `@SceneStorage`, so the View menu can label its toggle Show vs. Hide.
+    /// stored state, so the View menu can label its toggle Show vs. Hide.
     var inspectorVisible = true
 
-    /// The active window tab, mirrored from the container's `@SceneStorage`. Commands
+    /// The active window tab, mirrored from the window's stored state. Commands
     /// that belong to a tab gate on it (`CommandContext.canPerform`), so they don't act
     /// on a stale selection while another tab is showing.
     var activeTab: ArchiveTab = .artifacts

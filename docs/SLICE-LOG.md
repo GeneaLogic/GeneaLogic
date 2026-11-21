@@ -4444,6 +4444,23 @@ been two slices.
   thumbnail can be stale or letterboxed, so a mismatched aspect redraws from the image. A
   locked PDF draws white, so it counts as undrawable.
 
+- **85 — an archive reopens as it was left** (app; no format change). G10, the first half
+  of #40; G11, G24 and G12 are 85b. **Decided:** window state (tab, selections, sidebar
+  visibility, width and sections, tree depths, inspector, frame) is a `WindowState` on
+  this Mac, never in the archive, keyed by the archive's **file identity**: a moved or
+  renamed archive keeps it, a copy starts fresh, a cross-volume move starts fresh. It
+  replaces `@SceneStorage`, so reopen and relaunch read one record, written on every
+  change. **The invariant:** a record belongs to one folder, not to a path. **Revised in
+  the build:** the spec reached identity through the archive's bookmark, but a bookmark
+  resolves by path first, so a newcomer at a moved archive's old path inherited its state
+  (a test caught it). The key is `volumeUUID:inode`; APFS's document identifier is
+  assigned lazily, so a fresh folder has none. **Gotchas:** a `URL` caches resource
+  values, so a long-lived one reports a replaced folder's old inode; read from a fresh
+  one. Reading the identity needs sandbox access, so the state loads right after the
+  model's `load()`, in the same synchronous step, before the first frame. Column widths
+  have no SwiftUI binding: the sidebar reuses the inspector's measure-and-replay
+  (`RememberedColumnWidth`). The frame uses AppKit's autosave under a per-record name.
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the

@@ -9,27 +9,38 @@ import UniformTypeIdentifiers
 struct ArchiveContainerView: View {
     let url: URL
     @State private var model: ArchiveModel
-    /// The selected artifact, persisted **per window** via scene storage so it's
-    /// restored alongside the window on relaunch (slice 18) — it rides the same
-    /// state-restoration machinery as the window itself (slice 12). Stored as the
-    /// id's raw string (`@SceneStorage` can't hold `ArtifactID?` directly); empty
-    /// means no selection. Bridged to an `ArtifactID?` binding by `selection`.
-    @SceneStorage("selectedArtifactID") private var selectedArtifactID: String = ""
-    /// The selected person, persisted per window (the People-tab analog of
-    /// `selectedArtifactID`) — restored alongside the window on relaunch. Empty
-    /// means no selection; bridged to a `PersonID?` binding by `personSelection`.
-    @SceneStorage("selectedPersonID") private var selectedPersonID: String = ""
-    /// The selected worklist row in the Review section, persisted per window like the
-    /// other two selections. Stored as `ReviewItem.ID` (the mention's
-    /// `artifact|localRef` address) — a mention has no uid of its own, and the address is
-    /// what every write path takes anyway. Empty means no selection.
-    @SceneStorage("selectedReviewItemID") private var selectedReviewItemID: String = ""
-    /// The active window tab, persisted per window, so a relaunch restores the tab
-    /// you were on. Stored as the enum's raw value; bridged by `tab`.
-    @SceneStorage("selectedTab") private var selectedTabRaw: String = ArchiveTab.artifacts.rawValue
-    /// Whether People was last shown as a tree, per window, so a person row clicked from
-    /// another area returns to that view (slice 84). Kept by `tab`'s setter.
-    @SceneStorage("peopleShowsTree") private var peopleShowsTree = false
+    /// How this archive's window was left, on this Mac (slice 85): the selections, the
+    /// tab, the sidebar, the inspector, the tree's depths and the frame. Read once the
+    /// window owns its archive, and written on every change, so a reopen restores it as
+    /// well as a relaunch. Replaces `@SceneStorage`, which only a relaunch restored.
+    @State private var windowState: ArchiveWindowState
+
+    /// The three selections, as raw ids (empty means none), and the tab as the enum's
+    /// raw value. A review selection is a `ReviewItem.ID` (the mention's
+    /// `artifact|localRef` address): a mention has no uid of its own, and the address is
+    /// what every write path takes anyway.
+    private var selectedArtifactID: String {
+        get { windowState.values.selectedArtifactID }
+        nonmutating set { windowState.values.selectedArtifactID = newValue }
+    }
+    private var selectedPersonID: String {
+        get { windowState.values.selectedPersonID }
+        nonmutating set { windowState.values.selectedPersonID = newValue }
+    }
+    private var selectedReviewItemID: String {
+        get { windowState.values.selectedReviewItemID }
+        nonmutating set { windowState.values.selectedReviewItemID = newValue }
+    }
+    private var selectedTabRaw: String {
+        get { windowState.values.tab }
+        nonmutating set { windowState.values.tab = newValue }
+    }
+    /// Whether People was last shown as a tree, so a person row clicked from another
+    /// area returns to that view (slice 84). Kept by `tab`'s setter.
+    private var peopleShowsTree: Bool {
+        get { windowState.values.peopleShowsTree }
+        nonmutating set { windowState.values.peopleShowsTree = newValue }
+    }
     /// This window's undo manager, handed to the model so its mutations register
     /// undo/redo on the window's own stack (undo is per-archive-window).
     @Environment(\.undoManager) private var undoManager
@@ -41,7 +52,7 @@ struct ArchiveContainerView: View {
     /// fails to claim the archive's slot and dismisses itself.
     @State private var windowToken = UUID()
 
-    /// An `ArtifactID?` view over the scene-stored raw id, handed down to the list
+    /// An `ArtifactID?` view over the stored raw id, handed down to the list
     /// and detail. The detail resolves it against `model.artifacts` only when
     /// rendering, so a stored id whose artifact is gone (deleted between sessions)
     /// simply falls back to the placeholder.
@@ -52,7 +63,7 @@ struct ArchiveContainerView: View {
         )
     }
 
-    /// A `PersonID?` view over the scene-stored raw id, handed to the People tab.
+    /// A `PersonID?` view over the stored raw id, handed to the People tab.
     private var personSelection: Binding<PersonID?> {
         Binding(
             get: { selectedPersonID.isEmpty ? nil : PersonID(selectedPersonID) },
@@ -60,7 +71,7 @@ struct ArchiveContainerView: View {
         )
     }
 
-    /// A `ReviewItem.ID?` view over the scene-stored raw value, handed to the Review
+    /// A `ReviewItem.ID?` view over the stored raw value, handed to the Review
     /// section. Resolved against the worklist only when rendering, so a stored row whose
     /// mention has since been resolved falls back to the placeholder.
     private var reviewSelection: Binding<ReviewItem.ID?> {
@@ -70,7 +81,7 @@ struct ArchiveContainerView: View {
         )
     }
 
-    /// An `ArchiveTab` view over the scene-stored raw value, driving the tab bar.
+    /// An `ArchiveTab` view over the stored raw value, driving the tab bar.
     private var tab: Binding<ArchiveTab> {
         Binding(
             get: { ArchiveTab(rawValue: selectedTabRaw) ?? .artifacts },
@@ -84,6 +95,7 @@ struct ArchiveContainerView: View {
     init(url: URL) {
         self.url = url
         _model = State(initialValue: ArchiveModel(url: url))
+        _windowState = State(initialValue: ArchiveWindowState(url: url))
     }
 
     var body: some View {
@@ -93,6 +105,16 @@ struct ArchiveContainerView: View {
                 minWidth: Layout.ArchiveWindow.minWidth, minHeight: Layout.ArchiveWindow.minHeight
             )
             .environment(model)
+            .environment(windowState)
+            // The frame follows the archive (slice 85), so the autosave waits for the
+            // archive's record.
+            .background {
+                if windowState.isLoaded {
+                    WindowFrameAutosave(name: windowState.values.frameAutosaveName)
+                        .frame(width: 0, height: 0)
+                        .accessibilityHidden(true)
+                }
+            }
             .focusedSceneValue(\.archiveModel, model)
             .navigationTitle(url.deletingPathExtension().lastPathComponent)
             .navigationDocument(url)
@@ -108,6 +130,10 @@ struct ArchiveContainerView: View {
                     return
                 }
                 model.load()
+                // In the same synchronous step, so the archive's first frame is already
+                // as it was left (slice 85); after `load()`, whose `ensureAccess` gives
+                // the access reading the archive's identity needs.
+                windowState.load()
 
                 // Notice another writer (slice 51): poll for an external change
                 // for as long as this window lives. Deliberately *inside* this
@@ -239,9 +265,16 @@ private struct OpenArchiveView: View {
     @State private var scanner = ContinuityCameraScanner()
     /// Whether the sidebar's search field has focus, for Edit ▸ Find… (slice 82).
     @FocusState private var isSearchFocused: Bool
+    /// How this archive's window was left (slice 85): whether the sidebar is hidden,
+    /// and its width.
+    @Environment(ArchiveWindowState.self) private var windowState
     /// Whether the sidebar is showing, bound so Edit ▸ Find… can show a hidden one: its
-    /// search field can't take focus while it is hidden. Per window, like the toggle.
-    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
+    /// search field can't take focus while it is hidden. Kept as hidden or not, so a
+    /// reopened window comes back with the sidebar as it was.
+    private var columnVisibility: NavigationSplitViewVisibility {
+        get { windowState.values.sidebarHidden ? .detailOnly : .automatic }
+        nonmutating set { windowState.values.sidebarHidden = newValue == .detailOnly }
+    }
     /// Per-window, per-session dismissal of the damage banner (slice 56). Not
     /// persisted on purpose: one click must not silence damage that is still
     /// there, so it comes back on the next open. The pinned placeholder rows
@@ -420,7 +453,7 @@ private struct OpenArchiveView: View {
                 }
             }
             // Auto-select a freshly-created artifact / person (slice 29 + its People
-            // analog): the model publishes a one-shot intent; move the scene-stored
+            // analog): the model publishes a one-shot intent; move the stored
             // selection there and clear it.
             // Revealed too, when its area is showing: a new row can sort off-screen. (A
             // create from another area switches once the record exists, and that switch
@@ -472,14 +505,26 @@ private struct OpenArchiveView: View {
     }
 
     private var content: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
+        NavigationSplitView(
+            columnVisibility: Binding(get: { columnVisibility }, set: { columnVisibility = $0 })
+        ) {
             ArchiveSidebar(
                 selection: sidebarSelection, revealRequest: revealRequest,
                 isSearchFocused: $isSearchFocused
             )
+            // The width as it last settled, replayed as the column's `ideal` (slice 85),
+            // as the inspector's is: SwiftUI has no binding for a column's width.
+            .modifier(
+                RememberedColumnWidth(
+                    saved: Binding(
+                        get: { windowState.values.sidebarWidth },
+                        set: { windowState.values.sidebarWidth = $0 }),
+                    isShown: columnVisibility != .detailOnly,
+                    range: Double(Layout.ArchiveWindow.sidebarMinWidth)...Double.greatestFiniteMagnitude)
+            )
             .navigationSplitViewColumnWidth(
                 min: Layout.ArchiveWindow.sidebarMinWidth,
-                ideal: Layout.ArchiveWindow.sidebarIdealWidth)
+                ideal: max(CGFloat(windowState.values.sidebarWidth), Layout.ArchiveWindow.sidebarMinWidth))
         } detail: {
             detail
         }

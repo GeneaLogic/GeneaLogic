@@ -57,22 +57,24 @@ struct ArtifactDetailView: View {
     /// Opens popped-out preview windows (the Selected File menu's "separate window").
     @Environment(\.openWindow) private var openWindow
 
-    /// Whether the metadata inspector is shown. Per-window and restored across relaunch
-    /// (it rides the same `@SceneStorage` machinery as the artifact selection); defaults
-    /// to visible so a fresh window shows the metadata beside the document.
-    @SceneStorage("inspectorShown") private var inspectorShown: Bool = true
+    /// How this archive's window was left (slice 85): the inspector's visibility and
+    /// width are kept there, so they come back on a reopen as well as a relaunch.
+    @Environment(ArchiveWindowState.self) private var windowState
+
+    /// Whether the metadata inspector is shown; visible in a window never opened before,
+    /// so it shows the metadata beside the document.
+    private var inspectorShown: Bool {
+        get { windowState.values.inspectorShown }
+        nonmutating set { windowState.values.inspectorShown = newValue }
+    }
 
     /// The inspector's width, as it last settled (slice 80). SwiftUI rebuilds the column
     /// on every hide and show, and on every tab switch (this view is recreated), and a
-    /// rebuilt column opens at its `ideal` width. So the width is saved here and handed
-    /// back as `ideal`. Per-window and restored across relaunch, like `inspectorShown`.
-    /// See `RememberedInspectorWidth` for when it is saved.
-    @SceneStorage("inspectorWidth") private var inspectorWidth: Double = Self.inspectorIdealWidth
+    /// rebuilt column opens at its `ideal` width. So the width is saved and handed back
+    /// as `ideal`. See `RememberedColumnWidth` for when it is saved.
+    private var inspectorWidth: Double { windowState.values.inspectorWidth }
 
-    /// The inspector column's resize range, and its width in a window that has never
-    /// saved one.
-    private static let inspectorWidthRange = 280.0...480.0
-    private static let inspectorIdealWidth = 340.0
+    private static let inspectorWidthRange = Layout.ArchiveWindow.inspectorWidthRange
 
     var body: some View {
         ArtifactDocumentPane(
@@ -82,7 +84,9 @@ struct ArtifactDetailView: View {
         // Metadata lives in a trailing inspector beside the document, toggled from
         // the toolbar. Edit mode happens *inside* the inspector, so the document
         // stays visible while you transcribe evidence off it.
-        .inspector(isPresented: $inspectorShown) {
+        .inspector(
+            isPresented: Binding(get: { inspectorShown }, set: { inspectorShown = $0 })
+        ) {
             ArtifactInspector(
                 artifactID: artifact.uid, slug: artifact.slug,
                 primaryDate: artifact.primaryDate, detail: detail, transcript: transcript,
@@ -90,9 +94,11 @@ struct ArtifactDetailView: View {
                 selectedFileID: $selectedFileID, sheet: $sheet
             )
             .modifier(
-                RememberedInspectorWidth(
-                    saved: $inspectorWidth, isShown: inspectorShown,
-                    range: Self.inspectorWidthRange)
+                RememberedColumnWidth(
+                    saved: Binding(
+                        get: { windowState.values.inspectorWidth },
+                        set: { windowState.values.inspectorWidth = $0 }),
+                    isShown: inspectorShown, range: Self.inspectorWidthRange)
             )
             // **Keep this, even though it is half of #9's trigger** (slice 80). It is
             // the only API that sets the column's resize range: a content frame in its
@@ -361,44 +367,6 @@ private struct ArtifactSheetContent: View {
                 transcript = saved
             }
         }
-    }
-}
-
-/// Saves the inspector's width once it settles, not on every frame (slice 80).
-///
-/// The live width stays in this modifier's own state, so a drag re-renders only this,
-/// not the detail view, and the column's `ideal` is not rewritten mid-drag. It is saved
-/// after half a second without change, when the inspector hides, or when the view goes
-/// away (a tab switch). Widths read while the inspector hides are ignored (`isShown` is
-/// already false), and so are widths outside the column's range.
-///
-/// **Not only drags are saved.** A width SwiftUI imposes and then holds, such as the
-/// column narrowed by a narrower window, is saved too, because nothing here can tell
-/// the two apart.
-private struct RememberedInspectorWidth: ViewModifier {
-    @Binding var saved: Double
-    let isShown: Bool
-    let range: ClosedRange<Double>
-    @State private var live: Double?
-
-    func body(content: Content) -> some View {
-        content
-            .onGeometryChange(for: Double.self) {
-                $0.size.width
-            } action: { width in
-                guard isShown, range.contains(width) else { return }
-                live = width
-            }
-            .task(id: live) {
-                try? await Task.sleep(for: .milliseconds(500))
-                if !Task.isCancelled { save() }
-            }
-            .onChange(of: isShown) { _, shown in if !shown { save() } }
-            .onDisappear { save() }
-    }
-
-    private func save() {
-        if let live, live != saved { saved = live }
     }
 }
 

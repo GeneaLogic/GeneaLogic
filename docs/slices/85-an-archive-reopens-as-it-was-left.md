@@ -18,32 +18,35 @@ restores.
   Mac's, as the audit said.
 - **Neither the HIG nor Apple's document-app guidance** says anything about reopening a
   document as it was left. They cover restoring windows on relaunch only.
-- **The key is the archive's file identity** (agreed 2026-11-21), as a bookmark gives it.
-  The alternatives were the manifest's `archiveUID`, which a Finder copy shares, and the
-  path, which a move or rename loses. The kernel's document identifier, which a bookmark
-  resolves through, follows a move or rename on a volume and survives restarts. A copy
-  doesn't get it. So a moved archive keeps its state, and a copy starts fresh. A
-  cross-volume move or a restore from backup starts fresh too: that is the accepted
-  cost.
+- **The key is the archive's file identity** (agreed 2026-11-21). The alternatives were
+  the manifest's `archiveUID`, which a Finder copy shares, and the path, which a move or
+  rename loses. A file's identity follows a move or rename on a volume and survives
+  restarts, and a copy doesn't get it. So a moved archive keeps its state, and a copy
+  starts fresh. A cross-volume move or a restore from backup starts fresh too: that is
+  the accepted cost.
+- **The identity is the volume's UUID and the folder's inode, not a bookmark** (found
+  while building). The spec first reached it through the bookmark the app already keeps,
+  but a bookmark resolves by **path** first: an archive put at a moved one's old path
+  inherited its state, in a test. The kernel's document identifier is no better: APFS
+  assigns it lazily, so a fresh folder has none.
 
 ## The design
 
-- **One record per known archive, on this Mac.** It lives beside the archive's bookmark
-  in `ArchiveBookmarks` (in `UserDefaults`, the app's container), and shares its lifetime:
-  pruned when the bookmark stops resolving. It holds the tab, the three selections,
+- **One record per known archive, on this Mac**, in `ArchiveBookmarks` (`UserDefaults`,
+  the app's container), keyed by identity and carrying the path it was last seen at. It
+  is dropped with its archive's bookmark when that stops resolving, and the most
+  recently opened 100 are kept. It holds the tab, the three selections,
   People-as-tree, the sidebar's visibility, width and sections' expansion, the tree's two
   depths, the inspector's visibility and width, and the window's frame.
-- **It replaces `@SceneStorage`**, and the sidebar's plain `@State` visibility, for all of these, so relaunch and reopen read one
+- **It replaces `@SceneStorage`** (and the sidebar's visibility, plain `@State` before) for all of these, so relaunch and reopen read one
   place. Relaunch still restores *which* windows were open, as today. A window
   reads its record when it opens the archive, and writes each change as it happens, so a
   crash loses nothing. Two windows never show one archive (slice 31), so two windows
   never write one record.
-- **Finding the record for an opened URL.** The entry at that path whose bookmark
-  resolves to it is the archive. Otherwise the stored bookmarks are resolved
-  (`.withoutUI`, `.withoutMounting`), and one that resolves to the URL is the archive,
-  moved. Its entry is re-keyed to the new path. Otherwise the archive is new to this
-  Mac, and it gets a fresh record. An entry at the path whose bookmark resolves
-  somewhere else belongs to the archive that moved away, not to the one there now.
+- **Finding the record for an opened URL** is one lookup by its identity, read after
+  the window has the archive's sandbox access, from a fresh `URL` (a `URL` caches
+  resource values, so a long-lived one reports a replaced folder's old inode). A volume
+  with no identity falls back to the path.
 - **The frame** uses AppKit's frame autosave under a per-record id, so AppKit stores and
   applies it. If SwiftUI's own window sizing fights the autosave, the frame goes in the
   record instead, applied through a window accessor. A first open still gets the
@@ -63,13 +66,13 @@ restores.
 ## Verification
 
 - **App tests** for the store, over an injected `UserDefaults` suite and plain
-  (non-security-scoped) bookmarks in a temp folder, so no test writes to the
-  developer's own defaults (the reason for `adoptAlreadyReachable`):
+  temp folders, so no test writes to the developer's own defaults (the reason for
+  `adoptAlreadyReachable`):
   - the record round-trips;
   - a reopen at the same path finds it;
   - a moved or renamed archive finds it and is re-keyed;
-  - a copy gets a fresh record;
-  - a pruned bookmark drops its record.
+  - a copy gets a fresh record, and so does an archive put at a moved one's old path;
+  - a forgotten bookmark drops its record, frame included.
 - ARCHITECTURE §7's "session-scoped only" paragraph, stale since restoration shipped, is
   rewritten for the store.
 - **Hand-test** (on a throwaway or the sample archive):

@@ -1158,10 +1158,15 @@ GeneaLogicKit.
 >   screen uses SwiftUI `.fileImporter` (a view can host it; stays drivable), the
 >   File menu uses `NSOpenPanel` (a `Commands` body can't host one).
 >
-> Session-scoped only (`restorationBehavior(.disabled)`): a bare `URL` window-value
-> doesn't carry sandbox access, so windows aren't restored across relaunch — a fresh
-> launch shows a single welcome window. Bookmark-backed restoration is a later
-> follow-on.
+> **Restoration and window state.** Windows restore across relaunch through the OS
+> (`restorationBehavior(.automatic)`, honouring "Close windows when quitting"); a
+> restored `URL` carries no sandbox access, so the window re-derives it from the
+> archive's app-scoped bookmark (`ArchiveBookmarks`). How each archive's window was left
+> (tab, selections, sidebar, inspector, tree depths, frame) is a `WindowState` kept on
+> this Mac, never in the archive, and **keyed by the archive's file identity** (volume
+> and folder inode), so reopening an archive restores it as well as a relaunch does: a
+> moved or renamed archive keeps it, and a copy starts fresh (slice 85). Not keyed
+> through the bookmark, which resolves by path first.
 
 **Shipped so far (Phase 2, slices 1–10):** open/create + browse a `.genea`;
 drag-in / Add Media ingest via `GeneaLogicExtract` with read-only embedded-metadata
