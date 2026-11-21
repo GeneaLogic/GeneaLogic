@@ -20,8 +20,17 @@
   `app`, `cli`, `format`) and the kind (`bug`, `decision`, `feature-request`,
   `enhancement`). `parked` marks a deliberate deferral, and the issue says what un-parks
   it. Issues are not tagged by slice; a slice's PR links the issues it closes.
-- **File issues only for concrete work.** Ideas that are not concrete yet stay as bullets
-  here, under *Next* or *Parked*.
+- **Capture: every idea is an issue, filed when it comes up.** However rough, it goes in
+  as a `feature-request` with no milestone; a defect goes in as a `bug`. Issues are the
+  one searchable, linkable place for work. This document doesn't hold ideas of its own:
+  it gives direction and order, and links to the issues.
+- **Triage: each issue gets a milestone, or `parked` with what un-parks it.** An accepted
+  `feature-request` becomes an `enhancement`. A `decision` issue can be milestoned before
+  it is settled; the decision is part of the milestone's work.
+- **Cadence: at every slice boundary**, before the next slice starts. The queue is the
+  open issues with neither a milestone nor `parked`:
+  `gh issue list --search "no:milestone -label:parked"`. The SQLite freshness workflow
+  files its issue against the earliest open milestone, so it doesn't wait in the queue.
 - **The app version is independent of the archive format version**
   (`genealogic-archive-1.0`). App `1.0` and format `1.0` are different promises.
 
@@ -180,20 +189,11 @@ and the app and CLI are always the same version. The Mac App Store stays possibl
 app is already sandboxed), but a sandboxed `genea` cannot open user paths from
 Terminal, which breaks the agent-drives-the-CLI case 47 was built for.
 
-- **Versioning.** The version comes from a git tag (`0.1.0`); the build number is the
-  commit count on `main`, stamped at build time (it only rises, because merges are
-  `--no-ff` on a straight `main`). `genea --version` prints version, build and short
-  hash. Today `MARKETING_VERSION = 1.0` and `CURRENT_PROJECT_VERSION = 1` are set by hand.
-- **Embedding the CLI** at `GeneaLogic.app/Contents/Helpers/genea`, linked into the PATH
-  by an *Install Command Line Tool…* menu item (`/usr/local/bin` needs an admin
-  password), or a documented `ln -s`; a Homebrew cask can do it later.
-- **Infrastructure:** Apple Developer Program membership, signing secrets in CI,
-  notarization, an updater (Sparkle?).
-- **Membership is needed before any downloadable build**, not just for the App Store:
-  macOS 15+ blocks an un-notarized download without a trip to System Settings. Decide
-  individual vs organization enrollment early: as an individual, the developer name
-  shown is a person's; showing "GeneaLogic" needs a legal entity and a D-U-N-S number,
-  which take weeks.
+- **Decide enrollment first** ([#66](https://github.com/GeneaLogic/GeneaLogic/issues/66)): showing "GeneaLogic" as the developer needs a
+  D-U-N-S number, which takes weeks, and every downloadable build waits on membership.
+- **Then the build:** versioning from the tag ([#64](https://github.com/GeneaLogic/GeneaLogic/issues/64)), the embedded CLI ([#65](https://github.com/GeneaLogic/GeneaLogic/issues/65)),
+  and signing, notarization and the DMG in CI ([#67](https://github.com/GeneaLogic/GeneaLogic/issues/67)). The updater ([#68](https://github.com/GeneaLogic/GeneaLogic/issues/68)) ships in the
+  first build, or that build can't update itself.
 - **Application Support differs between the sandboxed app and the unsandboxed CLI.**
   That is fine today, because everything they share lives in the package. Future shared
   user-level state (a gazetteer, the name-variant table, a default archive) goes in an
@@ -208,44 +208,19 @@ in ARCHITECTURE ([#26](https://github.com/GeneaLogic/GeneaLogic/issues/26)).
 
 ## Next — app development, by milestone
 
-Opens with **feature planning**: list the features wanted, choose a target milestone for
-each (before, at or after `1.0`), and file each as an issue whose slice spec is written
-before it is built. It absorbs the former Phase 5 (GEDCOM) and Phase 6's AI enrichment.
+The work is in the [milestones](https://github.com/GeneaLogic/GeneaLogic/milestones); this section gives the order where it
+matters. It absorbs the former Phase 5 (GEDCOM) and Phase 6's AI enrichment.
 
 **`0.1`'s exit criterion:** *a stranger downloads the DMG, opens or creates an archive,
-and `genea` works in Terminal.* Whether GEDCOM import is in `0.1` is decided at feature
-planning.
+and `genea` works in Terminal.*
 
-Starting list, with what each depends on:
-
-- **Scale.** GEDCOM import is the first time persons arrive in thousands rather than
-  tens. Matcher candidate blocking (45p's floor), the persons list, the tree view and
-  rebuild time have not been exercised at that size. A slice before import.
-- **GEDCOM import**, then export. A new user's first act is bringing in the tree they
-  already have. Imported facts carry provenance marking them imported.
-- **`genea --json`.** Agents parse output far more reliably than they read it. It becomes
-  a stability surface at `1.0`. Then **an agent skill** for driving `genea` (a
-  `SKILL.md` that can live in the repo and ship with the app), which needs the CLI on
-  the PATH (workstream 6).
-- **AI suggestions from the on-device model** (Foundation Models, available at the
-  macOS 26 floor). First use: suggesting artifact properties from what is already known.
-  - **Settle the format question first.** `Artifact` carries provenance for the whole
-    record, not per field. A suggestion can live outside the record until accepted and
-    then be written as an ordinary edit (no format change, but the record forgets a
-    machine proposed it), or pending and accepted machine values can be stored per field
-    (a format change, its own slice). The provenance rule — human vs machine, review
-    status — argues the question is not settled by "no format change" alone.
-  - In an Apple-only target behind `#if canImport(FoundationModels)`, never the core.
-    The app must work fully without Apple Intelligence. Reuse the review queue
-    (`ReviewListView`, `FactSuggestionRow`); record the model and its version in the
-    tool identifier.
-- **App Intents** (Shortcuts, Siri, Spotlight), after the `ArchiveModel` split. The typed
-  ids map onto App Intents entities.
-- **From the UI audit, early in `0.2`:** the archive's own undo stack, then multiple
-  selection in the sidebars, then drag and drop ([#16](https://github.com/GeneaLogic/GeneaLogic/issues/16)), which builds on it. **Before
-  `1.0`:** a user guide as a Help Book (in Tips) and on genealogic.app.
-- **The open feature requests**, milestoned at triage (workstream 4): app features in `0.2`,
-  format additions in `0.3`.
+- **Scale before GEDCOM.** Import ([#75](https://github.com/GeneaLogic/GeneaLogic/issues/75)) is the first time persons arrive in thousands, so
+  the scale slice ([#74](https://github.com/GeneaLogic/GeneaLogic/issues/74)) goes first; export ([#76](https://github.com/GeneaLogic/GeneaLogic/issues/76)) follows import.
+- **`genea --json` ([#69](https://github.com/GeneaLogic/GeneaLogic/issues/69)) before `1.0`**, which makes it a stability surface. The agent skill
+  ([#70](https://github.com/GeneaLogic/GeneaLogic/issues/70)) needs it and the CLI on the PATH ([#65](https://github.com/GeneaLogic/GeneaLogic/issues/65)).
+- **AI suggestions ([#72](https://github.com/GeneaLogic/GeneaLogic/issues/72)) settle their format question first**, as a `0.3` decision.
+- **From the UI audit, early in `0.2`:** the archive's own undo stack ([#46](https://github.com/GeneaLogic/GeneaLogic/issues/46)), then multiple
+  selection in the sidebars ([#47](https://github.com/GeneaLogic/GeneaLogic/issues/47)), then drag and drop ([#16](https://github.com/GeneaLogic/GeneaLogic/issues/16)), which builds on it.
 
 ## Later
 
@@ -282,22 +257,10 @@ Windows does not have.
 
 ## Parked
 
-Each with what un-parks it.
-
-- **Ngram blocking below 45p's floor** — parked with data; the scale slice may un-park it.
-- **[#24](https://github.com/GeneaLogic/GeneaLogic/issues/24)** (phonetic keyer protocol) — one implementation today, so not built
-  speculatively; un-parks when a second keyer is proposed. A `good first issue`.
-- **USB/network scanner ingest** (`ImageCaptureCore`) — only if wanted.
-- **A persisted, cross-relaunch undo journal** — only if wanted; the trash is a narrow
-  recovery carve-out, not a general journal.
-- **Slice 80's inspector workaround** — applies only before macOS 27.2.1, where Apple
-  fixed #9. Un-parks when the floor reaches 27.2.1; then the `else` in `ArtifactInspector`
-  and `scripts/inspector-edge-repro/` go.
-- **[#12](https://github.com/GeneaLogic/GeneaLogic/issues/12)** (re-run and backup contract for migration steps) — lands with the first real
-  migration step. Until then it is the one deferral that can break workstream 2's exit
-  criterion.
-- **[#13](https://github.com/GeneaLogic/GeneaLogic/issues/13)** (the size sweep calls a newer record a size mismatch) — until format 1.1
-  exists; no archive can reach it before then.
+Parked work is [labelled `parked`](https://github.com/GeneaLogic/GeneaLogic/issues?q=is%3Aopen+label%3Aparked), and each issue says what un-parks it. One deserves a
+watch: [#12](https://github.com/GeneaLogic/GeneaLogic/issues/12) (a re-run and backup contract for migration steps) lands with the first real
+migration step, and until then it's the one deferral that can break workstream 2's exit
+criterion.
 
 ## Cross-cutting, from day one
 
