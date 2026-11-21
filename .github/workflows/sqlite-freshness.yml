@@ -64,9 +64,18 @@ jobs:
           existing="$(gh issue list --state open --label sqlite-update \
             --json number --jq '.[0].number // empty')"
           if [ -n "$existing" ]; then
+            # Leave the milestone alone: one set at triage is a decision, not a default.
             echo "Refreshing existing tracking issue #$existing"
             gh issue edit "$existing" --title "$title" --body "$body"
           else
-            echo "Opening a new tracking issue"
-            gh issue create --title "$title" --body "$body" --label sqlite-update
+            # File it against the earliest open version milestone, so it is planned
+            # work from the start rather than waiting unmilestoned for the next triage.
+            milestone="$(gh api "repos/$GITHUB_REPOSITORY/milestones?state=open&per_page=100" \
+              --jq '.[].title' | { grep -E '^[0-9]+(\.[0-9]+)*$' || true; } | sort -V | head -1)"
+            args=(--title "$title" --body "$body" --label sqlite-update)
+            if [ -n "$milestone" ]; then
+              args+=(--milestone "$milestone")
+            fi
+            echo "Opening a new tracking issue (milestone: ${milestone:-none})"
+            gh issue create "${args[@]}"
           fi

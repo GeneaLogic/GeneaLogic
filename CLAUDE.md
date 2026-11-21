@@ -136,6 +136,10 @@ skill, which wraps this.
   and open a PR whose body says `Closes #N` for each issue it settles; CI runs there.
   On the user's go-ahead, merge with a merge commit titled `Merge slice <n>: <title>`,
   and delete the branch.
+- **Triage before branching a slice.** Run
+  `gh issue list --search "no:milestone -label:parked"`. If it isn't empty, propose a
+  milestone (or `parked` and what un-parks it) for each issue, get the user's answer, and
+  apply it before the slice starts. The rule is ROADMAP § *How work is tracked*.
 - **The user hand-tests before the merge.** Tests, Linux and `/code-review` are the
   pre-check, not the gate — hand off and stop. The engine half of a hand-test is
   `genea` at the command line and Claude can run it; the app half needs the window
