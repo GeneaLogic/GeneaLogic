@@ -4436,7 +4436,7 @@ been two slices.
   **And the stall on entering Review:** the duplicates scan's scoring ran on the main
   thread, as did the file sweep, the reconcile and Verify Integrity. All four were
   `nonisolated async`, which Approachable Concurrency runs on the caller's actor; 84 only
-  made it visible by scanning at open and on each visit. `offMainActor` is `@concurrent`.
+  made it visible by scanning at open and on each visit. They are `@concurrent` now.
 
 ## Carryovers and parked work
 

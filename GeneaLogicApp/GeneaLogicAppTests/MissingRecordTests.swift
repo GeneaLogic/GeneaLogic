@@ -64,8 +64,13 @@ import Testing
     @Test func restoringBringsThePersonBack() async throws {
         let (model, root, path) = try await modelWithAMissingPerson()
         defer { AppTestSupport.remove(root) }
+        // The sweeps run off the main thread (truly, since slice 84), so wait for the
+        // opening one: a request made while it runs is coalesced onto it, and only the
+        // window's poll would run it again.
+        await model.fileSweepSettled()
 
         await model.act { model.repairRecord(atPath: path) }
+        await model.fileSweepSettled()
 
         #expect(model.unreadablePersons.isEmpty)
         #expect(model.persons.count == 1)

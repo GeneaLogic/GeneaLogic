@@ -3,22 +3,31 @@ import Testing
 
 @testable import GeneaLogicApp
 
-/// Slice 84's hand-test: the background work that wasn't. See `offMainActor`.
+/// Slice 84's hand-test: the background work that wasn't.
+///
+/// The app builds with Approachable Concurrency, under which a `nonisolated async`
+/// function runs on its caller's actor. The duplicates scan, the file sweep, the
+/// reconcile and Verify Integrity were all written that way to run in the background,
+/// and all ran on the main thread. They are `@concurrent` now. These pin the rule the
+/// fix relies on, so a change to the setting or the language shows up here.
 @MainActor
 @Suite struct OffMainActorTests {
-    /// The trap, pinned so the reason for `offMainActor` can't quietly stop being true
-    /// or be forgotten: in this target a `nonisolated async` function called from the
-    /// main actor runs on the main thread.
     @Test func nonisolatedAsyncStaysOnTheCallersActor() async {
+        #expect(pthread_main_np() != 0)
         #expect(await Self.nonisolatedProbe())
     }
 
-    @Test func offMainActorLeavesTheMainThread() async {
+    @Test func concurrentLeavesTheMainThread() async {
         #expect(pthread_main_np() != 0)
-        #expect(await offMainActor { pthread_main_np() != 0 } == false)
+        #expect(await Self.concurrentProbe() == false)
     }
 
     private nonisolated static func nonisolatedProbe() async -> Bool {
+        pthread_main_np() != 0
+    }
+
+    @concurrent
+    private nonisolated static func concurrentProbe() async -> Bool {
         pthread_main_np() != 0
     }
 }

@@ -91,10 +91,10 @@ extension ArchiveModel {
         }
     }
 
-    /// The walk itself. `offMainActor` rather than `Task.detached`, for the reason
+    /// The walk itself. `@concurrent` rather than `Task.detached`, for the reason
     /// `scoreDuplicates` is: a detached task outlives the cancellation of whatever
-    /// started it. **Until slice 84 it ran on the main thread**, as `scoreDuplicates`
-    /// did, for the reason `offMainActor` gives.
+    /// started it. **Until slice 84 it was only `nonisolated`, and ran on the main
+    /// thread**, for the reason `scoreDuplicates` gives.
     ///
     /// **Cancellation is checked here, before the walk, and that is the only
     /// place it can be** (review finding, 57). `sweepFileSizes()` is synchronous
@@ -109,11 +109,12 @@ extension ArchiveModel {
     /// once slice 61 put this on the 1 Hz poll. Requests now coalesce onto the
     /// running walk (see `reloadFileDamage`), so the only cancellation left is the
     /// archive going away.
-    private static func sweepFiles(
+    @concurrent
+    private nonisolated static func sweepFiles(
         _ archive: Archive
     ) async -> Archive.FileSweepReport? {
         guard !Task.isCancelled else { return nil }
-        return await offMainActor { archive.sweepFileSizes() }
+        return archive.sweepFileSizes()
     }
 
     /// Re-reads the standing findings, **never downgrading a warning because a
@@ -244,9 +245,9 @@ extension ArchiveModel {
     /// no archive is open (the menu command is disabled in that case). Read-only:
     /// it touches nothing and is safe to re-run.
     ///
-    /// **Off the main actor** (slice 57b), through `offMainActor` as `sweepFiles` is
-    /// (until slice 84 a `nonisolated async` function, which ran on the main thread
-    /// after all; see `offMainActor`). It was a synchronous main-actor call, which was already
+    /// **Off the main actor** (slice 57b), `@concurrent` as `sweepFiles` is (until slice
+    /// 84 only `nonisolated`, which ran on the main thread after all; see
+    /// `scoreDuplicates`). It was a synchronous main-actor call, which was already
     /// a long freeze on a large archive and became an unbounded one the moment
     /// this call could be asked to *download* the files it hashes: a spinner that
     /// paints once and then a dead window for as long as the network takes.
@@ -271,12 +272,11 @@ extension ArchiveModel {
     /// everything it did not read, named. Returning `nil` here instead would
     /// discard that and leave the panel rendering "No archive is open" for a
     /// download the user themselves stopped.
-    private static func verify(
+    @concurrent
+    private nonisolated static func verify(
         _ archive: Archive, includingDatalessFiles: Bool
     ) async throws -> IntegrityReport {
-        try await offMainActor {
-            Result { try archive.verifyIntegrity(includingDatalessFiles: includingDatalessFiles) }
-        }.get()
+        try archive.verifyIntegrity(includingDatalessFiles: includingDatalessFiles)
     }
 
     /// Runs the engine's `findDanglingReferences()` — the referential sweep over
