@@ -64,11 +64,8 @@ import Testing
     @Test func restoringBringsThePersonBack() async throws {
         let (model, root, path) = try await modelWithAMissingPerson()
         defer { AppTestSupport.remove(root) }
-        // The sweeps run off the main thread (truly, since slice 84), so wait for the
-        // opening one: a request made while it runs is coalesced onto it, and only the
-        // window's poll would run it again.
-        await model.fileSweepSettled()
-
+        // The repair can land while the opening sweep still walks; its request then runs
+        // again when that walk ends (84's `/code-review`), which this waits for.
         await model.act { model.repairRecord(atPath: path) }
         await model.fileSweepSettled()
 

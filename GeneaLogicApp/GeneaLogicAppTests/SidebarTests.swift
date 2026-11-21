@@ -188,7 +188,7 @@ import Testing
         let (model, root) = try await makeArchive()
         defer { AppTestSupport.remove(root) }
         model.refreshDuplicateCandidates()
-        await model.duplicateScanTask?.value
+        await model.duplicateScanSettled()
         #expect(!model.reviewItems.isEmpty)
         #expect(!model.factItems.isEmpty)
 
@@ -344,15 +344,38 @@ import Testing
         defer { AppTestSupport.remove(root) }
         await model.act { model.createPerson(given: "Ann", surname: "Roe") }
         model.refreshDuplicateCandidates()
-        await model.duplicateScanTask?.value
-        let before = try #require(model.duplicateScanTask)
+        await model.duplicateScanSettled()
+        let before = model.duplicateScansStarted
         let id = try #require(model.persons.first?.uid)
 
         await model.act {
             model.updatePerson(of: id) { $0.facts.append(PersonFact(type: .birth, date: "1888")) }
         }
+        await model.duplicateScanSettled()
 
-        // A new scan, which may already have finished with one person to compare.
-        #expect(model.duplicateScanTask != before)
-}
+        #expect(model.duplicateScansStarted > before)
+    }
+
+    /// One scan at a time (84's `/code-review`): requests during one run it once more,
+    /// rather than each starting a quadratic sweep of its own.
+    @Test func scanRequestsDuringAScanRunOnceMore() async throws {
+        let (model, root) = try AppTestSupport.makeModel()
+        defer { AppTestSupport.remove(root) }
+        await model.act { model.createPerson(given: "Ann", surname: "Roe") }
+        await model.act { model.createPerson(given: "Anne", surname: "Roe") }
+        await model.duplicateScanSettled()
+        let before = model.duplicateScansStarted
+
+        model.refreshDuplicateCandidates()
+        model.refreshDuplicateCandidates()
+        model.refreshDuplicateCandidates()
+        #expect(model.duplicateScansStarted == before + 1)
+        #expect(model.duplicateScanRequested)
+
+        await model.duplicateScanSettled()
+        #expect(model.duplicateScansStarted == before + 2)
+        #expect(!model.duplicateScanRequested)
+        #expect(!model.isScanningDuplicates)
+        #expect(model.hasScannedDuplicates)
+    }
 }

@@ -4412,33 +4412,19 @@ been two slices.
 - **84 — the window's structure** (app only; no format change; #39). G4, re-scoped: the
   switcher moved because the area was a toolbar control over a sidebar holding its
   collection. **Decided** (prototype on `spike-84`): one sidebar of Review, Artifacts and
-  People, two columns on every area; Tree a List | Tree view of People; Review one section,
-  lane by lane, hidden while searching; Filter and Sort in the Artifacts header.
-  **The invariant:** the area is where the selection is. `SidebarSelection` maps the
-  list's one selection to the area and that area's own, and a switch the sidebar didn't
-  make (⌘1–⌘4, a jump) reveals the area's selection, else its header. **Judgment calls:**
-  Find is on every area, since the field is (the one availability test that changed);
-  a drop ingests from any area, switching to Artifacts as a create does; Review's header
-  keeps the Refresh its strip had. **Gotchas:** the list deselects when its row leaves it
-  (a search, Review hiding), so a deselection is ignored rather than losing the area's
-  selection. Review's count would grow after the first visit, so the duplicates scan runs
-  at open, carries an ellipsis until it lands, and re-runs when the people change.
-  **`/code-review`:** every section's rows show on every area, but the area check dimmed
-  their verbs off their own area. That check is the menu bar's, against a stale
-  selection; a sidebar row names its subject, so its verbs pass `fromSidebar` and run
-  anywhere, and `ReviewCommandHost` moved off Review's detail to run them. **Hand-test:**
-  the system's hover chevron moved the header's controls, so headers draw their own; a
-  tinted symbol vanished into the selection; a list bound straight to the selection never
-  re-highlighted a row a search had dropped, so it keeps its own copy; Tree runs People's
-  menu-bar verbs; both creates are in the toolbar; switching to Review ends a search; a
-  create switches area once the record lands, not before (82's fork 2 lost your place on
-  a cancel); the selected row is kept in view whatever moved it, not only on ⌘1–⌘4.
-  Enabling the Person menu on the tree wasn't enough: its adds' sheets lived on the
-  person's page, so the tree hosts them too (`TreePersonAdds`).
-  **And the stall on entering Review:** the duplicates scan's scoring ran on the main
-  thread, as did the file sweep, the reconcile and Verify Integrity. All four were
-  `nonisolated async`, which Approachable Concurrency runs on the caller's actor; 84 only
-  made it visible by scanning at open and on each visit. They are `@concurrent` now.
+  People, two columns everywhere; Tree a List | Tree view of People, running People's
+  menu-bar verbs; Review one section, lane by lane, hidden while searching. **The
+  invariant:** the area is where the selection is (`SidebarSelection`), and the selected
+  row is kept in view whatever moved it. **Revised:** a create switches area once the
+  record exists, not before (82's fork 2 lost your place on a cancel). **Gotchas:** the
+  list drops its selection when the row leaves, so the drop is ignored and the list keeps
+  its own copy to re-highlight with. Every section's rows show on every area, but the area
+  check (the menu bar's, against a stale selection) dimmed their verbs: a sidebar row
+  names its subject, so its verbs pass `fromSidebar`. Review's count, owed from open, put
+  the duplicates scan on every visit and exposed that it, the file sweep, the reconcile and
+  Verify Integrity all ran on the main thread: `nonisolated async` runs on the caller's
+  actor under Approachable Concurrency. They are `@concurrent`, and the scan and sweep run
+  one at a time, a request during one running it once more.
 
 ## Carryovers and parked work
 

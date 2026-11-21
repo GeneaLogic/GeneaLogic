@@ -207,9 +207,17 @@ extension ArchiveModel {
     /// `load()` or a refresh returns. Awaits the real task rather than polling for
     /// its effect — polling could not tell "the sweep found nothing" from "the
     /// sweep hasn't run yet", which is the distinction half these tests are about.
+    ///
+    /// Until no walk is running: a request made during one runs again when it ends.
     @MainActor
     func fileSweepSettled() async {
-        await fileSweepTask?.value
+        while let task = fileSweepTask { await task.value }
+    }
+
+    /// Waits for the duplicates scan, and any scan it was asked to run again.
+    @MainActor
+    func duplicateScanSettled() async {
+        while let task = duplicateScanTask { await task.value }
     }
 
     /// Waits for the out-of-band staleness check to finish (slice 60).

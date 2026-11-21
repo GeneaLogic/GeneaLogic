@@ -13,6 +13,9 @@ build/
 # macOS
 .DS_Store
 
+# Editors and tools that drop history files where they run
+.Rhistory
+
 # Claude Code — personal/local settings, notes and worktrees (shared settings.json IS committed)
 .claude/settings.local.json
 CLAUDE.local.md

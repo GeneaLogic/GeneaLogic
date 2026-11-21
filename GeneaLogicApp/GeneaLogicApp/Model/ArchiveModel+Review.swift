@@ -448,14 +448,29 @@ extension ArchiveModel {
         }
     }
 
+    /// **One scan at a time; a request during one runs once after it** (84's
+    /// `/code-review`). Cancel-and-replace started a new full sweep per request, and the
+    /// engine's scoring never checks for cancellation, so a run of edits on a large
+    /// archive ran that many quadratic sweeps at once, on every core, to keep the last.
+    /// The running scan's answer is discarded when a request came in during it: it
+    /// predates that request, and could name a person merged away since, offering a merge
+    /// that can only fail (`dropDuplicateRows`). The file sweep coalesces the same way.
     func refreshDuplicateCandidates() {
-        duplicateScanTask?.cancel()
         guard let archive else {
+            duplicateScanTask?.cancel()
+            duplicateScanTask = nil
+            duplicateScanRequested = false
             duplicateItems = []
             isScanningDuplicates = false
             return
         }
         isScanningDuplicates = true
+        guard duplicateScanTask == nil else {
+            duplicateScanRequested = true
+            return
+        }
+        duplicateScanRequested = false
+        duplicateScansStarted += 1
         // **The read is here, on the main actor, and it is linear** — one pass over the
         // conclusions to build the snapshot, the same cost the other two lanes pay. Only
         // the quadratic scoring goes off-actor, and it takes no lock, so an archive read
@@ -466,6 +481,12 @@ extension ArchiveModel {
         duplicateScanTask = Task { [weak self] in
             let candidates = await Self.scoreDuplicates(input)
             guard !Task.isCancelled, let self else { return }
+            self.duplicateScanTask = nil
+            // Asked again while this ran: this answer is already behind, so run again.
+            if self.duplicateScanRequested {
+                self.refreshDuplicateCandidates()
+                return
+            }
             self.duplicateItems = candidates.map { candidate in
                 DuplicateReviewItem(
                     candidate: candidate,

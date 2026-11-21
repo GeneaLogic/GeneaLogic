@@ -66,8 +66,14 @@ struct TreeTab: View {
         .safeAreaInset(edge: .top) { if !model.persons.isEmpty { controls } }
         // Rebuild whenever the focus, the depths, or any conclusion mutation changes.
         .task(id: rebuildKey) { await rebuild() }
-        // Mirrored for View's depth items and Person ▸ Show in People (slice 83).
-        .onChange(of: effectiveFocus, initial: true) { _, person in model.treeFocus = person }
+        // Mirrored for View's depth items and Person ▸ Show in People (slice 83). And
+        // written back as the people selection when the tree fell back to someone (84's
+        // `/code-review`): the tree is People's view now, so the person it is drawn
+        // around is the one the sidebar highlights and the Person menu acts on.
+        .onChange(of: effectiveFocus, initial: true) { _, person in
+            model.treeFocus = person
+            if focus != person { focus = person }
+        }
         .onChange(of: ancestorDepth, initial: true) { _, depth in
             model.treeDepths.ancestors = depth
         }

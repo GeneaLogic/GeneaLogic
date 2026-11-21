@@ -60,10 +60,7 @@ import Testing
     @Test func restoringTurnsThePlaceholderIntoARealRecord() async throws {
         let (model, root, path) = try await modelWithABrokenPerson()
         defer { AppTestSupport.remove(root) }
-        // Wait for the sweeps, which run off the main thread: see `MissingRecordTests`'
-        // `restoringBringsThePersonBack`.
-        await model.fileSweepSettled()
-
+        // See `MissingRecordTests`' `restoringBringsThePersonBack`.
         await model.act { model.repairRecord(atPath: path) }
         await model.fileSweepSettled()
 

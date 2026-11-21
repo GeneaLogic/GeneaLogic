@@ -608,7 +608,6 @@ struct CommandContext: Equatable {
         // The tree runs People's verbs, but this one would show what is already showing:
         // the tree's focus is the people selection. A sidebar row names its own person.
         case .showInTree: return fromSidebar || activeTab != .tree
-        // The one sidebar's field is there from every area (slice 84).
         case .acceptSuggestion:
             return !isDecidingReview && subject.reviewLane?.canAccept == true
         case .declineSuggestion:

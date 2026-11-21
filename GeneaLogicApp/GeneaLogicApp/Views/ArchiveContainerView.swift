@@ -422,8 +422,9 @@ private struct OpenArchiveView: View {
             // Auto-select a freshly-created artifact / person (slice 29 + its People
             // analog): the model publishes a one-shot intent; move the scene-stored
             // selection there and clear it.
-            // Revealed too: the switch to the area ran before the record existed, so a
-            // new row sorted off-screen would otherwise stay there.
+            // Revealed too, when its area is showing: a new row can sort off-screen. (A
+            // create from another area switches once the record exists, and that switch
+            // reveals it.)
             .onChange(of: model.lastCreatedArtifact) { _, created in
                 if let created {
                     selection = created

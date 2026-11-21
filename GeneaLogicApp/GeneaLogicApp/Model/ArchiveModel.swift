@@ -276,9 +276,17 @@ final class ArchiveModel {
     /// them for the other two lanes.
     var hasScannedDuplicates = false
 
-    /// The in-flight scan, cancelled when a newer one starts so a slow sweep can never
-    /// overwrite a fresher result.
+    /// The in-flight scan, `nil` between scans. A request while it runs is coalesced onto
+    /// it (`duplicateScanRequested`), so a slow sweep can never overwrite a fresher result.
     var duplicateScanTask: Task<Void, Never>?
+
+    /// A scan was asked for while one ran, so it runs once more when that one ends
+    /// (`refreshDuplicateCandidates`).
+    var duplicateScanRequested = false
+
+    /// How many scans have started in this window: how the tests tell a coalesced
+    /// request from a fresh scan.
+    var duplicateScansStarted = 0
 
     // MARK: Window state (the macOS-shaped part; its methods are in `+Window`)
     //
@@ -331,9 +339,9 @@ final class ArchiveModel {
     /// (`claimPendingCommand`).
     var pendingCommand: PendingCommand?
 
-    /// One-shot "switch to this tab" intent (View ▸ ⌘1–⌘4, and a create that switches to
-    /// its own tab first). The container owns the scene-stored tab, so it moves it and
-    /// clears this.
+    /// One-shot "switch to this tab" intent (View ▸ ⌘1–⌘4, and a create switching to its
+    /// own tab once the record exists). The container owns the scene-stored tab, so it
+    /// moves it and clears this.
     var pendingTab: ArchiveTab?
 
     /// The sheets, dialogs and alerts a view in this window has up, each reported by its

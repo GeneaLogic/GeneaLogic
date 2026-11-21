@@ -35,9 +35,10 @@ struct ArchiveSidebar: View {
     @State private var uncataloguedOnly = false
 
     /// The list's own selection, a mirror of `selection.item`. The list drops it when its
-    /// row leaves (a search filters it out, Review hides), and `selection` keeps the
-    /// area's; this puts the highlight back when the row returns. Bound straight to
-    /// `selection`, the list's dropped selection never came back: nothing it reads changed.
+    /// row leaves (a search or filter, a collapsed section, Review hiding, a delete), and
+    /// `selection` keeps the area's; this puts the highlight back when the row returns.
+    /// Bound straight to `selection`, the list's dropped selection never came back:
+    /// nothing it reads changed.
     @State private var listSelection: SidebarItem?
 
     var body: some View {
@@ -45,6 +46,7 @@ struct ArchiveSidebar: View {
         // reveal all read the same answer.
         let artifacts = ShownArtifacts(
             displayed: model.displayedArtifacts, uncataloguedOnly: uncataloguedOnly)
+        let selectedRowShows = selection.item.map { rowShows($0, artifacts: artifacts) } ?? false
         ScrollViewReader { proxy in
             list(artifacts)
                 .onChange(of: revealRequest) { reveal(proxy, artifacts: artifacts) }
@@ -62,10 +64,12 @@ struct ArchiveSidebar: View {
         .onChange(of: selection.item, initial: true) { _, item in
             if listSelection != item { listSelection = item }
         }
-        // After the rows the search changed are in the list.
-        .onChange(of: model.searchText) {
+        // Whatever brought the row back, once it is in the list (84's `/code-review`:
+        // restoring on a search alone missed the rest).
+        .onChange(of: selectedRowShows) { _, shows in
+            guard shows, listSelection == nil, let item = selection.item else { return }
             Task { @MainActor in
-                if listSelection == nil, let item = selection.item { listSelection = item }
+                if listSelection == nil, selection.item == item { listSelection = item }
             }
         }
         // **Release the filter, don't just mask it.** When the debt reaches zero the
@@ -290,12 +294,24 @@ struct ArchiveSidebar: View {
         return sections
     }
 
+    /// Whether the section's rows include `item`, collapsed or not. Review's lanes are
+    /// asked one by one, which doesn't build the whole worklist (`reviewRows`).
     private func isListed(_ item: SidebarItem, artifacts: ShownArtifacts) -> Bool {
         switch item {
-        case .review(let id): model.reviewRows.contains { $0.id == id }
+        case .review(let id):
+            model.reviewItems.contains { $0.id == id } || model.factItems.contains { $0.id == id }
+                || model.relationshipItems.contains { $0.id == id }
+                || model.duplicateItems.contains { $0.id == id }
         case .artifact(let id): artifacts.visible.contains { $0.uid == id }
         case .person(let id): model.displayedPersons.contains { $0.uid == id }
         }
+    }
+
+    /// Whether `item`'s row is on the list right now: listed, in an open section that
+    /// isn't hidden.
+    private func rowShows(_ item: SidebarItem, artifacts: ShownArtifacts) -> Bool {
+        !collapsed.contains(item.section) && !(isSearching && item.section == .review)
+            && isListed(item, artifacts: artifacts)
     }
 
     /// Scrolls the selected row into view, if its section is showing it.

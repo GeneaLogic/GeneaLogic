@@ -83,6 +83,11 @@ extension ArchiveModel {
             let report = await Self.sweepFiles(archive)
             guard let self else { return }
             self.fileSweepTask = nil
+            // A request made during the walk runs now, not at the next poll (84's
+            // `/code-review`): the poll backs off, and until it came round a repair made
+            // while the opening sweep ran left that sweep's damage on the banner. This
+            // walk's answer is still applied first; it is only older, never wrong.
+            defer { if self.fileSweepCoalesced { self.reloadFileDamage() } }
             // The window may have loaded a different archive while we walked —
             // the same guard, and the same reason, as the reconcile task's.
             guard let report, self.archive === archive else { return }
