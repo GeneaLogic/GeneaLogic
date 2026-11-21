@@ -62,8 +62,9 @@ enum ArchiveCommand: Hashable, CaseIterable {
     nonisolated static func delete(on tab: ArchiveTab) -> ArchiveCommand? {
         switch tab {
         case .artifacts: .deleteArtifact
-        case .people: .deletePerson
-        case .tree, .review: nil
+        // The tree is People too (slice 84's hand-test).
+        case .people, .tree: .deletePerson
+        case .review: nil
         }
     }
 
@@ -342,7 +343,9 @@ enum ArchiveCommand: Hashable, CaseIterable {
 
     var systemImage: String {
         switch self {
-        case .addArtifact, .newPerson: "plus"
+        // Told apart since slice 84, when both went in the toolbar on every area.
+        case .addArtifact: "doc.badge.plus"
+        case .newPerson: "person.badge.plus"
         case .verifyIntegrity: "checkmark.shield"
         case .showTrash: "trash"
         case .find: "magnifyingglass"
@@ -596,11 +599,14 @@ struct CommandContext: Equatable {
         guard hasArchive, !isPresentingModal, subject.kind == command.subjectKind else {
             return false
         }
-        if !fromSidebar, let tab = command.tab, tab != activeTab { return false }
+        if !fromSidebar, let tab = command.tab, !activeTab.runs(tab) { return false }
         switch command {
         // The inspector belongs to the artifact detail, which shows only with a selection.
         case .toggleInspector: return selectedArtifact != nil
         case .mergePerson: return personCount > 1
+        // The tree runs People's verbs, but this one would show what is already showing:
+        // the tree's focus is the people selection. A sidebar row names its own person.
+        case .showInTree: return fromSidebar || activeTab != .tree
         // The one sidebar's field is there from every area (slice 84).
         case .acceptSuggestion:
             return !isDecidingReview && subject.reviewLane?.canAccept == true
@@ -637,7 +643,7 @@ struct CommandContext: Equatable {
     /// drops a duplicate key from the later menu item, enabled or not (measured), so a
     /// key attached to both would leave Delete Person… with none.
     func ownsShortcut(_ command: ArchiveCommand) -> Bool {
-        command.tab == nil || command.tab == activeTab
+        command.tab.map(activeTab.runs) ?? true
     }
 }
 
@@ -648,6 +654,14 @@ extension CommandSubject {
 }
 
 extension ArchiveTab {
+    /// Whether a command of `tab`'s runs while this one shows. Each tab runs its own, and
+    /// the tree runs People's too (slice 84's hand-test): it is a view of People, and the
+    /// person the sidebar shows selected is the one the Person menu acts on. People
+    /// doesn't run the tree's, which act on the tree's focus and depths.
+    nonisolated func runs(_ tab: ArchiveTab) -> Bool {
+        tab == self || (self == .tree && tab == .people)
+    }
+
     /// ⌘1–⌘4, in the switcher's order, as Finder and Mail number theirs (G2).
     fileprivate var shortcutKey: KeyEquivalent {
         switch self {

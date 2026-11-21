@@ -34,6 +34,12 @@ struct ArchiveSidebar: View {
     /// the user has to remember they left on.
     @State private var uncataloguedOnly = false
 
+    /// The list's own selection, a mirror of `selection.item`. The list drops it when its
+    /// row leaves (a search filters it out, Review hides), and `selection` keeps the
+    /// area's; this puts the highlight back when the row returns. Bound straight to
+    /// `selection`, the list's dropped selection never came back: nothing it reads changed.
+    @State private var listSelection: SidebarItem?
+
     var body: some View {
         // Filtered once per draw: the rows, the header's count, the Filter menu and the
         // reveal all read the same answer.
@@ -49,6 +55,18 @@ struct ArchiveSidebar: View {
                     proxy.scrollTo(SidebarRowID.item(.review(id)))
                 }
         }
+        .onChange(of: listSelection) { _, item in
+            if let item, item != selection.item { selection.select(item) }
+        }
+        .onChange(of: selection.item, initial: true) { _, item in
+            if listSelection != item { listSelection = item }
+        }
+        // After the rows the search changed are in the list.
+        .onChange(of: model.searchText) {
+            Task { @MainActor in
+                if listSelection == nil, let item = selection.item { listSelection = item }
+            }
+        }
         // **Release the filter, don't just mask it.** When the debt reaches zero the
         // menu stops offering the toggle, which is the only way to turn it off — so the
         // state itself is reset. Left set, it would silently re-collapse the list on the
@@ -59,12 +77,12 @@ struct ArchiveSidebar: View {
     }
 
     private func list(_ artifacts: ShownArtifacts) -> some View {
-        List(selection: listSelection) {
+        List(selection: $listSelection) {
             if !isSearching {
-                Section(isExpanded: $reviewExpanded) {
-                    reviewRows
+                Section {
+                    if reviewExpanded { reviewRows }
                 } header: {
-                    header(.review, count: reviewCount) {
+                    header(.review, count: reviewCount, isExpanded: $reviewExpanded) {
                         Button {
                             model.perform(.refreshReview, fromSidebar: true)
                         } label: {
@@ -76,13 +94,14 @@ struct ArchiveSidebar: View {
                     }
                 }
             }
-            Section(isExpanded: $artifactsExpanded) {
-                artifactRows(artifacts)
+            Section {
+                if artifactsExpanded { artifactRows(artifacts) }
             } header: {
                 header(
                     .artifacts,
                     count: SidebarCount.text(
-                        shown: artifacts.visible.count, of: model.artifacts.count)
+                        shown: artifacts.visible.count, of: model.artifacts.count),
+                    isExpanded: $artifactsExpanded
                 ) {
                     if !model.artifacts.isEmpty {
                         ArtifactFilterMenu(
@@ -92,13 +111,14 @@ struct ArchiveSidebar: View {
                     }
                 }
             }
-            Section(isExpanded: $peopleExpanded) {
-                personRows
+            Section {
+                if peopleExpanded { personRows }
             } header: {
                 header(
                     .people,
                     count: SidebarCount.text(
-                        shown: model.displayedPersons.count, of: model.persons.count)
+                        shown: model.displayedPersons.count, of: model.persons.count),
+                    isExpanded: $peopleExpanded
                 ) { EmptyView() }
             }
         }
@@ -123,10 +143,6 @@ struct ArchiveSidebar: View {
     }
 
     // MARK: - Selection and search
-
-    private var listSelection: Binding<SidebarItem?> {
-        Binding(get: { selection.item }, set: { selection.select($0) })
-    }
 
     /// The one field, over both searches: the artifacts' (title, inline transcript and
     /// notes, AND-combined with the tag filter) and the people's.
@@ -252,18 +268,13 @@ struct ArchiveSidebar: View {
     }
 
     /// A section header: its title in plain text, as Finder's and Mail's are, then its
-    /// controls and its count.
+    /// controls, its count and its disclosure button.
     private func header(
-        _ section: SidebarSection, count: String,
+        _ section: SidebarSection, count: String, isExpanded: Binding<Bool>,
         @ViewBuilder controls: () -> some View
     ) -> some View {
-        HStack(spacing: 6) {
-            Text(section.title)
-            Spacer(minLength: 4)
+        SidebarSectionHeader(title: section.title, count: count, isExpanded: isExpanded) {
             controls()
-            Text(count)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
         }
         .id(SidebarRowID.header(section))
     }
@@ -319,5 +330,53 @@ private struct ShownArtifacts {
         let uncatalogued = displayed.filter { $0.sourceAuthorityTier == nil }
         uncataloguedCount = uncatalogued.count
         visible = uncataloguedOnly && !uncatalogued.isEmpty ? uncatalogued : displayed
+    }
+}
+
+/// A section header with its own disclosure button, rather than `Section(isExpanded:)`'s
+/// (slice 84's hand-test).
+///
+/// **The system's chevron moved the header's controls.** It appears on hover, and the
+/// header made room for it, so Refresh, Filter and Sort slid left just as the pointer
+/// reached them. This one keeps its place whether or not it shows, and fades in on
+/// hover as the system's does. A click on the title toggles too, as on the system's.
+private struct SidebarSectionHeader<Controls: View>: View {
+    let title: String
+    let count: String
+    @Binding var isExpanded: Bool
+    @ViewBuilder let controls: Controls
+
+    @State private var isHovering = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button(action: toggle) {
+                Text(title)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(isExpanded ? "Collapses the section" : "Expands the section")
+            controls
+            Text(count)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+            Button(action: toggle) {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            // Hidden, not removed: the space stays, so nothing beside it moves.
+            .opacity(isHovering || !isExpanded ? 1 : 0)
+            .help(isExpanded ? "Hide \(title)" : "Show \(title)")
+            .accessibilityLabel(isExpanded ? "Hide \(title)" : "Show \(title)")
+        }
+        .onHover { isHovering = $0 }
+    }
+
+    private func toggle() {
+        withAnimation(.snappy(duration: 0.2)) { isExpanded.toggle() }
     }
 }

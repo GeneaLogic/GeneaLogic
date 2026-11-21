@@ -330,10 +330,14 @@ private struct OpenArchiveView: View {
                         .help("Show the people as a list or as a tree")
                     }
                 }
-                // The area's add button (Artifacts: Add/scan menu; People: New Person).
-                // Review has nothing to add here.
-                if tab != .review {
-                    ToolbarItem { addButton }
+                // Both creates, on every area (slice 84's hand-test): the sidebar shows both
+                // collections everywhere, and a create switches to its own area first.
+                ToolbarItemGroup {
+                    // One connected menu (Add Artifact… + Continuity scan options), shown by
+                    // the AppKit receiver — a plain SwiftUI `Menu` can't host the
+                    // auto-inserted scan items, so this button pops that menu.
+                    CommandToolbarButton(command: .addArtifact) { model.beginAddOrScan() }
+                    CommandToolbarButton(command: .newPerson)
                 }
             }
             // The scanner's responder-chain receiver, hosted zero-size in the window
@@ -355,7 +359,7 @@ private struct OpenArchiveView: View {
                 // Seed the menu-bar's artifact-selection mirror (only meaningful on
                 // the Artifacts tab), so the Artifact menu is correctly enabled.
                 model.selectedArtifact = tab == .artifacts ? selectedArtifact?.uid : nil
-                model.selectedPerson = tab == .people ? selectedPerson?.uid : nil
+                model.selectedPerson = tab.section == .people ? selectedPerson?.uid : nil
                 // Review's section is always in the sidebar, so its count is owed from
                 // the start (slice 84): the worklist now, and the duplicates scan in the
                 // background, the header showing an ellipsis until it lands. From here
@@ -368,7 +372,8 @@ private struct OpenArchiveView: View {
                 // Re-seed / clear the mirror as the tab changes so the Artifact menu
                 // never acts on a stale selection from another section.
                 model.selectedArtifact = newTab == .artifacts ? selectedArtifact?.uid : nil
-                model.selectedPerson = newTab == .people ? selectedPerson?.uid : nil
+                // People's on the tree too, which runs the Person menu (84's hand-test).
+                model.selectedPerson = newTab.section == .people ? selectedPerson?.uid : nil
                 model.selectedFile = nil
                 // Re-scan the duplicates lane on entering Review, as before slice 84: its
                 // scores read records a person's summary doesn't show (a name added), so
@@ -385,7 +390,7 @@ private struct OpenArchiveView: View {
             }
             // The same for the Person menu (slice 82).
             .onChange(of: selectedPerson?.uid) { _, resolvedID in
-                guard tab == .people else { return }
+                guard tab.section == .people else { return }
                 model.selectedPerson = resolvedID
             }
             // Edit ▸ Find… (slice 82). A hidden sidebar is shown first, and the field
@@ -405,6 +410,10 @@ private struct OpenArchiveView: View {
             // View ▸ ⌘1–⌘4, and a create that switches to its own tab first (slice 82).
             .onChange(of: model.pendingTab) { _, target in
                 if let target {
+                    // Going to Review ends a search (84's hand-test): Review's rows aren't
+                    // search results, so its section hides while one is on, and the row
+                    // the window opens on would be nowhere in the sidebar.
+                    if target == .review, !model.searchText.trimmed.isEmpty { model.endSearch() }
                     tab = target
                     model.pendingTab = nil
                     revealRequest += 1
@@ -547,24 +556,6 @@ private struct OpenArchiveView: View {
             ReviewDetailPlaceholder(
                 hasWork: !model.reviewItems.isEmpty || !model.factItems.isEmpty
                     || !model.relationshipItems.isEmpty || !model.duplicateItems.isEmpty)
-        }
-    }
-
-    @ViewBuilder
-    private var addButton: some View {
-        switch tab {
-        case .artifacts:
-            // One connected menu (Add Artifact… + Continuity scan options), shown by
-            // the AppKit receiver — a plain SwiftUI `Menu` can't host the auto-inserted
-            // scan items, so this button pops that menu.
-            CommandToolbarButton(command: .addArtifact) { model.beginAddOrScan() }
-        case .people, .tree:
-            CommandToolbarButton(command: .newPerson)
-        case .review:
-            // Nothing is *added* in Review — every row is a mention that already exists,
-            // and the only thing it can mint (a person) belongs to the row's own
-            // somebody-new action, where the below-threshold check sits.
-            EmptyView()
         }
     }
 

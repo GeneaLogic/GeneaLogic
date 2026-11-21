@@ -4426,7 +4426,11 @@ been two slices.
   **`/code-review`:** every section's rows show on every area, but the area check dimmed
   their verbs off their own area. That check is the menu bar's, against a stale
   selection; a sidebar row names its subject, so its verbs pass `fromSidebar` and run
-  anywhere, and `ReviewCommandHost` moved off Review's detail to run them.
+  anywhere, and `ReviewCommandHost` moved off Review's detail to run them. **Hand-test:**
+  the system's hover chevron moved the header's controls, so headers draw their own; a
+  tinted symbol vanished into the selection; a list bound straight to the selection never
+  re-highlighted a row a search had dropped, so it keeps its own copy; Tree runs People's
+  menu-bar verbs; both creates are in the toolbar; switching to Review ends a search.
 
 ## Carryovers and parked work
 

@@ -61,7 +61,11 @@ import Testing
             available(in: context(on: .artifacts))
                 == everywhere.union(artifactVerbs).union([.toggleInspector]))
         #expect(available(in: context(on: .people)) == everywhere.union(personVerbs))
-        #expect(available(in: context(on: .tree)) == everywhere.union(treeVerbs))
+        // The tree is People too, so it offers People's verbs (slice 84's hand-test), all
+        // but the one that would show the tree it is on.
+        #expect(
+            available(in: context(on: .tree))
+                == everywhere.union(treeVerbs).union(personVerbs).subtracting([.showInTree]))
         #expect(available(in: context(on: .review)) == everywhere.union(reviewVerbs))
     }
 
@@ -252,7 +256,8 @@ import Testing
     @Test func theDeleteItemFollowsTheTab() {
         #expect(ArchiveCommand.delete(on: .artifacts) == .deleteArtifact)
         #expect(ArchiveCommand.delete(on: .people) == .deletePerson)
-        #expect(ArchiveCommand.delete(on: .tree) == nil)
+        // The tree is People too (slice 84's hand-test).
+        #expect(ArchiveCommand.delete(on: .tree) == .deletePerson)
         #expect(ArchiveCommand.delete(on: .review) == nil)
     }
 
@@ -453,7 +458,7 @@ import Testing
         let delete = KeyboardShortcut(.delete, modifiers: .command)
         for (tab, owner) in [
             (ArchiveTab.artifacts, ArchiveCommand.deleteArtifact), (.people, .deletePerson),
-            (.review, .declineSuggestion),
+            (.tree, .deletePerson), (.review, .declineSuggestion),
         ] {
             let context = CommandContext(hasArchive: true, activeTab: tab)
             let owners = ArchiveCommand.allCases.filter {

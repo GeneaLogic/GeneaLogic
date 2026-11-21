@@ -46,20 +46,23 @@ One `NavigationSplitView`, two columns, on every area: **sidebar | item**.
 - **The area is where the selection is.** Selecting a row sets the area; each area keeps
   its own selection. ⌘1–⌘4 and the jumps (Show in People, Show in Tree, a mention's
   person) expand the area's section if collapsed and scroll to its selection, else its
-  header. The menu bar's commands still scope by area, unchanged.
+  header. The menu bar's commands still scope by area, but Tree runs People's (all but
+  Show in Tree): it is a view of People. A sidebar row's own verbs run from any area.
 - **Tree is a view of People**: a List | Tree control in the toolbar on People, the tree
   taking the detail, the people selection its focus. ⌘3 opens People as a tree. Tree's
   focus popover and Choose Focus… stay.
 - **One search field** filters Artifacts and People. **Review's section hides while a
   search is active**, so the results start at the top and nothing unfiltered sits among
   them. Its rows aren't search results: the worklist was never searchable, because
-  filtering work owed hides it. Edit ▸ Find focuses the field from any area.
+  filtering work owed hides it. Switching to Review ends the search. Edit ▸ Find focuses
+  the field from any area.
 - **The duplicates scan runs when the archive opens**, in the background, so Review's
   count is whole from the start; the header shows an ellipsis until it finishes.
 - **Collapsed sections are remembered per window**, like the selections. 85 decides
   where window state lives, and takes this with it.
-- **No area switcher in the toolbar.** The `+` button follows the area, and the
-  inspector toggle stays at the trailing end on Artifacts.
+- **No area switcher in the toolbar.** Add Artifact and New Person are both there on
+  every area, each switching to its own area first, and the inspector toggle stays at
+  the trailing end on Artifacts.
 
 ## From the spike
 

@@ -148,6 +148,14 @@ extension ArchiveModel {
     /// module's `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` put it on the actor.
     nonisolated static let defaultFileRole: FileRole = .preservationMaster
 
+    /// Ends the one sidebar search, over the artifacts and the people both (slice 84).
+    func endSearch() {
+        searchText = ""
+        personSearchText = ""
+        applyFilters()
+        applyPersonFilter()
+    }
+
     /// Runs the active filter through the engine's index-backed
     /// `artifacts(matching:)` into `filterResults`: free text over title + inline
     /// transcript + notes + the text of any `role: .transcript` *file* (§5.1),

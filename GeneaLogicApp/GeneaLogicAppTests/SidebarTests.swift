@@ -227,6 +227,27 @@ import Testing
     }
 }
 
+/// The tree runs People's commands, and People doesn't run the tree's.
+@Suite struct TreeRunsPeoplesCommandsTests {
+    @Test func theTreeRunsPeoplesCommands() {
+        #expect(ArchiveTab.tree.runs(.people))
+        #expect(!ArchiveTab.people.runs(.tree))
+        for tab in ArchiveTab.allCases { #expect(tab.runs(tab)) }
+        #expect(!ArchiveTab.tree.runs(.artifacts))
+        #expect(ArchiveCommand.delete(on: .tree) == .deletePerson)
+    }
+
+    /// The Person menu on the tree acts on the person selected in the sidebar.
+    @Test func thePersonMenuWorksOnTheTree() {
+        let person = PersonID("PER-a")
+        let context = CommandContext(
+            hasArchive: true, activeTab: .tree, selectedPerson: person, personCount: 2)
+        for command in [ArchiveCommand.addName, .addFact, .addRelationship, .mergePerson, .deletePerson] {
+            #expect(context.isAvailable(command), "\(command) on the tree")
+        }
+    }
+}
+
 /// A sidebar row's commands run from any area; the menu bar's stay scoped by area.
 @MainActor
 @Suite struct SidebarCommandTests {
@@ -245,8 +266,11 @@ import Testing
         ]
         for (command, subject) in rows {
             #expect(context.canPerform(command, on: subject, fromSidebar: true))
+            // Show in Tree is off on the tree it would show (`canPerform`).
+            let onItsArea =
+                (command.tab.map(area.runs) ?? true) && !(command == .showInTree && area == .tree)
             #expect(
-                context.canPerform(command, on: subject) == (command.tab == area),
+                context.canPerform(command, on: subject) == onItsArea,
                 "\(command) off the sidebar is scoped by area")
         }
     }

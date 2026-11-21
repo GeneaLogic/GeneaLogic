@@ -192,6 +192,9 @@ extension ArchiveModel {
             actionError = "Open an archive before adding media."
             return
         }
+        // The toolbar's button is on every area since slice 84, and a create switches to
+        // its own area first (slice 82, fork 2), as `perform(.addArtifact)` does.
+        if activeTab != .artifacts { pendingTab = .artifacts }
         guard let continuityScanner else {
             beginAddMedia()
             return

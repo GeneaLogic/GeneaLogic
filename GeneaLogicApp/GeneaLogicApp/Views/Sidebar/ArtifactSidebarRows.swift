@@ -58,12 +58,18 @@ struct ArtifactRow: View {
 
 /// A sidebar row's leading symbol, in the one tint artifact and Review rows share
 /// (slice 84, fork 4), at a fixed width so the titles line up whatever the glyph.
+///
+/// **Not tinted on a selected row** while the list has focus: the highlight is the same
+/// accent, and the symbol vanished into it (84's hand-test). There it takes the row's
+/// text colour, as Finder's and Mail's sidebar symbols do.
 struct SidebarSymbol: View {
     let name: String
+    @Environment(\.backgroundProminence) private var prominence
 
     var body: some View {
         Image(systemName: name)
-            .foregroundStyle(.tint)
+            .foregroundStyle(
+                prominence == .increased ? AnyShapeStyle(.primary) : AnyShapeStyle(.tint))
             .frame(width: 18)
     }
 }
