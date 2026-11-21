@@ -109,8 +109,9 @@ extension ArchiveModel {
         }
     }
 
-    /// `nonisolated` + `async` so the work leaves the main actor, the same shape
-    /// `sweepFiles` uses. Deliberately **not** cancellation-checked: unlike a
+    /// Through `offMainActor` so the work leaves the main actor, as `sweepFiles` does
+    /// (until slice 84 a `nonisolated async` function, which ran on the main thread
+    /// after all; see `offMainActor`). Deliberately **not** cancellation-checked: unlike a
     /// sweep, this can be halfway through writing an index, and abandoning it is
     /// not cheaper than finishing it.
     ///
@@ -121,11 +122,13 @@ extension ArchiveModel {
     /// on the main actor once a second would put a manifest parse back where 52
     /// took the freezes out. The reconcile has just computed the same fact
     /// anyway.
-    private nonisolated static func reconcileIfStale(
+    private static func reconcileIfStale(
         _ archive: Archive
     ) async -> (rebuilt: Bool, deliveryInFlight: Bool) {
-        let rebuilt = (try? archive.reconcileIfStale()) ?? false
-        return (rebuilt, archive.deliveryIsInFlight)
+        await offMainActor {
+            let rebuilt = (try? archive.reconcileIfStale()) ?? false
+            return (rebuilt, archive.deliveryIsInFlight)
+        }
     }
 
     // MARK: - A change on its way in (slice 61)
