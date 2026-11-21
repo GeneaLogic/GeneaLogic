@@ -4433,6 +4433,10 @@ been two slices.
   menu-bar verbs; both creates are in the toolbar; switching to Review ends a search; a
   create switches area once the record lands, not before (82's fork 2 lost your place on
   a cancel); the selected row is kept in view whatever moved it, not only on ⌘1–⌘4.
+  **And the stall on entering Review:** the duplicates scan's scoring ran on the main
+  thread, as did the file sweep, the reconcile and Verify Integrity. All four were
+  `nonisolated async`, which Approachable Concurrency runs on the caller's actor; 84 only
+  made it visible by scanning at open and on each visit. `offMainActor` is `@concurrent`.
 
 ## Carryovers and parked work
 
