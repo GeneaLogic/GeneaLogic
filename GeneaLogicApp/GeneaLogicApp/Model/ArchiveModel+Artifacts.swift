@@ -701,7 +701,11 @@ extension ArchiveModel {
         // Select the new artifact so its document/inspector shows at once (slice
         // 29). A multi-file add lands on the last one created. Only set when a
         // create actually succeeded, so a wholly-failed ingest leaves selection be.
-        if let created { lastCreatedArtifact = created }
+        if let created {
+            lastCreatedArtifact = created
+            // To Artifacts, now that there is something there to see (slice 84).
+            if activeTab != .artifacts { pendingTab = .artifacts }
+        }
     }
 
     /// What the scan path needs from either outcome type: whether the file landed.

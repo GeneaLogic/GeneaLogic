@@ -4430,7 +4430,9 @@ been two slices.
   the system's hover chevron moved the header's controls, so headers draw their own; a
   tinted symbol vanished into the selection; a list bound straight to the selection never
   re-highlighted a row a search had dropped, so it keeps its own copy; Tree runs People's
-  menu-bar verbs; both creates are in the toolbar; switching to Review ends a search.
+  menu-bar verbs; both creates are in the toolbar; switching to Review ends a search; a
+  create switches area once the record lands, not before (82's fork 2 lost your place on
+  a cancel); the selected row is kept in view whatever moved it, not only on ⌘1–⌘4.
 
 ## Carryovers and parked work
 

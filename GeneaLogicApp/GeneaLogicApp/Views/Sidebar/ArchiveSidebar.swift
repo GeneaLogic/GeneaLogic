@@ -48,12 +48,13 @@ struct ArchiveSidebar: View {
         ScrollViewReader { proxy in
             list(artifacts)
                 .onChange(of: revealRequest) { reveal(proxy, artifacts: artifacts) }
-                // Review's keys move the selection down a list the pointer isn't on, and
-                // `List` doesn't follow a selection set from outside.
-                .onChange(of: selection.review) { _, id in
-                    guard let id, selection.area == .review, !isSearching else { return }
-                    proxy.scrollTo(SidebarRowID.item(.review(id)))
-                }
+                // `List` doesn't follow a selection set from outside, and plenty sets it:
+                // the List | Tree control, a refocus in the tree, Review's keys walking
+                // down the worklist, a record just created. Whatever moved the area or its
+                // selection, the selected row is brought into view, no further than it
+                // has to go — so a row just clicked doesn't move (84's hand-test).
+                .onChange(of: selection.area) { keepSelectionInView(proxy) }
+                .onChange(of: selection.item) { keepSelectionInView(proxy) }
         }
         .onChange(of: listSelection) { _, item in
             if let item, item != selection.item { selection.select(item) }
@@ -297,6 +298,17 @@ struct ArchiveSidebar: View {
         }
     }
 
+    /// Scrolls the selected row into view, if its section is showing it.
+    private func keepSelectionInView(_ proxy: ScrollViewProxy) {
+        guard let item = selection.item, !collapsed.contains(item.section),
+            !(isSearching && item.section == .review)
+        else { return }
+        let target = SidebarRowID.item(item)
+        // Twice, for the reason `reveal` gives.
+        proxy.scrollTo(target)
+        Task { @MainActor in proxy.scrollTo(target) }
+    }
+
     private func reveal(_ proxy: ScrollViewProxy, artifacts: ShownArtifacts) {
         let reveal = SidebarReveal(
             for: selection, collapsed: collapsed, hidden: isSearching ? [.review] : []
@@ -339,7 +351,8 @@ private struct ShownArtifacts {
 /// **The system's chevron moved the header's controls.** It appears on hover, and the
 /// header made room for it, so Refresh, Filter and Sort slid left just as the pointer
 /// reached them. This one keeps its place whether or not it shows, and fades in on
-/// hover as the system's does. A click on the title toggles too, as on the system's.
+/// hover as the system's does. A click on the title or the count toggles too: everything
+/// in the header but its own controls.
 private struct SidebarSectionHeader<Controls: View>: View {
     let title: String
     let count: String
@@ -358,9 +371,13 @@ private struct SidebarSectionHeader<Controls: View>: View {
             .buttonStyle(.plain)
             .accessibilityHint(isExpanded ? "Collapses the section" : "Expands the section")
             controls
-            Text(count)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
+            Button(action: toggle) {
+                Text(count)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
             Button(action: toggle) {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))

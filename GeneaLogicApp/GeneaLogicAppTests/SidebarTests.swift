@@ -298,18 +298,43 @@ import Testing
     }
 
     /// The tree is People too, so a new person stays on it, as its new focus.
-    @Test func newPersonFromTheTreeStaysOnTheTree() throws {
+    @Test func newPersonFromTheTreeStaysOnTheTree() async throws {
         let (model, root) = try AppTestSupport.makeModel()
         defer { AppTestSupport.remove(root) }
         model.activeTab = .tree
-        model.perform(.newPerson)
+        await model.act { model.createPerson(given: "Ann", surname: "Roe") }
         #expect(model.pendingTab == nil)
-        #expect(model.isCreatingPerson)
 
-        model.isCreatingPerson = false
+        model.activeTab = .review
+        await model.act { model.createPerson(given: "Ben", surname: "Roe") }
+        #expect(model.pendingTab == .people)
+    }
+
+    /// Asking for the sheet doesn't move the window: a cancel would lose your place.
+    @Test func newPersonWaitsForThePerson() throws {
+        let (model, root) = try AppTestSupport.makeModel()
+        defer { AppTestSupport.remove(root) }
         model.activeTab = .review
         model.perform(.newPerson)
-        #expect(model.pendingTab == .people)
+        #expect(model.isCreatingPerson)
+        #expect(model.pendingTab == nil)
+    }
+
+    /// A merge follows the survivor in People's selection, but leaves the window on the
+    /// area it was merged from (Review's duplicates lane).
+    @Test func aMergeDoesNotLeaveReview() async throws {
+        let (model, root) = try AppTestSupport.makeModel()
+        defer { AppTestSupport.remove(root) }
+        await model.act { model.createPerson(given: "Ann", surname: "Roe") }
+        await model.act { model.createPerson(given: "Anne", surname: "Roe") }
+        let ids = model.persons.map(\.uid)
+        model.activeTab = .review
+        model.pendingTab = nil
+
+        await model.act { model.mergePersons(ids[1], into: ids[0]) }
+
+        #expect(model.lastCreatedPerson == ids[0])
+        #expect(model.pendingTab == nil)
     }
 
     /// Review's count shows on every area, so an edit to a person re-scans the duplicates.

@@ -129,7 +129,8 @@ enum ArchiveCommand: Hashable, CaseIterable {
     }
 
     /// The tab a command belongs to, or `nil` for one that works from any tab. A create
-    /// belongs to no tab: it switches to its own first (fork 2), so the result is in view.
+    /// belongs to no tab: it switches to its own once the record exists (82's fork 2, as
+    /// revised by 84), so the result is in view.
     ///
     /// Nor does a row's command (slice 83b): it is drawn only on its row, which is on
     /// screen, and owns no key, so the check (which exists for the menu bar) adds nothing.

@@ -331,7 +331,7 @@ private struct OpenArchiveView: View {
                     }
                 }
                 // Both creates, on every area (slice 84's hand-test): the sidebar shows both
-                // collections everywhere, and a create switches to its own area first.
+                // collections everywhere, and a create switches to its own area once it lands.
                 ToolbarItemGroup {
                     // One connected menu (Add Artifact… + Continuity scan options), shown by
                     // the AppKit receiver — a plain SwiftUI `Menu` can't host the
@@ -407,7 +407,7 @@ private struct OpenArchiveView: View {
                     isSearchFocused = true
                 }
             }
-            // View ▸ ⌘1–⌘4, and a create that switches to its own tab first (slice 82).
+            // View ▸ ⌘1–⌘4, and a create switching to its own area once it lands.
             .onChange(of: model.pendingTab) { _, target in
                 if let target {
                     // Going to Review ends a search (84's hand-test): Review's rows aren't
@@ -483,10 +483,9 @@ private struct OpenArchiveView: View {
             detail
         }
         .modifier(ReviewCommandHost(selection: $reviewSelection))
-        // Drag-in ingest, from any area: the drop is a create, so like the File menu's
-        // it switches to its own area first (slice 82, fork 2).
+        // Drag-in ingest, from any area: a create, so it switches to Artifacts once the
+        // artifact exists (`commitIngest`).
         .dropDestination(for: URL.self) { urls, _ in
-            if tab != .artifacts { tab = .artifacts }
             model.ingest(urls)
             return true
         }

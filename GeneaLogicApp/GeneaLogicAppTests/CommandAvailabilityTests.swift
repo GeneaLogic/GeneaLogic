@@ -270,15 +270,26 @@ import Testing
 
     // MARK: - Running a command
 
-    @MainActor @Test func aCreateSwitchesToItsTab() throws {
+    /// A create switches to its own tab once the record exists (82's fork 2, revised by
+    /// 84's hand-test): asking doesn't move the window, so a cancel leaves it where it was.
+    @MainActor @Test func aCreateSwitchesToItsTabWhenItLands() async throws {
         let (model, root) = try AppTestSupport.makeModel()
         defer { AppTestSupport.remove(root) }
         model.activeTab = .review
 
         model.perform(.addArtifact)
+        #expect(model.pendingTab == nil)
+        #expect(model.isImporterPresented)
+        model.isImporterPresented = false
+
+        let file = root.deletingLastPathComponent()
+            .appendingPathComponent("scan-\(UUID().uuidString).txt")
+        try Data("a census".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        await model.act { model.ingest([file]) }
 
         #expect(model.pendingTab == .artifacts)
-        #expect(model.isImporterPresented)
+        #expect(model.lastCreatedArtifact != nil)
     }
 
     @MainActor @Test func aViewClaimsOnlyTheCommandsItRuns() throws {

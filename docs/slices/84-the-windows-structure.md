@@ -61,7 +61,8 @@ One `NavigationSplitView`, two columns, on every area: **sidebar | item**.
 - **Collapsed sections are remembered per window**, like the selections. 85 decides
   where window state lives, and takes this with it.
 - **No area switcher in the toolbar.** Add Artifact and New Person are both there on
-  every area, each switching to its own area first, and the inspector toggle stays at
+  every area, each switching to its own area once the record exists (revising 82's fork
+  2: switching first lost your place for a cancel), and the inspector toggle stays at
   the trailing end on Artifacts.
 
 ## From the spike

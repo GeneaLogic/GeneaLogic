@@ -107,13 +107,12 @@ extension ArchiveModel {
     ) {
         guard canPerform(command, on: subject, fromSidebar: fromSidebar) else { return }
         switch command {
+        // A create switches to its own area once the record exists, not before (slice 84's
+        // hand-test, revising 82's fork 2): switching first lost your place for a cancel.
+        // `commitIngest` and `createPerson` switch.
         case .addArtifact:
-            pendingTab = .artifacts
             beginAddMedia()
         case .newPerson:
-            // To People, unless it is already showing: the tree is People too, and the
-            // new person becomes its focus there (slice 84).
-            if activeTab.section != .people { pendingTab = .people }
             isCreatingPerson = true
         case .verifyIntegrity: beginVerifyIntegrity()
         case .showTrash: beginShowTrash()
@@ -192,9 +191,6 @@ extension ArchiveModel {
             actionError = "Open an archive before adding media."
             return
         }
-        // The toolbar's button is on every area since slice 84, and a create switches to
-        // its own area first (slice 82, fork 2), as `perform(.addArtifact)` does.
-        if activeTab != .artifacts { pendingTab = .artifacts }
         guard let continuityScanner else {
             beginAddMedia()
             return
