@@ -63,9 +63,9 @@ extension ArchiveModel {
 
     /// Rebuilds the worklist from the archive.
     ///
-    /// Runs on entering the section, from its Refresh button, and — once it has been
-    /// loaded at all — from `refresh()`, so a decision, an undo, or an edit made in
-    /// another section is reflected. **A recompute cannot reorder the queue**, which is
+    /// Runs when the window opens (slice 84: Review's count is in the sidebar on every
+    /// area), from Refresh, and from `refresh()`, so a decision, an undo, or an edit made
+    /// in another section is reflected. **A recompute cannot reorder the queue**, which is
     /// what makes wiring it to every mutation safe rather than disorienting: the engine
     /// returns document order (artifact `uid`, then the record's own mention order), and a
     /// decision on one pair moves nothing else. Patching the list in place instead would
@@ -119,10 +119,19 @@ extension ArchiveModel {
 
     // MARK: - Review's commands (slice 83)
 
-    /// The worklist in the sidebar's order: names, facts, relationships, duplicates.
+    /// The worklist in the sidebar's order, the order Review's keys walk. Drawn from the
+    /// sidebar's rows, so the two orders are one (`ReviewSidebarRow.rows`).
     var reviewRows: [ReviewTarget] {
-        reviewItems.map(\.target) + factItems.map(\.target)
-            + relationshipItems.map(\.target) + duplicateItems.map(\.target)
+        reviewSidebarRows(showingScan: false).compactMap(\.target)
+    }
+
+    /// The sidebar's Review rows: every lane, and the duplicates scan's place while its
+    /// first run is under way if `showingScan`.
+    func reviewSidebarRows(showingScan: Bool = true) -> [ReviewSidebarRow] {
+        ReviewSidebarRow.rows(
+            names: reviewItems, facts: factItems, relationships: relationshipItems,
+            duplicates: duplicateItems,
+            isScanningDuplicates: showingScan && isScanningDuplicates)
     }
 
     /// The selected row, if it is still on the worklist. Looked up lane by lane rather
@@ -405,10 +414,10 @@ extension ArchiveModel {
     /// behind that lock, so the scan is simply a detached read whose result is applied back
     /// here; the lock still serializes it against any concurrent write.
     ///
-    /// **Not wired into `refresh()`**, unlike the other two lanes. A quadratic sweep on
-    /// every mutation is the cost this indirection exists to avoid, and unlike the names
-    /// lane the answer does not change under an ordinary edit — so it runs on entering the
-    /// section and from Refresh. What *does* invalidate it immediately is a decision on one
+    /// **Not run on every `refresh()`**, unlike the other lanes. A quadratic sweep on every
+    /// mutation is the cost this indirection exists to avoid, and unlike the names lane the
+    /// answer does not change under an ordinary edit — so it runs when the window opens, on
+    /// entering Review, from Refresh, and from `refresh()` only when the people changed. What *does* invalidate it immediately is a decision on one
     /// of its own rows, and those drop the row locally rather than re-scanning.
     /// Re-scans **only if the lane has been shown**, for a change that invalidates it
     /// structurally — a person ceasing to exist, which every merge and every delete does.
@@ -439,14 +448,29 @@ extension ArchiveModel {
         }
     }
 
+    /// **One scan at a time; a request during one runs once after it** (84's
+    /// `/code-review`). Cancel-and-replace started a new full sweep per request, and the
+    /// engine's scoring never checks for cancellation, so a run of edits on a large
+    /// archive ran that many quadratic sweeps at once, on every core, to keep the last.
+    /// The running scan's answer is discarded when a request came in during it: it
+    /// predates that request, and could name a person merged away since, offering a merge
+    /// that can only fail (`dropDuplicateRows`). The file sweep coalesces the same way.
     func refreshDuplicateCandidates() {
-        duplicateScanTask?.cancel()
         guard let archive else {
+            duplicateScanTask?.cancel()
+            duplicateScanTask = nil
+            duplicateScanRequested = false
             duplicateItems = []
             isScanningDuplicates = false
             return
         }
         isScanningDuplicates = true
+        guard duplicateScanTask == nil else {
+            duplicateScanRequested = true
+            return
+        }
+        duplicateScanRequested = false
+        duplicateScansStarted += 1
         // **The read is here, on the main actor, and it is linear** — one pass over the
         // conclusions to build the snapshot, the same cost the other two lanes pay. Only
         // the quadratic scoring goes off-actor, and it takes no lock, so an archive read
@@ -457,6 +481,12 @@ extension ArchiveModel {
         duplicateScanTask = Task { [weak self] in
             let candidates = await Self.scoreDuplicates(input)
             guard !Task.isCancelled, let self else { return }
+            self.duplicateScanTask = nil
+            // Asked again while this ran: this answer is already behind, so run again.
+            if self.duplicateScanRequested {
+                self.refreshDuplicateCandidates()
+                return
+            }
             self.duplicateItems = candidates.map { candidate in
                 DuplicateReviewItem(
                     candidate: candidate,
@@ -470,9 +500,16 @@ extension ArchiveModel {
 
     /// The quadratic half, off the main actor.
     ///
-    /// `nonisolated` + `async` rather than `Task.detached`: a detached task is unstructured
-    /// and outlives the cancellation of whatever started it, so rapid Refresh clicks would
+    /// `@concurrent` rather than `Task.detached`: a detached task is unstructured and
+    /// outlives the cancellation of whatever started it, so rapid Refresh clicks would
     /// pile up sweeps nobody is waiting for. This one is part of the task that awaits it.
+    ///
+    /// **`@concurrent`, not just `nonisolated`.** The app builds with Approachable
+    /// Concurrency, under which a `nonisolated async` function runs on its caller's actor:
+    /// here, the main one. Until slice 84 that is how this was written, and it ran on the
+    /// main thread; 84 scanned at open and on entering Review, and the window stalled for
+    /// a second or two on a 400-person archive. `OffMainActorTests` pins the rule.
+    @concurrent
     private nonisolated static func scoreDuplicates(
         _ input: DuplicateScanInput
     ) async -> [DuplicateCandidate] {

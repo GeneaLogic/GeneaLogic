@@ -62,8 +62,9 @@ enum ArchiveCommand: Hashable, CaseIterable {
     nonisolated static func delete(on tab: ArchiveTab) -> ArchiveCommand? {
         switch tab {
         case .artifacts: .deleteArtifact
-        case .people: .deletePerson
-        case .tree, .review: nil
+        // The tree is People too (slice 84's hand-test).
+        case .people, .tree: .deletePerson
+        case .review: nil
         }
     }
 
@@ -128,7 +129,8 @@ enum ArchiveCommand: Hashable, CaseIterable {
     }
 
     /// The tab a command belongs to, or `nil` for one that works from any tab. A create
-    /// belongs to no tab: it switches to its own first (fork 2), so the result is in view.
+    /// belongs to no tab: it switches to its own once the record exists (82's fork 2, as
+    /// revised by 84), so the result is in view.
     ///
     /// Nor does a row's command (slice 83b): it is drawn only on its row, which is on
     /// screen, and owns no key, so the check (which exists for the menu bar) adds nothing.
@@ -342,7 +344,9 @@ enum ArchiveCommand: Hashable, CaseIterable {
 
     var systemImage: String {
         switch self {
-        case .addArtifact, .newPerson: "plus"
+        // Told apart since slice 84, when both went in the toolbar on every area.
+        case .addArtifact: "doc.badge.plus"
+        case .newPerson: "person.badge.plus"
         case .verifyIntegrity: "checkmark.shield"
         case .showTrash: "trash"
         case .find: "magnifyingglass"
@@ -585,17 +589,25 @@ struct CommandContext: Equatable {
     }
 
     /// Whether `command` can run on `subject` right now. The one rule every surface asks.
-    func canPerform(_ command: ArchiveCommand, on subject: CommandSubject) -> Bool {
+    ///
+    /// `fromSidebar` is for a command on a sidebar row (its context menu, ⌫, a header's
+    /// button), which runs from any area (slice 84). The area check is the menu bar's: it
+    /// keeps a verb off a stale selection while another area shows. A sidebar row names
+    /// its own subject, and the sidebar shows every section's rows on every area.
+    func canPerform(
+        _ command: ArchiveCommand, on subject: CommandSubject, fromSidebar: Bool = false
+    ) -> Bool {
         guard hasArchive, !isPresentingModal, subject.kind == command.subjectKind else {
             return false
         }
-        if let tab = command.tab, tab != activeTab { return false }
+        if !fromSidebar, let tab = command.tab, !activeTab.runs(tab) { return false }
         switch command {
         // The inspector belongs to the artifact detail, which shows only with a selection.
         case .toggleInspector: return selectedArtifact != nil
         case .mergePerson: return personCount > 1
-        // The two tabs with a search field.
-        case .find: return activeTab == .artifacts || activeTab == .people
+        // The tree runs People's verbs, but this one would show what is already showing:
+        // the tree's focus is the people selection. A sidebar row names its own person.
+        case .showInTree: return fromSidebar || activeTab != .tree
         case .acceptSuggestion:
             return !isDecidingReview && subject.reviewLane?.canAccept == true
         case .declineSuggestion:
@@ -631,7 +643,7 @@ struct CommandContext: Equatable {
     /// drops a duplicate key from the later menu item, enabled or not (measured), so a
     /// key attached to both would leave Delete Person… with none.
     func ownsShortcut(_ command: ArchiveCommand) -> Bool {
-        command.tab == nil || command.tab == activeTab
+        command.tab.map(activeTab.runs) ?? true
     }
 }
 
@@ -642,6 +654,14 @@ extension CommandSubject {
 }
 
 extension ArchiveTab {
+    /// Whether a command of `tab`'s runs while this one shows. Each tab runs its own, and
+    /// the tree runs People's too (slice 84's hand-test): it is a view of People, and the
+    /// person the sidebar shows selected is the one the Person menu acts on. People
+    /// doesn't run the tree's, which act on the tree's focus and depths.
+    nonisolated func runs(_ tab: ArchiveTab) -> Bool {
+        tab == self || (self == .tree && tab == .people)
+    }
+
     /// ⌘1–⌘4, in the switcher's order, as Finder and Mail number theirs (G2).
     fileprivate var shortcutKey: KeyEquivalent {
         switch self {

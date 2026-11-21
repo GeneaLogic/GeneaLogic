@@ -2,19 +2,33 @@ import GeneaLogicArchive
 import GeneaLogicModel
 import SwiftUI
 
-/// People-tab browse list of the open archive's concluded persons (or the active
-/// search's results). Mirrors `ArtifactListView`: selectable rows, a ⌫ /
-/// context-menu delete raising a confirm, and distinct empty states for a genuinely
-/// empty archive vs. a search that matched nothing.
-struct PersonListView: View {
-    @Environment(ArchiveModel.self) private var model
-    let persons: [PersonSummary]
-    @Binding var selection: PersonID?
-    var isFiltering: Bool = false
-    var onDelete: (PersonID) -> Void = { _ in }
+/// A person's sidebar row: the display name over a one-line subtitle of primary date
+/// (EDTF-glossed) and fact count. No symbol (slice 84, fork 4): every row in the section
+/// is a person, so one would distinguish nothing.
+struct PersonRow: View {
+    let summary: PersonSummary
 
-    /// The person a right-click "Delete Person…" or the ⌫ key is awaiting
-    /// confirmation for.
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(summary.displayName ?? "Unnamed person")
+                .font(.headline)
+                .lineLimit(1)
+            Text(summary.browseSubtitle)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+}
+
+/// Delete Person…'s confirm and Merge Into…'s picker and confirm, from ⌫, the Person
+/// menu and a row's context menu. On the sidebar as a whole, like
+/// `ArtifactDeleteConfirmation`, so they work with the section collapsed or a search
+/// showing none of the people.
+struct PersonDeleteAndMerge: ViewModifier {
+    @Environment(ArchiveModel.self) private var model
+
+    /// The person awaiting delete confirmation.
     @State private var pendingDelete: PersonSummary?
 
     /// The duplicate whose "Merge Into…" picker is up (slice 45f), or `nil`. This is the
@@ -27,11 +41,8 @@ struct PersonListView: View {
     /// from the row alone — so the pair is named back before anything is written.
     @State private var pendingMerge: PendingMerge?
 
-    var body: some View {
-        // The confirm lives on the always-mounted outer body (not the `List`), so a
-        // ⌫ delete still confirms when a search has emptied the list, and so do the
-        // Person menu's Delete and Merge (slice 82).
-        listContent
+    func body(content: Content) -> some View {
+        content
             .onChange(of: model.pendingCommand) {
                 guard
                     let (command, subject) = model.claimPendingCommand({
@@ -52,7 +63,7 @@ struct PersonListView: View {
                     get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
                 titleVisibility: .visible, presenting: pendingDelete
             ) { person in
-                Button("Delete Person", role: .destructive) { onDelete(person.uid) }
+                Button("Delete Person", role: .destructive) { model.deletePerson(person.uid) }
             } message: { _ in
                 Text(
                     "This removes the person from the archive. Any relationships or "
@@ -113,80 +124,5 @@ struct PersonListView: View {
 
     private func name(of id: PersonID) -> String {
         model.persons.first { $0.uid == id }?.displayName ?? "the other person"
-    }
-
-    /// Placeholders for people whose record couldn't be read (slice 56).
-    private var unreadable: [UnreadableRecordRow] { model.unreadablePersons }
-
-    @ViewBuilder
-    private var listContent: some View {
-        // As in the artifacts list: an unreadable person must not make the archive
-        // look like it has no people — but a search that matches nothing must
-        // still say so, so the filter is asked first (review finding, 56).
-        if isFiltering && persons.isEmpty {
-            ContentUnavailableView(
-                "No Matches", systemImage: "person.crop.circle.badge.questionmark",
-                description: Text("No people match the current search."))
-        } else if persons.isEmpty && !showsPlaceholders {
-            ContentUnavailableView(
-                "No People Yet", systemImage: "person.2",
-                description: Text("Add a person with the + button to start building the tree."))
-        } else {
-            List(selection: $selection) {
-                unreadableRows
-                ForEach(persons, id: \.uid) { person in
-                    PersonRow(summary: person)
-                        .tag(person.uid)
-                        .contextMenu {
-                            CommandButton(.showInTree, on: .person(person.uid))
-                            CommandButton(.mergePerson, on: .person(person.uid))
-                            CommandButton(.deletePerson, on: .person(person.uid))
-                        }
-                }
-            }
-            .onDeleteCommand {
-                if let selection { model.perform(.deletePerson, on: .person(selection)) }
-            }
-        }
-    }
-
-    /// Whether the damaged rows belong in the list right now — not while a search
-    /// is active, for the reasons in `ArtifactListView.showsPlaceholders`.
-    private var showsPlaceholders: Bool { !isFiltering && !unreadable.isEmpty }
-
-    /// Pinned above the people, untagged so the `PersonID` selection can't land
-    /// on one — see `UnreadableRecordRowView`.
-    @ViewBuilder
-    private var unreadableRows: some View {
-        if showsPlaceholders {
-            Section {
-                ForEach(unreadable) { row in
-                    UnreadableRecordRowView(
-                        row: row, root: model.url, plan: model.repairPlans[row.path],
-                        restore: { accepted in
-                            model.repairRecord(atPath: row.path, acceptingInexactRestore: accepted)
-                        },
-                        delete: { model.deleteVanishedRecord(atPath: row.path) })
-                }
-            }
-        }
-    }
-}
-
-/// A single row in the People browse list: the display name over a one-line
-/// subtitle of primary date (EDTF-glossed) and fact count.
-private struct PersonRow: View {
-    let summary: PersonSummary
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(summary.displayName ?? "Unnamed person")
-                .font(.headline)
-                .lineLimit(1)
-            Text(summary.browseSubtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
     }
 }

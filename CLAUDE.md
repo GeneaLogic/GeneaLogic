@@ -123,6 +123,10 @@ skill, which wraps this.
 ## Conventions
 
 - Model types are `struct`, `Codable`, `Sendable`, value semantics.
+- **In the app, work meant to leave the main actor is `@concurrent`**, never a bare
+  `nonisolated async`: the app builds with Approachable Concurrency, which runs that on
+  the caller's actor, so it silently stays on the main thread (slice 84 found four;
+  `OffMainActorTests` pins the rule). The packages build without the setting.
 - Run `swift build` / `swift test` to verify; `swift format` keeps style (a hook
   formats Swift files on edit automatically).
 - Commit messages: imperative, scoped. Don't push `main` or merge without being asked.

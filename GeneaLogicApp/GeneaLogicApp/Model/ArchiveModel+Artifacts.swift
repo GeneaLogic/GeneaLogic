@@ -148,6 +148,14 @@ extension ArchiveModel {
     /// module's `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` put it on the actor.
     nonisolated static let defaultFileRole: FileRole = .preservationMaster
 
+    /// Ends the one sidebar search, over the artifacts and the people both (slice 84).
+    func endSearch() {
+        searchText = ""
+        personSearchText = ""
+        applyFilters()
+        applyPersonFilter()
+    }
+
     /// Runs the active filter through the engine's index-backed
     /// `artifacts(matching:)` into `filterResults`: free text over title + inline
     /// transcript + notes + the text of any `role: .transcript` *file* (§5.1),
@@ -693,7 +701,11 @@ extension ArchiveModel {
         // Select the new artifact so its document/inspector shows at once (slice
         // 29). A multi-file add lands on the last one created. Only set when a
         // create actually succeeded, so a wholly-failed ingest leaves selection be.
-        if let created { lastCreatedArtifact = created }
+        if let created {
+            lastCreatedArtifact = created
+            // To Artifacts, now that there is something there to see (slice 84).
+            if activeTab != .artifacts { pendingTab = .artifacts }
+        }
     }
 
     /// What the scan path needs from either outcome type: whether the file landed.

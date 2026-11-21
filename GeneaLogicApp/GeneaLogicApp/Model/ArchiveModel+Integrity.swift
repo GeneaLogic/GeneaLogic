@@ -83,6 +83,11 @@ extension ArchiveModel {
             let report = await Self.sweepFiles(archive)
             guard let self else { return }
             self.fileSweepTask = nil
+            // A request made during the walk runs now, not at the next poll (84's
+            // `/code-review`): the poll backs off, and until it came round a repair made
+            // while the opening sweep ran left that sweep's damage on the banner. This
+            // walk's answer is still applied first; it is only older, never wrong.
+            defer { if self.fileSweepCoalesced { self.reloadFileDamage() } }
             // The window may have loaded a different archive while we walked —
             // the same guard, and the same reason, as the reconcile task's.
             guard let report, self.archive === archive else { return }
@@ -91,9 +96,10 @@ extension ArchiveModel {
         }
     }
 
-    /// The walk itself. `nonisolated` + `async` rather than `Task.detached`, for
-    /// the reason `scoreDuplicates` is: a detached task outlives the cancellation
-    /// of whatever started it.
+    /// The walk itself. `@concurrent` rather than `Task.detached`, for the reason
+    /// `scoreDuplicates` is: a detached task outlives the cancellation of whatever
+    /// started it. **Until slice 84 it was only `nonisolated`, and ran on the main
+    /// thread**, for the reason `scoreDuplicates` gives.
     ///
     /// **Cancellation is checked here, before the walk, and that is the only
     /// place it can be** (review finding, 57). `sweepFileSizes()` is synchronous
@@ -108,6 +114,7 @@ extension ArchiveModel {
     /// once slice 61 put this on the 1 Hz poll. Requests now coalesce onto the
     /// running walk (see `reloadFileDamage`), so the only cancellation left is the
     /// archive going away.
+    @concurrent
     private nonisolated static func sweepFiles(
         _ archive: Archive
     ) async -> Archive.FileSweepReport? {
@@ -243,8 +250,9 @@ extension ArchiveModel {
     /// no archive is open (the menu command is disabled in that case). Read-only:
     /// it touches nothing and is safe to re-run.
     ///
-    /// **Off the main actor** (slice 57b), the same `nonisolated` + `async` shape
-    /// `sweepFiles` uses. It was a synchronous main-actor call, which was already
+    /// **Off the main actor** (slice 57b), `@concurrent` as `sweepFiles` is (until slice
+    /// 84 only `nonisolated`, which ran on the main thread after all; see
+    /// `scoreDuplicates`). It was a synchronous main-actor call, which was already
     /// a long freeze on a large archive and became an unbounded one the moment
     /// this call could be asked to *download* the files it hashes: a spinner that
     /// paints once and then a dead window for as long as the network takes.
@@ -269,6 +277,7 @@ extension ArchiveModel {
     /// everything it did not read, named. Returning `nil` here instead would
     /// discard that and leave the panel rendering "No archive is open" for a
     /// download the user themselves stopped.
+    @concurrent
     private nonisolated static func verify(
         _ archive: Archive, includingDatalessFiles: Bool
     ) async throws -> IntegrityReport {

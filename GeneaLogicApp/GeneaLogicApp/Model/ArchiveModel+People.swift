@@ -86,6 +86,9 @@ extension ArchiveModel {
         } commit: { [self] person in
             registerPersonRedelete(of: person.uid, actionName: "Add Person")
             lastCreatedPerson = person.uid
+            // To People, now that the person exists (slice 84), unless it is showing: the
+            // tree is People too, and the new person becomes its focus there.
+            if activeTab.section != .people { pendingTab = .people }
             bumpAndRefresh()
             // A new person can *be* a duplicate — that is the case the lane exists for,
             // and the one the somebody-new path creates by accident.

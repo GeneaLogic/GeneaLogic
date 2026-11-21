@@ -60,8 +60,9 @@ import Testing
     @Test func restoringTurnsThePlaceholderIntoARealRecord() async throws {
         let (model, root, path) = try await modelWithABrokenPerson()
         defer { AppTestSupport.remove(root) }
-
+        // See `MissingRecordTests`' `restoringBringsThePersonBack`.
         await model.act { model.repairRecord(atPath: path) }
+        await model.fileSweepSettled()
 
         #expect(model.unreadablePersons.isEmpty)
         #expect(model.repairPlans.isEmpty)

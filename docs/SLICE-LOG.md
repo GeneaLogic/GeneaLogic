@@ -4409,6 +4409,23 @@ been two slices.
   where there's nothing to decide. The HIG keeps a menu's *set* of items stable and asks a
   title to clarify its target; fork 4 had read the first as fixed wording.
 
+- **84 — the window's structure** (app only; no format change; #39). G4, re-scoped: the
+  switcher moved because the area was a toolbar control over a sidebar holding its
+  collection. **Decided** (prototype on `spike-84`): one sidebar of Review, Artifacts and
+  People, two columns everywhere; Tree a List | Tree view of People, running People's
+  menu-bar verbs; Review one section, lane by lane, hidden while searching. **The
+  invariant:** the area is where the selection is (`SidebarSelection`), and the selected
+  row is kept in view whatever moved it. **Revised:** a create switches area once the
+  record exists, not before (82's fork 2 lost your place on a cancel). **Gotchas:** the
+  list drops its selection when the row leaves, so the drop is ignored and the list keeps
+  its own copy to re-highlight with. Every section's rows show on every area, but the area
+  check (the menu bar's, against a stale selection) dimmed their verbs: a sidebar row
+  names its subject, so its verbs pass `fromSidebar`. Review's count, owed from open, put
+  the duplicates scan on every visit and exposed that it, the file sweep, the reconcile and
+  Verify Integrity all ran on the main thread: `nonisolated async` runs on the caller's
+  actor under Approachable Concurrency. They are `@concurrent`, and the scan and sweep run
+  one at a time, a request during one running it once more.
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the

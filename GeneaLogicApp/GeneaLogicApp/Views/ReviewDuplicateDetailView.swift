@@ -26,7 +26,7 @@ struct ReviewDuplicateDetailView: View {
 
     /// The chosen direction, awaiting confirmation. A merge cannot be understood from the
     /// row alone and there is no second chance inside it, so the pair is named back — the
-    /// same step `PersonListView` puts in front of its own Merge Into….
+    /// same step `PersonDeleteAndMerge` puts in front of its own Merge Into….
     @State private var pendingMerge: PendingMerge?
 
     var body: some View {

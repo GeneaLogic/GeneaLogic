@@ -54,13 +54,18 @@ import Testing
         let reviewVerbs: Set<ArchiveCommand> = [
             .acceptSuggestion, .declineSuggestion, .somebodyNew, .refreshReview,
         ]
-        let everywhere = Self.creates.union(Self.tabs)
+        // Find is everywhere since slice 84: the one sidebar's field is there on every area.
+        let everywhere = Self.creates.union(Self.tabs).union([.find])
 
         #expect(
             available(in: context(on: .artifacts))
-                == everywhere.union(artifactVerbs).union([.toggleInspector, .find]))
-        #expect(available(in: context(on: .people)) == everywhere.union(personVerbs).union([.find]))
-        #expect(available(in: context(on: .tree)) == everywhere.union(treeVerbs))
+                == everywhere.union(artifactVerbs).union([.toggleInspector]))
+        #expect(available(in: context(on: .people)) == everywhere.union(personVerbs))
+        // The tree is People too, so it offers People's verbs (slice 84's hand-test), all
+        // but the one that would show the tree it is on.
+        #expect(
+            available(in: context(on: .tree))
+                == everywhere.union(treeVerbs).union(personVerbs).subtracting([.showInTree]))
         #expect(available(in: context(on: .review)) == everywhere.union(reviewVerbs))
     }
 
@@ -251,7 +256,8 @@ import Testing
     @Test func theDeleteItemFollowsTheTab() {
         #expect(ArchiveCommand.delete(on: .artifacts) == .deleteArtifact)
         #expect(ArchiveCommand.delete(on: .people) == .deletePerson)
-        #expect(ArchiveCommand.delete(on: .tree) == nil)
+        // The tree is People too (slice 84's hand-test).
+        #expect(ArchiveCommand.delete(on: .tree) == .deletePerson)
         #expect(ArchiveCommand.delete(on: .review) == nil)
     }
 
@@ -264,15 +270,26 @@ import Testing
 
     // MARK: - Running a command
 
-    @MainActor @Test func aCreateSwitchesToItsTab() throws {
+    /// A create switches to its own tab once the record exists (82's fork 2, revised by
+    /// 84's hand-test): asking doesn't move the window, so a cancel leaves it where it was.
+    @MainActor @Test func aCreateSwitchesToItsTabWhenItLands() async throws {
         let (model, root) = try AppTestSupport.makeModel()
         defer { AppTestSupport.remove(root) }
         model.activeTab = .review
 
         model.perform(.addArtifact)
+        #expect(model.pendingTab == nil)
+        #expect(model.isImporterPresented)
+        model.isImporterPresented = false
+
+        let file = root.deletingLastPathComponent()
+            .appendingPathComponent("scan-\(UUID().uuidString).txt")
+        try Data("a census".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        await model.act { model.ingest([file]) }
 
         #expect(model.pendingTab == .artifacts)
-        #expect(model.isImporterPresented)
+        #expect(model.lastCreatedArtifact != nil)
     }
 
     @MainActor @Test func aViewClaimsOnlyTheCommandsItRuns() throws {
@@ -452,7 +469,7 @@ import Testing
         let delete = KeyboardShortcut(.delete, modifiers: .command)
         for (tab, owner) in [
             (ArchiveTab.artifacts, ArchiveCommand.deleteArtifact), (.people, .deletePerson),
-            (.review, .declineSuggestion),
+            (.tree, .deletePerson), (.review, .declineSuggestion),
         ] {
             let context = CommandContext(hasArchive: true, activeTab: tab)
             let owners = ArchiveCommand.allCases.filter {

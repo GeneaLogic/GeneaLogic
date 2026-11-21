@@ -276,9 +276,17 @@ final class ArchiveModel {
     /// them for the other two lanes.
     var hasScannedDuplicates = false
 
-    /// The in-flight scan, cancelled when a newer one starts so a slow sweep can never
-    /// overwrite a fresher result.
+    /// The in-flight scan, `nil` between scans. A request while it runs is coalesced onto
+    /// it (`duplicateScanRequested`), so a slow sweep can never overwrite a fresher result.
     var duplicateScanTask: Task<Void, Never>?
+
+    /// A scan was asked for while one ran, so it runs once more when that one ends
+    /// (`refreshDuplicateCandidates`).
+    var duplicateScanRequested = false
+
+    /// How many scans have started in this window: how the tests tell a coalesced
+    /// request from a fresh scan.
+    var duplicateScansStarted = 0
 
     // MARK: Window state (the macOS-shaped part; its methods are in `+Window`)
     //
@@ -331,9 +339,9 @@ final class ArchiveModel {
     /// (`claimPendingCommand`).
     var pendingCommand: PendingCommand?
 
-    /// One-shot "switch to this tab" intent (View ▸ ⌘1–⌘4, and a create that switches to
-    /// its own tab first). The container owns the scene-stored tab, so it moves it and
-    /// clears this.
+    /// One-shot "switch to this tab" intent (View ▸ ⌘1–⌘4, and a create switching to its
+    /// own tab once the record exists). The container owns the scene-stored tab, so it
+    /// moves it and clears this.
     var pendingTab: ArchiveTab?
 
     /// The sheets, dialogs and alerts a view in this window has up, each reported by its
@@ -539,7 +547,13 @@ final class ArchiveModel {
         let available = Set(artifacts.flatMap { $0.tags.map { $0.lowercased() } })
         selectedTags.formIntersection(available)
         if isFiltering { applyFilters() }
+        let personsBefore = persons
         reloadPersons()
+        // A person renamed, re-dated or given facts scores differently against everyone,
+        // and Review's count shows on every area (slice 84), so the duplicates lane
+        // re-scans when the people change. Off the main actor, and a newer scan cancels
+        // an older, so a run of edits costs one sweep's wait.
+        if persons != personsBefore { refreshDuplicateCandidatesIfShown() }
         // Cheap enough to ride every refresh, which is what makes damage arriving
         // from another writer (51's poll goes through here) visible without the
         // user thinking to run anything (slice 56).
@@ -547,9 +561,9 @@ final class ArchiveModel {
         // 57's half of the same idea, and the one that catches damage nothing has
         // recorded yet. Off the main actor, so it does not ride this call's cost.
         reloadFileDamage()
-        // After the people list, which the worklist's candidate names read. Only once the
-        // Review section has actually been opened — a window that never visits it never
-        // pays for a match sweep (see `refreshReviewWorklist`).
+        // After the people list, which the worklist's candidate names read. Every window
+        // loads the worklist at open since slice 84, for Review's count in the sidebar, so
+        // every mutation pays this sweep (see `refreshReviewWorklist`).
         if hasLoadedReviewWorklist { refreshReviewWorklist() }
     }
 
