@@ -6,8 +6,8 @@ import Foundation
 ///
 /// Since slice 84 the area is set by selecting in the sidebar (`SidebarSelection`), and
 /// Tree is People's second view (`section`), switched by a List | Tree control in the
-/// toolbar; ⌘1–⌘4 still name all four. Persisted with the archive's window state (`WindowState`) and
-/// mirrored into the model (`activeTab`) so the menu bar can scope its commands by area.
+/// toolbar; ⌘1–⌘4 still name all four. Persisted with the archive's window state
+/// (`WindowState`) and mirrored into the model (`activeTab`) so the menu bar can scope its commands by area.
 ///
 /// **Review is a section, not a sheet** (45e fork (a)): triage is a place you come back
 /// to and work through, and the two sheet precedents (`TrashSheet`,

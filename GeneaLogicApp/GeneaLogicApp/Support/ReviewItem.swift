@@ -11,8 +11,8 @@ import GeneaLogicModel
 /// list** (slice 45i), and one selection has to be able to name a row in either.
 ///
 /// Kept as a prefixed string rather than the enum itself because the selection is
-/// persisted in the window's state (`WindowState`), and because the ids double as `ForEach` identities. Nothing
-/// parses one back: the detail pane resolves a selection by looking for it in the two
+/// persisted in the window's state (`WindowState`), and because the ids double as
+/// `ForEach` identities. Nothing parses one back: the detail pane resolves a selection by looking for it in the two
 /// worklists, so an id left over from a previous launch (a mention since resolved, a
 /// person since deleted, or a pre-45i unprefixed id) simply doesn't match and the pane
 /// falls back to its placeholder — which is what should happen anyway.

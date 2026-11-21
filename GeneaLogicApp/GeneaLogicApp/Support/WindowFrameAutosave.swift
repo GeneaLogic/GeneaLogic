@@ -33,7 +33,26 @@ struct WindowFrameAutosave: NSViewRepresentable {
             guard let window, window.frameAutosaveName != name else { return }
             // Restore first: setting the name alone doesn't apply a saved frame.
             _ = window.setFrameUsingName(name)
-            window.setFrameAutosaveName(name)
+            if !window.setFrameAutosaveName(name) {
+                // **A name is one window's** (85's `/code-review`): AppKit refuses it
+                // while another window holds it, and SwiftUI can keep a closed window
+                // alive. One archive has one open window (slice 31), so the holder is
+                // this archive's closed one: take the name from it.
+                for other in NSApp.windows where other !== window && other.frameAutosaveName == name
+                {
+                    other.setFrameAutosaveName("")
+                }
+                window.setFrameAutosaveName(name)
+            }
+        }
+
+        /// Gives the name up as the window goes, so a reopened archive's window can take
+        /// it at once.
+        override func viewWillMove(toWindow newWindow: NSWindow?) {
+            if newWindow == nil, let window, window.frameAutosaveName == name {
+                window.setFrameAutosaveName("")
+            }
+            super.viewWillMove(toWindow: newWindow)
         }
     }
 }

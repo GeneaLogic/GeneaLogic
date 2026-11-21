@@ -28,18 +28,18 @@ struct ArchiveSidebar: View {
     @Environment(ArchiveWindowState.self) private var windowState
 
     private var reviewExpanded: Bool {
-        get { windowState.values.reviewExpanded }
-        nonmutating set { windowState.values.reviewExpanded = newValue }
+        get { windowState.reviewExpanded }
+        nonmutating set { windowState.reviewExpanded = newValue }
     }
 
     private var artifactsExpanded: Bool {
-        get { windowState.values.artifactsExpanded }
-        nonmutating set { windowState.values.artifactsExpanded = newValue }
+        get { windowState.artifactsExpanded }
+        nonmutating set { windowState.artifactsExpanded = newValue }
     }
 
     private var peopleExpanded: Bool {
-        get { windowState.values.peopleExpanded }
-        nonmutating set { windowState.values.peopleExpanded = newValue }
+        get { windowState.peopleExpanded }
+        nonmutating set { windowState.peopleExpanded = newValue }
     }
 
     /// Whether Artifacts is narrowed to the uncatalogued artifacts. Not persisted: it is a
@@ -100,7 +100,10 @@ struct ArchiveSidebar: View {
                 Section {
                     if reviewExpanded { reviewRows }
                 } header: {
-                    header(.review, count: reviewCount, isExpanded: Binding(get: { reviewExpanded }, set: { reviewExpanded = $0 })) {
+                    header(
+                        .review, count: reviewCount,
+                        isExpanded: Binding(get: { reviewExpanded }, set: { reviewExpanded = $0 })
+                    ) {
                         Button {
                             model.perform(.refreshReview, fromSidebar: true)
                         } label: {

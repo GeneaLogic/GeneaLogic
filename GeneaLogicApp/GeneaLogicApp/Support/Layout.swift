@@ -82,6 +82,11 @@ enum Layout {
         /// replaced: its rows carry a symbol and its headers a count and controls.
         static let sidebarMinWidth: CGFloat = 240
         static let sidebarIdealWidth: CGFloat = 300
+        /// The most the sidebar widens to (slice 85's `/code-review`). Its width is
+        /// remembered per archive, and an unbounded one saved on a large display would
+        /// squeeze the detail to its minimum on a laptop.
+        static let sidebarMaxWidth: CGFloat = 480
+        static let sidebarWidthRange = Double(sidebarMinWidth)...Double(sidebarMaxWidth)
         /// The artifact inspector's resize range, and its width in a window that has
         /// never saved one (slice 80).
         static let inspectorWidthRange = 280.0...480.0

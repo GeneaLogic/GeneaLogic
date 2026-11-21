@@ -33,20 +33,26 @@ restores.
 ## The design
 
 - **One record per known archive, on this Mac**, in `ArchiveBookmarks` (`UserDefaults`,
-  the app's container), keyed by identity and carrying the path it was last seen at. It
-  is dropped with its archive's bookmark when that stops resolving, and the most
-  recently opened 100 are kept. It holds the tab, the three selections,
-  People-as-tree, the sidebar's visibility, width and sections' expansion, the tree's two
-  depths, the inspector's visibility and width, and the window's frame.
-- **It replaces `@SceneStorage`** (and the sidebar's visibility, plain `@State` before) for all of these, so relaunch and reopen read one
+  the app's container), keyed by identity. **Only a cap drops one:** the 100 most
+  recently opened are kept, a read counting as opened. Not the bookmark's lifetime, as
+  first written (85's `/code-review`): Remove from Recents would reset the window, a path
+  can't say which record was whose, and a bookmark that fails may be on a drive that
+  isn't mounted. It holds the tab, the three selections, People-as-tree, the sidebar's
+  visibility, width and sections' expansion, the tree's two depths, the inspector's
+  visibility and width, and the window's frame.
+- **It replaces `@SceneStorage`** (and the sidebar's visibility, plain `@State` before)
+  for all of these, one observed property per field, so a view re-renders only for what
+  it reads. Relaunch and reopen read one
   place. Relaunch still restores *which* windows were open, as today. A window
   reads its record when it opens the archive, and writes each change as it happens, so a
   crash loses nothing. Two windows never show one archive (slice 31), so two windows
   never write one record.
-- **Finding the record for an opened URL** is one lookup by its identity, read after
-  the window has the archive's sandbox access, from a fresh `URL` (a `URL` caches
-  resource values, so a long-lived one reports a replaced folder's old inode). A volume
-  with no identity falls back to the path.
+- **Finding the record for an opened URL** is one lookup by its identity, read once the
+  archive has opened (so with its sandbox access; an archive that fails to open gets no
+  record), from a fresh `URL` (a `URL` caches resource values, so a long-lived one
+  reports a replaced folder's old inode). A volume with no identity falls back to the
+  path. **The identity is read once, at open,** and every write goes to it: the window's
+  URL is fixed, so an archive renamed while open would otherwise write elsewhere.
 - **The frame** uses AppKit's frame autosave under a per-record id, so AppKit stores and
   applies it. If SwiftUI's own window sizing fights the autosave, the frame goes in the
   record instead, applied through a window accessor. A first open still gets the
@@ -56,6 +62,8 @@ restores.
   `RememberedInspectorWidth` into one modifier: measure the column, save once it settles,
   and replay it as the column's `ideal` on open. Its known limit carries over: a width
   SwiftUI imposes, such as a narrower window squeezing the column, is saved as if dragged.
+  The sidebar gets a maximum of 480 pt, so a width saved on a large display can't squeeze
+  the detail on a laptop.
 - **A stored selection that no longer resolves** falls back to the placeholder, as today.
 
 ## Out of scope
@@ -72,7 +80,9 @@ restores.
   - a reopen at the same path finds it;
   - a moved or renamed archive finds it and is re-keyed;
   - a copy gets a fresh record, and so does an archive put at a moved one's old path;
-  - a forgotten bookmark drops its record, frame included.
+  - a forgotten path keeps every record;
+  - the cap drops the least recently opened, frame included;
+  - a window keeps writing to its record through a rename.
 - ARCHITECTURE §7's "session-scoped only" paragraph, stale since restoration shipped, is
   rewritten for the store.
 - **Hand-test** (on a throwaway or the sample archive):

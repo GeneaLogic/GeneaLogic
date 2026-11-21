@@ -43,3 +43,10 @@ struct RememberedColumnWidth: ViewModifier {
         if let live, live != saved { saved = live }
     }
 }
+
+extension Double {
+    /// The value, pinned into `range`: a remembered width replayed as a column's `ideal`.
+    func clamped(to range: ClosedRange<Double>) -> Double {
+        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
+    }
+}

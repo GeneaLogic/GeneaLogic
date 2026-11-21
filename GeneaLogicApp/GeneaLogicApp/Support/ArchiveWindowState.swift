@@ -33,7 +33,9 @@ struct WindowState: Codable, Equatable, Sendable {
     var inspectorWidth = Layout.ArchiveWindow.inspectorIdealWidth
 
     /// The frame autosave name for this record's window.
-    var frameAutosaveName: String { "GeneaLogic Archive \(id.uuidString)" }
+    var frameAutosaveName: String { Self.frameAutosaveName(for: id) }
+
+    static func frameAutosaveName(for id: UUID) -> String { "GeneaLogic Archive \(id.uuidString)" }
 
     init() {}
 
@@ -68,22 +70,76 @@ struct WindowState: Codable, Equatable, Sendable {
 /// now read the same record. Two windows never show one archive (slice 31), so two
 /// windows never write one record.
 ///
-/// **Loaded once the window owns its archive** (`load()`, from the container's `.task`
-/// after `claimWindow` and the model's `load()`), not in `init`: SwiftUI re-runs a
-/// view's `init` on every parent render, and reading the archive's identity needs the
-/// access the model's `load()` ensures. Until then it holds the defaults and writes
-/// nothing, so a duplicate window that dismisses itself never touches the record.
+/// **One observed property per field**, as `@SceneStorage` kept one key per field, so a
+/// view re-renders only for the fields it reads: a selection step doesn't invalidate
+/// the tree or the inspector.
+///
+/// **Loaded once the window has opened its archive** (`load()`, from the container's
+/// `.task`, after `claimWindow` and a successful `ArchiveModel.load()`), not in `init`:
+/// SwiftUI re-runs a view's `init` on every parent render, and reading the archive's
+/// identity needs the access the model's `load()` ensures. Until then it holds the
+/// defaults and writes nothing, so neither a duplicate window that dismisses itself nor
+/// one whose archive couldn't be opened touches any record.
+///
+/// **The identity is read once, at load**, and every write goes to it. The window's URL
+/// is fixed when it opens, so an archive renamed or moved while open would otherwise
+/// have its later writes land under a different key.
 @MainActor
 @Observable
 final class ArchiveWindowState {
-    var values = WindowState() {
-        didSet { if isLoaded, values != oldValue { bookmarks.setWindowState(values, for: url) } }
+    /// The record's id, which names the window's frame in AppKit's frame autosave.
+    private(set) var id = UUID()
+
+    var frameAutosaveName: String { WindowState.frameAutosaveName(for: id) }
+
+    var tab: String = WindowState().tab {
+        didSet { if tab != oldValue { persist() } }
+    }
+    var selectedArtifactID: String = WindowState().selectedArtifactID {
+        didSet { if selectedArtifactID != oldValue { persist() } }
+    }
+    var selectedPersonID: String = WindowState().selectedPersonID {
+        didSet { if selectedPersonID != oldValue { persist() } }
+    }
+    var selectedReviewItemID: String = WindowState().selectedReviewItemID {
+        didSet { if selectedReviewItemID != oldValue { persist() } }
+    }
+    var peopleShowsTree: Bool = WindowState().peopleShowsTree {
+        didSet { if peopleShowsTree != oldValue { persist() } }
+    }
+    var sidebarHidden: Bool = WindowState().sidebarHidden {
+        didSet { if sidebarHidden != oldValue { persist() } }
+    }
+    var sidebarWidth: Double = WindowState().sidebarWidth {
+        didSet { if sidebarWidth != oldValue { persist() } }
+    }
+    var reviewExpanded: Bool = WindowState().reviewExpanded {
+        didSet { if reviewExpanded != oldValue { persist() } }
+    }
+    var artifactsExpanded: Bool = WindowState().artifactsExpanded {
+        didSet { if artifactsExpanded != oldValue { persist() } }
+    }
+    var peopleExpanded: Bool = WindowState().peopleExpanded {
+        didSet { if peopleExpanded != oldValue { persist() } }
+    }
+    var treeAncestorDepth: Int = WindowState().treeAncestorDepth {
+        didSet { if treeAncestorDepth != oldValue { persist() } }
+    }
+    var treeDescendantDepth: Int = WindowState().treeDescendantDepth {
+        didSet { if treeDescendantDepth != oldValue { persist() } }
+    }
+    var inspectorShown: Bool = WindowState().inspectorShown {
+        didSet { if inspectorShown != oldValue { persist() } }
+    }
+    var inspectorWidth: Double = WindowState().inspectorWidth {
+        didSet { if inspectorWidth != oldValue { persist() } }
     }
 
     /// Whether `load()` has run. The frame autosave waits for it, so it never attaches
     /// under a name that is about to change.
     private(set) var isLoaded = false
 
+    @ObservationIgnored private var identity: String?
     @ObservationIgnored private let url: URL
     @ObservationIgnored private let bookmarks: ArchiveBookmarks
 
@@ -92,15 +148,61 @@ final class ArchiveWindowState {
         self.bookmarks = bookmarks
     }
 
-    /// Reads the archive's record, or starts one. A new record is written at once, so
-    /// its frame autosave name survives a close before anything else changes.
+    /// Reads the archive's record, or starts one, and writes it back at once: a new
+    /// record keeps its frame's name through a close before anything else changes, and
+    /// an existing one counts as just opened (the store keeps the most recently opened).
     func load() {
         guard !isLoaded else { return }
-        if let stored = bookmarks.windowState(for: url) {
-            values = stored
-        } else {
-            bookmarks.setWindowState(values, for: url)
+        let identity = ArchiveBookmarks.identity(of: url)
+        self.identity = identity
+        if let stored = bookmarks.windowState(forIdentity: identity) {
+            apply(stored)
         }
         isLoaded = true
+        persist()
+    }
+
+    /// The fields as one record.
+    var snapshot: WindowState {
+        var state = WindowState()
+        state.id = id
+        state.tab = tab
+        state.selectedArtifactID = selectedArtifactID
+        state.selectedPersonID = selectedPersonID
+        state.selectedReviewItemID = selectedReviewItemID
+        state.peopleShowsTree = peopleShowsTree
+        state.sidebarHidden = sidebarHidden
+        state.sidebarWidth = sidebarWidth
+        state.reviewExpanded = reviewExpanded
+        state.artifactsExpanded = artifactsExpanded
+        state.peopleExpanded = peopleExpanded
+        state.treeAncestorDepth = treeAncestorDepth
+        state.treeDescendantDepth = treeDescendantDepth
+        state.inspectorShown = inspectorShown
+        state.inspectorWidth = inspectorWidth
+        return state
+    }
+
+    private func apply(_ state: WindowState) {
+        id = state.id
+        tab = state.tab
+        selectedArtifactID = state.selectedArtifactID
+        selectedPersonID = state.selectedPersonID
+        selectedReviewItemID = state.selectedReviewItemID
+        peopleShowsTree = state.peopleShowsTree
+        sidebarHidden = state.sidebarHidden
+        sidebarWidth = state.sidebarWidth
+        reviewExpanded = state.reviewExpanded
+        artifactsExpanded = state.artifactsExpanded
+        peopleExpanded = state.peopleExpanded
+        treeAncestorDepth = state.treeAncestorDepth
+        treeDescendantDepth = state.treeDescendantDepth
+        inspectorShown = state.inspectorShown
+        inspectorWidth = state.inspectorWidth
+    }
+
+    private func persist() {
+        guard isLoaded, let identity else { return }
+        bookmarks.setWindowState(snapshot, forIdentity: identity)
     }
 }

@@ -17,13 +17,13 @@ struct TreeTab: View {
     @Environment(ArchiveWindowState.self) private var windowState
 
     private var ancestorDepth: Int {
-        get { windowState.values.treeAncestorDepth }
-        nonmutating set { windowState.values.treeAncestorDepth = newValue }
+        get { windowState.treeAncestorDepth }
+        nonmutating set { windowState.treeAncestorDepth = newValue }
     }
 
     private var descendantDepth: Int {
-        get { windowState.values.treeDescendantDepth }
-        nonmutating set { windowState.values.treeDescendantDepth = newValue }
+        get { windowState.treeDescendantDepth }
+        nonmutating set { windowState.treeDescendantDepth = newValue }
     }
 
     @State private var render: TreeRender?

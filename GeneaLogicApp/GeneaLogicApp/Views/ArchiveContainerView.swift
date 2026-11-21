@@ -20,26 +20,26 @@ struct ArchiveContainerView: View {
     /// `artifact|localRef` address): a mention has no uid of its own, and the address is
     /// what every write path takes anyway.
     private var selectedArtifactID: String {
-        get { windowState.values.selectedArtifactID }
-        nonmutating set { windowState.values.selectedArtifactID = newValue }
+        get { windowState.selectedArtifactID }
+        nonmutating set { windowState.selectedArtifactID = newValue }
     }
     private var selectedPersonID: String {
-        get { windowState.values.selectedPersonID }
-        nonmutating set { windowState.values.selectedPersonID = newValue }
+        get { windowState.selectedPersonID }
+        nonmutating set { windowState.selectedPersonID = newValue }
     }
     private var selectedReviewItemID: String {
-        get { windowState.values.selectedReviewItemID }
-        nonmutating set { windowState.values.selectedReviewItemID = newValue }
+        get { windowState.selectedReviewItemID }
+        nonmutating set { windowState.selectedReviewItemID = newValue }
     }
     private var selectedTabRaw: String {
-        get { windowState.values.tab }
-        nonmutating set { windowState.values.tab = newValue }
+        get { windowState.tab }
+        nonmutating set { windowState.tab = newValue }
     }
     /// Whether People was last shown as a tree, so a person row clicked from another
     /// area returns to that view (slice 84). Kept by `tab`'s setter.
     private var peopleShowsTree: Bool {
-        get { windowState.values.peopleShowsTree }
-        nonmutating set { windowState.values.peopleShowsTree = newValue }
+        get { windowState.peopleShowsTree }
+        nonmutating set { windowState.peopleShowsTree = newValue }
     }
     /// This window's undo manager, handed to the model so its mutations register
     /// undo/redo on the window's own stack (undo is per-archive-window).
@@ -110,7 +110,7 @@ struct ArchiveContainerView: View {
             // archive's record.
             .background {
                 if windowState.isLoaded {
-                    WindowFrameAutosave(name: windowState.values.frameAutosaveName)
+                    WindowFrameAutosave(name: windowState.frameAutosaveName)
                         .frame(width: 0, height: 0)
                         .accessibilityHidden(true)
                 }
@@ -132,8 +132,10 @@ struct ArchiveContainerView: View {
                 model.load()
                 // In the same synchronous step, so the archive's first frame is already
                 // as it was left (slice 85); after `load()`, whose `ensureAccess` gives
-                // the access reading the archive's identity needs.
-                windowState.load()
+                // the access reading the archive's identity needs. Not for an archive
+                // that couldn't be opened: it has no identity to read, and a record for
+                // it would be junk (85's `/code-review`).
+                if model.archive != nil { windowState.load() }
 
                 // Notice another writer (slice 51): poll for an external change
                 // for as long as this window lives. Deliberately *inside* this
@@ -272,8 +274,8 @@ private struct OpenArchiveView: View {
     /// search field can't take focus while it is hidden. Kept as hidden or not, so a
     /// reopened window comes back with the sidebar as it was.
     private var columnVisibility: NavigationSplitViewVisibility {
-        get { windowState.values.sidebarHidden ? .detailOnly : .automatic }
-        nonmutating set { windowState.values.sidebarHidden = newValue == .detailOnly }
+        get { windowState.sidebarHidden ? .detailOnly : .automatic }
+        nonmutating set { windowState.sidebarHidden = newValue == .detailOnly }
     }
     /// Per-window, per-session dismissal of the damage banner (slice 56). Not
     /// persisted on purpose: one click must not silence damage that is still
@@ -517,14 +519,16 @@ private struct OpenArchiveView: View {
             .modifier(
                 RememberedColumnWidth(
                     saved: Binding(
-                        get: { windowState.values.sidebarWidth },
-                        set: { windowState.values.sidebarWidth = $0 }),
+                        get: { windowState.sidebarWidth },
+                        set: { windowState.sidebarWidth = $0 }),
                     isShown: columnVisibility != .detailOnly,
-                    range: Double(Layout.ArchiveWindow.sidebarMinWidth)...Double.greatestFiniteMagnitude)
+                    range: Layout.ArchiveWindow.sidebarWidthRange)
             )
             .navigationSplitViewColumnWidth(
                 min: Layout.ArchiveWindow.sidebarMinWidth,
-                ideal: max(CGFloat(windowState.values.sidebarWidth), Layout.ArchiveWindow.sidebarMinWidth))
+                ideal: CGFloat(
+                    windowState.sidebarWidth.clamped(to: Layout.ArchiveWindow.sidebarWidthRange)),
+                max: Layout.ArchiveWindow.sidebarMaxWidth)
         } detail: {
             detail
         }

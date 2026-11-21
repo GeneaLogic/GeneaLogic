@@ -64,15 +64,15 @@ struct ArtifactDetailView: View {
     /// Whether the metadata inspector is shown; visible in a window never opened before,
     /// so it shows the metadata beside the document.
     private var inspectorShown: Bool {
-        get { windowState.values.inspectorShown }
-        nonmutating set { windowState.values.inspectorShown = newValue }
+        get { windowState.inspectorShown }
+        nonmutating set { windowState.inspectorShown = newValue }
     }
 
     /// The inspector's width, as it last settled (slice 80). SwiftUI rebuilds the column
     /// on every hide and show, and on every tab switch (this view is recreated), and a
     /// rebuilt column opens at its `ideal` width. So the width is saved and handed back
     /// as `ideal`. See `RememberedColumnWidth` for when it is saved.
-    private var inspectorWidth: Double { windowState.values.inspectorWidth }
+    private var inspectorWidth: Double { windowState.inspectorWidth }
 
     private static let inspectorWidthRange = Layout.ArchiveWindow.inspectorWidthRange
 
@@ -96,8 +96,8 @@ struct ArtifactDetailView: View {
             .modifier(
                 RememberedColumnWidth(
                     saved: Binding(
-                        get: { windowState.values.inspectorWidth },
-                        set: { windowState.values.inspectorWidth = $0 }),
+                        get: { windowState.inspectorWidth },
+                        set: { windowState.inspectorWidth = $0 }),
                     isShown: inspectorShown, range: Self.inspectorWidthRange)
             )
             // **Keep this, even though it is half of #9's trigger** (slice 80). It is
@@ -367,12 +367,6 @@ private struct ArtifactSheetContent: View {
                 transcript = saved
             }
         }
-    }
-}
-
-extension Double {
-    fileprivate func clamped(to range: ClosedRange<Double>) -> Double {
-        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }
 
