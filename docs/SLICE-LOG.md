@@ -4433,6 +4433,8 @@ been two slices.
   menu-bar verbs; both creates are in the toolbar; switching to Review ends a search; a
   create switches area once the record lands, not before (82's fork 2 lost your place on
   a cancel); the selected row is kept in view whatever moved it, not only on ⌘1–⌘4.
+  Enabling the Person menu on the tree wasn't enough: its adds' sheets lived on the
+  person's page, so the tree hosts them too (`TreePersonAdds`).
   **And the stall on entering Review:** the duplicates scan's scoring ran on the main
   thread, as did the file sweep, the reconcile and Verify Integrity. All four were
   `nonisolated async`, which Approachable Concurrency runs on the caller's actor; 84 only

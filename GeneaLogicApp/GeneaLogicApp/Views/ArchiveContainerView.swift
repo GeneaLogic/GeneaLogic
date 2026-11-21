@@ -528,6 +528,8 @@ private struct OpenArchiveView: View {
             // People as a tree: the people selection is its focus, so picking someone in
             // the sidebar refocuses it.
             TreeTab(focus: $personSelection)
+                // The Person menu's adds, whose sheets the person's page owns elsewhere.
+                .modifier(TreePersonAdds())
         }
     }
 
