@@ -11,9 +11,6 @@ import Foundation
 /// it expects but doesn't find takes its default. A record from another build still
 /// restores what it can, instead of failing whole.
 struct WindowState: Codable, Equatable, Sendable {
-    /// Names this record's window frame in AppKit's frame autosave. Minted with the
-    /// record and kept across a re-key, so a moved archive keeps its frame too.
-    var id = UUID()
     /// The area (`ArchiveTab`'s raw value).
     var tab = ArchiveTab.artifacts.rawValue
     /// The three selections, as raw ids. Empty means none.
@@ -31,11 +28,11 @@ struct WindowState: Codable, Equatable, Sendable {
     var treeDescendantDepth = 3
     var inspectorShown = true
     var inspectorWidth = Layout.ArchiveWindow.inspectorIdealWidth
-
-    /// The frame autosave name for this record's window.
-    var frameAutosaveName: String { Self.frameAutosaveName(for: id) }
-
-    static func frameAutosaveName(for id: UUID) -> String { "GeneaLogic Archive \(id.uuidString)" }
+    /// The window's frame, as AppKit describes it (`NSWindow.frameDescriptor`: the frame
+    /// and the screen it was on), or `nil` for a window never moved or resized. Kept here
+    /// rather than in AppKit's frame autosave, which SwiftUI's windows don't honour: they
+    /// keep a frame autosave name of SwiftUI's own (found in 85's hand-test).
+    var frame: String?
 
     init() {}
 
@@ -45,7 +42,6 @@ struct WindowState: Codable, Equatable, Sendable {
         func value<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T {
             (try? c.decodeIfPresent(T.self, forKey: key)) ?? fallback
         }
-        id = value(.id, d.id)
         tab = value(.tab, d.tab)
         selectedArtifactID = value(.selectedArtifactID, d.selectedArtifactID)
         selectedPersonID = value(.selectedPersonID, d.selectedPersonID)
@@ -60,6 +56,7 @@ struct WindowState: Codable, Equatable, Sendable {
         treeDescendantDepth = value(.treeDescendantDepth, d.treeDescendantDepth)
         inspectorShown = value(.inspectorShown, d.inspectorShown)
         inspectorWidth = value(.inspectorWidth, d.inspectorWidth)
+        frame = value(.frame, d.frame)
     }
 }
 
@@ -87,11 +84,6 @@ struct WindowState: Codable, Equatable, Sendable {
 @MainActor
 @Observable
 final class ArchiveWindowState {
-    /// The record's id, which names the window's frame in AppKit's frame autosave.
-    private(set) var id = UUID()
-
-    var frameAutosaveName: String { WindowState.frameAutosaveName(for: id) }
-
     var tab: String = WindowState().tab {
         didSet { if tab != oldValue { persist() } }
     }
@@ -134,9 +126,14 @@ final class ArchiveWindowState {
     var inspectorWidth: Double = WindowState().inspectorWidth {
         didSet { if inspectorWidth != oldValue { persist() } }
     }
+    /// Written by `WindowFrameKeeper` and read by it when the window opens; no view's
+    /// body reads it, so a move re-renders nothing.
+    @ObservationIgnored var frame: String? = nil {
+        didSet { if frame != oldValue { persist() } }
+    }
 
-    /// Whether `load()` has run. The frame autosave waits for it, so it never attaches
-    /// under a name that is about to change.
+    /// Whether `load()` has run. The frame keeper waits for it, so it applies the record's
+    /// frame and never saves into the defaults.
     private(set) var isLoaded = false
 
     @ObservationIgnored private var identity: String?
@@ -149,8 +146,8 @@ final class ArchiveWindowState {
     }
 
     /// Reads the archive's record, or starts one, and writes it back at once: a new
-    /// record keeps its frame's name through a close before anything else changes, and
-    /// an existing one counts as just opened (the store keeps the most recently opened).
+    /// record exists from the first open, and an existing one counts as just opened (the
+    /// store keeps the most recently opened).
     func load() {
         guard !isLoaded else { return }
         let identity = ArchiveBookmarks.identity(of: url)
@@ -165,7 +162,6 @@ final class ArchiveWindowState {
     /// The fields as one record.
     var snapshot: WindowState {
         var state = WindowState()
-        state.id = id
         state.tab = tab
         state.selectedArtifactID = selectedArtifactID
         state.selectedPersonID = selectedPersonID
@@ -180,11 +176,11 @@ final class ArchiveWindowState {
         state.treeDescendantDepth = treeDescendantDepth
         state.inspectorShown = inspectorShown
         state.inspectorWidth = inspectorWidth
+        state.frame = frame
         return state
     }
 
     private func apply(_ state: WindowState) {
-        id = state.id
         tab = state.tab
         selectedArtifactID = state.selectedArtifactID
         selectedPersonID = state.selectedPersonID
@@ -199,6 +195,7 @@ final class ArchiveWindowState {
         treeDescendantDepth = state.treeDescendantDepth
         inspectorShown = state.inspectorShown
         inspectorWidth = state.inspectorWidth
+        frame = state.frame
     }
 
     private func persist() {

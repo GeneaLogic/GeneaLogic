@@ -53,10 +53,11 @@ restores.
   reports a replaced folder's old inode). A volume with no identity falls back to the
   path. **The identity is read once, at open,** and every write goes to it: the window's
   URL is fixed, so an archive renamed while open would otherwise write elsewhere.
-- **The frame** uses AppKit's frame autosave under a per-record id, so AppKit stores and
-  applies it. If SwiftUI's own window sizing fights the autosave, the frame goes in the
-  record instead, applied through a window accessor. A first open still gets the
-  default size (slice 81).
+- **The frame is in the record**, as `NSWindow.frameDescriptor` (the frame and its
+  screen), applied a runloop hop after the window opens and saved when a resize or move
+  ends. A first open still gets the default size (slice 81). *Built first on AppKit's
+  frame autosave, as this spec said, and fell back as it allowed:* SwiftUI's windows keep
+  a frame autosave name of their own, and a name set on them saved nothing (hand-test).
 - **Column widths are measured and replayed.** SwiftUI has no binding for a column's
   current width, so the sidebar uses the inspector's mechanism, generalised from
   `RememberedInspectorWidth` into one modifier: measure the column, save once it settles,

@@ -106,11 +106,11 @@ struct ArchiveContainerView: View {
             )
             .environment(model)
             .environment(windowState)
-            // The frame follows the archive (slice 85), so the autosave waits for the
+            // The frame follows the archive (slice 85), so its keeper waits for the
             // archive's record.
             .background {
                 if windowState.isLoaded {
-                    WindowFrameAutosave(name: windowState.frameAutosaveName)
+                    WindowFrameKeeper(state: windowState)
                         .frame(width: 0, height: 0)
                         .accessibilityHidden(true)
                 }

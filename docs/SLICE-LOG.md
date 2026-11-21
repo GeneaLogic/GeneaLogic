@@ -4459,9 +4459,9 @@ been two slices.
   one. Reading the identity needs sandbox access, so the state loads right after the
   model's `load()`, in the same synchronous step, before the first frame. Column widths
   have no SwiftUI binding: the sidebar reuses the inspector's measure-and-replay
-  (`RememberedColumnWidth`). The frame uses AppKit's autosave under a per-record name,
-  which AppKit gives one window at a time: a closed window can keep it, so a new one
-  takes it back. **From `/code-review`:** only a cap of 100 drops a record, since a path
+  (`RememberedColumnWidth`). The frame is in the record (`frameDescriptor`), applied a
+  hop after the window opens: AppKit's frame autosave saved nothing, because SwiftUI's
+  windows keep an autosave name of their own. **From `/code-review`:** only a cap of 100 drops a record, since a path
   can't say whose it was and Remove from Recents mustn't reset a window; the identity is
   read once, at a successful open.
 

@@ -157,7 +157,7 @@ final class ArchiveBookmarks {
     }
 
     /// Records how the archive with this identity was left, and that it was just opened.
-    /// Past the cap, the least recently opened records go, and their frames with them.
+    /// Past the cap, the least recently opened records go.
     func setWindowState(_ state: WindowState, forIdentity identity: String) {
         var states = windowStates()
         guard let data = try? JSONEncoder().encode(StoredWindowState(state: state, opened: .now))
@@ -169,10 +169,7 @@ final class ArchiveBookmarks {
             }
             let oldest = decoded.sorted { $0.value.opened > $1.value.opened }
                 .dropFirst(windowStatesLimit)
-            for (evicted, stored) in oldest {
-                states[evicted] = nil
-                defaults.removeObject(forKey: "NSWindow Frame \(stored.state.frameAutosaveName)")
-            }
+            for (evicted, _) in oldest { states[evicted] = nil }
             // A record that no longer decodes has no date to sort by; it goes first.
             for key in states.keys where decoded[key] == nil { states[key] = nil }
         }

@@ -48,8 +48,7 @@ import Testing
         bookmarks.setWindowState(state, forIdentity: ArchiveBookmarks.identity(of: url))
     }
 
-    /// A state that differs from the defaults in every field the window restores. Made
-    /// once: each `WindowState()` mints its own `id`.
+    /// A state that differs from the defaults in every field the window restores.
     private let leftState = WindowStateTests.makeLeftState()
 
     private static func makeLeftState() -> WindowState {
@@ -68,6 +67,7 @@ import Testing
         state.treeDescendantDepth = 1
         state.inspectorShown = false
         state.inspectorWidth = 300
+        state.frame = "333 141 972 720 0 0 1512 949 "
         return state
     }
 
@@ -161,31 +161,27 @@ import Testing
 
     // MARK: - The cap
 
-    /// Past the cap, the least recently *opened* record goes, frame included. A window
-    /// that only opens and reads its record counts as opened.
+    /// Past the cap, the least recently *opened* record goes. A window that only opens
+    /// and reads its record counts as opened.
     @Test func theCapKeepsTheMostRecentlyOpened() throws {
         let first = try makeArchive("First")
         let second = try makeArchive("Second")
         let third = try makeArchive("Third")
         leave(first, as: leftState)
-        let secondState = WindowState()
-        leave(second, as: secondState)
-        let secondFrame = "NSWindow Frame \(secondState.frameAutosaveName)"
-        defaults.set("0 0 800 600 0 0 1440 900 ", forKey: secondFrame)
+        leave(second, as: WindowState())
 
         ArchiveWindowState(url: first, bookmarks: bookmarks).load()  // opened, unchanged
         leave(third, as: WindowState())
 
         #expect(state(of: first) == leftState)
         #expect(state(of: second) == nil)
-        #expect(defaults.object(forKey: secondFrame) == nil)
         #expect(state(of: third) != nil)
     }
 
     // MARK: - The window's holder
 
-    /// A new archive gets its record at once, so its frame's name survives a close
-    /// before anything else changes; from then on every change is written.
+    /// A new archive gets its record at once; from then on every change is written, the
+    /// frame included.
     @Test func aWindowWritesThroughOnceLoaded() throws {
         let archive = try makeArchive("Family")
 
@@ -198,11 +194,12 @@ import Testing
 
         window.inspectorShown = false
         #expect(state(of: archive)?.inspectorShown == false)
+        window.frame = "333 141 972 720 0 0 1512 949 "
+        #expect(state(of: archive)?.frame == window.frame)
 
         let reopened = ArchiveWindowState(url: archive, bookmarks: bookmarks)
         reopened.load()
         #expect(reopened.snapshot == window.snapshot)
-        #expect(reopened.frameAutosaveName == window.frameAutosaveName)
     }
 
     /// Renamed while its window is open: the window's URL is fixed, but its writes keep
