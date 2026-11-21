@@ -479,13 +479,17 @@ extension ArchiveModel {
 
     /// The quadratic half, off the main actor.
     ///
-    /// `nonisolated` + `async` rather than `Task.detached`: a detached task is unstructured
-    /// and outlives the cancellation of whatever started it, so rapid Refresh clicks would
+    /// `offMainActor` rather than `Task.detached`: a detached task is unstructured and
+    /// outlives the cancellation of whatever started it, so rapid Refresh clicks would
     /// pile up sweeps nobody is waiting for. This one is part of the task that awaits it.
-    private nonisolated static func scoreDuplicates(
+    ///
+    /// **Until slice 84 this ran on the main thread**, written as `nonisolated async`,
+    /// which this target runs on the caller's actor (see `offMainActor`). 84 ran the scan
+    /// at open and on entering Review, and the window stalled for a second or two.
+    private static func scoreDuplicates(
         _ input: DuplicateScanInput
     ) async -> [DuplicateCandidate] {
-        Archive.duplicateCandidates(in: input)
+        await offMainActor { Archive.duplicateCandidates(in: input) }
     }
 
     /// Records that a pair is **not** a duplicate, and drops it from the lane.
