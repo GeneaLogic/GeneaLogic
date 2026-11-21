@@ -402,7 +402,10 @@ extension Archive {
     /// fully present the instant you can see them at all. So on iCloud this
     /// returns `false` for every file in a `.genea`, and the skip above never
     /// fires there. See slice 57b's spec for what that leaves standing.
-    static func isDataless(_ st: stat) -> Bool {
+    ///
+    /// Public since slice 84b: the app's thumbnails `stat` a file once for its size,
+    /// date and this flag, and must not download a file to draw it.
+    public static func isDataless(_ st: stat) -> Bool {
         #if canImport(Darwin)
         return st.st_flags & UInt32(bitPattern: SF_DATALESS) != 0
         #else
@@ -415,9 +418,8 @@ extension Archive {
     /// the bytes down).
     ///
     /// A file that cannot be `stat`ed is not a placeholder; `verifyIntegrity()`
-    /// has already established the file exists by the time it asks. Public since
-    /// slice 84b, for the app's thumbnails, which must not download a file to draw it.
-    public static func fileIsDataless(at url: URL) -> Bool {
+    /// has already established the file exists by the time it asks.
+    static func fileIsDataless(at url: URL) -> Bool {
         var st = stat()
         let ok = url.withUnsafeFileSystemRepresentation { path in
             path.map { stat($0, &st) == 0 } ?? false

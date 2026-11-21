@@ -64,18 +64,25 @@ public struct ArtifactSummary: Sendable, Equatable, Hashable {
         self.thumbnailFile = thumbnailFile
     }
 
-    /// The file behind an artifact's thumbnail: enough to find it and to know when its
-    /// bytes changed, without decoding the record again.
+    /// The file behind an artifact's thumbnail: enough to find it, to tell whether the
+    /// bytes on disk are the ones recorded, and to know when they changed, without
+    /// decoding the record again.
     public struct ThumbnailFile: Sendable, Equatable, Hashable {
         public var uid: FileID
-        /// Relative to the archive's root, e.g. `artifacts/<slug>/<path>`.
+        /// Relative to the archive's root, in the manifest's form
+        /// (`artifacts/<slug>/<path>`), so it can be matched against a sweep's findings.
+        /// Resolve it with ``Archive/url(of:)``.
         public var path: String
+        /// The recorded length. A file on disk of any other length is still arriving or
+        /// damaged, and is not drawn.
+        public var byteLength: Int64
         /// Changes when the file is replaced, so it keys a cache of drawn thumbnails.
         public var sha256: String
 
-        public init(uid: FileID, path: String, sha256: String) {
+        public init(uid: FileID, path: String, byteLength: Int64, sha256: String) {
             self.uid = uid
             self.path = path
+            self.byteLength = byteLength
             self.sha256 = sha256
         }
 
@@ -92,7 +99,8 @@ public struct ArtifactSummary: Sendable, Equatable, Hashable {
             else { return nil }
             return ThumbnailFile(
                 uid: file.uid,
-                path: "\(ArchiveLayout.artifactsDirectoryName)/\(slug)/\(file.path)",
+                path: ArchiveLayout.artifactFileRelativePath(slug: slug, file: file.path),
+                byteLength: file.byteLength,
                 sha256: file.sha256)
         }
 

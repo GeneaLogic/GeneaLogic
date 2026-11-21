@@ -315,8 +315,16 @@ extension Archive {
             primaryDate: earliestDate(of: artifact.events.map(\.date)),
             tags: artifact.tags,
             fileCount: artifact.files.count,
-            thumbnailFile: slug.flatMap { ArtifactSummary.ThumbnailFile.choose(from: artifact.files, slug: $0) }
+            thumbnailFile: slug.flatMap { slug in
+                ArtifactSummary.ThumbnailFile.choose(from: artifact.files, slug: slug)
+            }
         )
+    }
+
+    /// Where a summary's thumbnail file is on disk. Reads nothing: a list resolves every
+    /// visible row through this, so it must not touch the index.
+    public func url(of thumbnail: ArtifactSummary.ThumbnailFile) -> URL {
+        rootURL.appendingPathComponent(thumbnail.path)
     }
 
     /// Builds a `PersonSummary` snapshot from a full `Person`.

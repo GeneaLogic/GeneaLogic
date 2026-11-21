@@ -58,16 +58,30 @@ import Testing
         #expect(thumbnail(artifact.uid, in: archive) == nil)
     }
 
-    @Test func thePathIsRelativeToTheArchiveRoot() throws {
+    @Test func itResolvesToTheAttachedFileAndCarriesItsRecordedLength() throws {
         let archive = try Archive.create(at: TestSupport.makeTempDirectory())
         let artifact = try archive.addArtifact(.sample())
         let entry = try attach("scan.png", .accessCopy, to: artifact.uid, in: archive)
 
         let file = try #require(thumbnail(artifact.uid, in: archive))
         #expect(file.sha256 == entry.sha256)
+        #expect(file.byteLength == entry.byteLength)
         #expect(
-            archive.rootURL.appendingPathComponent(file.path).standardizedFileURL
+            archive.url(of: file).standardizedFileURL
                 == archive.fileURL(of: entry.uid, in: artifact.uid)?.standardizedFileURL)
+    }
+
+    /// The path is the manifest's form, so the app can match it against the file sweep's
+    /// findings (a missing or wrong-length file keeps its symbol).
+    @Test func thePathMatchesTheSweepsForm() throws {
+        let archive = try Archive.create(at: TestSupport.makeTempDirectory())
+        let artifact = try archive.addArtifact(.sample())
+        _ = try attach("scan.png", .accessCopy, to: artifact.uid, in: archive)
+        let file = try #require(thumbnail(artifact.uid, in: archive))
+
+        try FileManager.default.removeItem(at: archive.url(of: file))
+        let report = archive.sweepFileSizes()
+        #expect(report.issues.contains(.missingFile(path: file.path)))
     }
 
     @Test func aReplaceMovesTheThumbnailToTheNewBytes() throws {

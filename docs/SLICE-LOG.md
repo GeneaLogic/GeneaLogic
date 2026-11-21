@@ -4427,18 +4427,20 @@ been two slices.
   one at a time, a request during one running it once more.
 
 - **84b — artifact thumbnails** (engine summary + app; no format change). 84's fork 4.
-  **Decided:** the browse summary carries `thumbnailFile` (path from the archive root,
-  and the checksum), chosen in the engine: the first image or PDF by extension, access
+  **Decided:** the browse summary carries `thumbnailFile` (manifest-form path, recorded
+  length, checksum), chosen in the engine: the first image or PDF by extension, access
   copy → preservation master → derivative, never a transcript. Drawn in-process (ImageIO,
   Core Graphics for a PDF's first page), whole and scaled to fit a 32-pt square, cached in
-  memory by checksum. **The invariant:** a row never reads a file that isn't on this Mac
-  (`Archive.fileIsDataless`, now public), and never re-decodes the record to find one.
-  **Revised in the build:** fork 1 expected an index schema bump, but `summarize` already
-  works from the record the index holds, so no schema change. **Gotchas:** a dataless or
-  missing file is asked again next time it shows, since it may have arrived; a file that is
-  here but won't decode is remembered by checksum, so a damaged scan isn't re-read on every
-  scroll. `kCGImageSourceShouldCacheImmediately`, or the decode lands on the main thread at
-  first draw.
+  memory by checksum. **The invariant:** a row draws only the recorded bytes, here: never a
+  dataless file, one of the wrong length, or one the size sweep lists. **Revised in the
+  build:** fork 1 expected an index schema bump, but `summarize` already works from the
+  record the index holds. **Gotchas** (most from `/code-review`): decodes block on reads,
+  so they run two at a time on an `OperationQueue`, shared per file, and skipped once no
+  row wants them; on the cooperative pool a fast scroll starved the app. The app's default
+  isolation is the main actor, so the loader is `nonisolated` explicitly. A failed decode
+  is remembered with the file's size and date, or it never retries. An embedded EXIF
+  thumbnail can be stale or letterboxed, so a mismatched aspect redraws from the image. A
+  locked PDF draws white, so it counts as undrawable.
 
 ## Carryovers and parked work
 
