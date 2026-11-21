@@ -37,6 +37,10 @@ public struct ArtifactSummary: Sendable, Equatable, Hashable {
     public var primaryDate: String?
     public var tags: [String]
     public var fileCount: Int
+    /// The file a list draws as this artifact's thumbnail, or `nil` when none of its
+    /// files is an image or a PDF (slice 84b). Chosen here, from the record the index
+    /// already holds, so a row reads nothing it doesn't draw.
+    public var thumbnailFile: ThumbnailFile?
 
     public init(
         uid: ArtifactID,
@@ -46,7 +50,8 @@ public struct ArtifactSummary: Sendable, Equatable, Hashable {
         sourceAuthorityTier: SourceAuthorityTier?,
         primaryDate: String?,
         tags: [String],
-        fileCount: Int
+        fileCount: Int,
+        thumbnailFile: ThumbnailFile? = nil
     ) {
         self.uid = uid
         self.title = title
@@ -56,6 +61,60 @@ public struct ArtifactSummary: Sendable, Equatable, Hashable {
         self.primaryDate = primaryDate
         self.tags = tags
         self.fileCount = fileCount
+        self.thumbnailFile = thumbnailFile
+    }
+
+    /// The file behind an artifact's thumbnail: enough to find it, to tell whether the
+    /// bytes on disk are the ones recorded, and to know when they changed, without
+    /// decoding the record again.
+    public struct ThumbnailFile: Sendable, Equatable, Hashable {
+        public var uid: FileID
+        /// Relative to the archive's root, in the manifest's form
+        /// (`artifacts/<slug>/<path>`), so it can be matched against a sweep's findings.
+        /// Resolve it with ``Archive/url(of:)``.
+        public var path: String
+        /// The recorded length. A file on disk of any other length is still arriving or
+        /// damaged, and is not drawn.
+        public var byteLength: Int64
+        /// Changes when the file is replaced, so it keys a cache of drawn thumbnails.
+        public var sha256: String
+
+        public init(uid: FileID, path: String, byteLength: Int64, sha256: String) {
+            self.uid = uid
+            self.path = path
+            self.byteLength = byteLength
+            self.sha256 = sha256
+        }
+
+        /// The first drawable file in role order: an access copy before a preservation
+        /// master (smaller, and the master is the file most likely left in the cloud),
+        /// then a derivative. A transcript is never drawn. Within a role, the record's
+        /// own order decides.
+        static func choose(from files: [FileEntry], slug: String) -> ThumbnailFile? {
+            let order: [FileRole] = [.accessCopy, .preservationMaster, .derivative]
+            let drawable = files.filter { isDrawable($0.path) }
+            guard
+                let file = order.lazy.compactMap({ role in drawable.first { $0.role == role } })
+                    .first
+            else { return nil }
+            return ThumbnailFile(
+                uid: file.uid,
+                path: ArchiveLayout.artifactFileRelativePath(slug: slug, file: file.path),
+                byteLength: file.byteLength,
+                sha256: file.sha256)
+        }
+
+        /// Whether a file's extension names an image ImageIO decodes, or a PDF. By
+        /// extension because the engine is Foundation-only; a file that turns out not to
+        /// decode keeps its symbol, so erring toward inclusion costs nothing.
+        static func isDrawable(_ path: String) -> Bool {
+            drawableExtensions.contains((path as NSString).pathExtension.lowercased())
+        }
+
+        static let drawableExtensions: Set<String> = [
+            "jpg", "jpeg", "jpe", "png", "gif", "tif", "tiff", "bmp", "heic", "heif", "webp",
+            "avif", "jxl", "jp2", "jpx", "j2k", "psd", "pdf",
+        ]
     }
 }
 

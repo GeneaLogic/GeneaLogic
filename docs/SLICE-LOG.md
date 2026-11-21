@@ -4426,6 +4426,24 @@ been two slices.
   actor under Approachable Concurrency. They are `@concurrent`, and the scan and sweep run
   one at a time, a request during one running it once more.
 
+- **84b — artifact thumbnails** (engine summary + app; no format change). 84's fork 4.
+  **Decided:** the browse summary carries `thumbnailFile` (manifest-form path, recorded
+  length, checksum), chosen in the engine: the first image or PDF by extension, access
+  copy → preservation master → derivative, never a transcript. Drawn in-process (ImageIO,
+  Core Graphics for a PDF's first page), whole and scaled to fit a 32-pt square, cached in
+  memory by checksum. **The invariant:** a row draws only the recorded bytes, here: never a
+  dataless file, one of the wrong length, or one the size sweep lists. **Revised in the
+  build:** fork 1 expected an index schema bump, but `summarize` already works from the
+  record the index holds. **Gotchas** (most from `/code-review`): decodes block on reads,
+  so they run two at a time on an `OperationQueue`, shared per file, and skipped once no
+  row wants them; on the cooperative pool a fast scroll starved the app. The app's default
+  isolation is the main actor, so the loader is `nonisolated` explicitly. Keyed by
+  checksum alone, the cache showed a zeroed same-length scan as its old picture (and one
+  archive's picture for another's copy): every request now `stat`s first (~1 µs, off
+  main), and size and date join every key, failed decodes included. An embedded EXIF
+  thumbnail can be stale or letterboxed, so a mismatched aspect redraws from the image. A
+  locked PDF draws white, so it counts as undrawable.
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the

@@ -37,6 +37,15 @@ enum ArchiveLayout {
         artifactsDirectory(in: root).appendingPathComponent(slug, isDirectory: true)
     }
 
+    /// The manifest-form path (relative to the archive root) of a file in an artifact's
+    /// folder. Derived from `artifactDirectory(in:slug:)` rather than spelled out, so the
+    /// two can't drift apart.
+    static func artifactFileRelativePath(slug: String, file: String) -> String {
+        let root = URL(fileURLWithPath: "/", isDirectory: true)
+        let url = artifactDirectory(in: root, slug: slug).appendingPathComponent(file)
+        return relativePath(of: url, in: root)
+    }
+
     static func recordURL(in root: URL, slug: String) -> URL {
         artifactDirectory(in: root, slug: slug).appendingPathComponent(recordFileName)
     }
