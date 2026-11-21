@@ -82,11 +82,16 @@ struct ArtifactThumbnail: View {
 /// **Never a file that isn't on this Mac,** or isn't the one recorded. Reading a dataless
 /// file downloads it (57b), so scrolling a synced archive would download every scan, and a
 /// file of the wrong length is still arriving or damaged. Either keeps its symbol and is
-/// asked again next time, since it may be whole by then. A whole file that won't decode is
-/// remembered with its size and date, so it isn't re-read on every scroll but is once it
-/// is rewritten.
+/// asked again next time, since it may be whole by then.
 ///
-/// **Memory only** (84b, fork 2), keyed by the file's checksum so a replace draws anew.
+/// **Every request looks at the file first, cache hits included:** one `stat`, measured at
+/// about 1 µs, off the main thread so a slow volume delays thumbnails and not the sidebar.
+/// Its size and modification date join the checksum in every key, so a file overwritten in
+/// place gets drawn again rather than shown as it was, and two archives' copies of one file
+/// don't share an entry (both hit in 84b's hand-test). A whole file that won't decode is
+/// remembered under the same key, so it isn't re-read on every scroll but is once rewritten.
+///
+/// **Memory only** (84b, fork 2).
 ///
 /// **`nonisolated`, explicitly:** the app's default isolation is the main actor, and the
 /// decodes run on `queue`'s threads.
@@ -102,7 +107,7 @@ nonisolated final class ThumbnailLoader: Sendable {
         /// The requests waiting on each decode, by cache key. An entry with no waiters
         /// left is a decode queued for nobody.
         var waiting: [String: [UUID: CheckedContinuation<CGImage?, Never>]] = [:]
-        /// Whole files that didn't decode, by checksum, size and modification date.
+        /// Whole files that didn't decode, by `identity`.
         var undrawable: Set<String> = []
     }
 
@@ -122,10 +127,12 @@ nonisolated final class ThumbnailLoader: Sendable {
 
     /// The thumbnail of `file`, at `url`, `pixels` on its longer side; `nil` when there
     /// is nothing to draw yet or ever, or the caller was cancelled.
+    @concurrent
     func image(
         for file: ArtifactSummary.ThumbnailFile, at url: URL, pixels: Int
     ) async -> CGImage? {
-        let key = "\(file.sha256)@\(pixels)"
+        guard let identity = Self.identity(of: file, at: url) else { return nil }
+        let key = "\(identity)@\(pixels)"
         if let hit = cache.object(forKey: key as NSString) { return hit.image }
         let id = UUID()
         return await withTaskCancellationHandler {
@@ -139,7 +146,9 @@ nonisolated final class ThumbnailLoader: Sendable {
                 switch first {
                 case nil: continuation.resume(returning: nil)
                 case true?:
-                    queue.addOperation { self.run(key, file: file, url: url, pixels: pixels) }
+                    queue.addOperation {
+                        self.run(key, identity: identity, url: url, pixels: pixels)
+                    }
                 case false?: break
                 }
             }
@@ -149,7 +158,20 @@ nonisolated final class ThumbnailLoader: Sendable {
         }
     }
 
-    private func run(_ key: String, file: ArtifactSummary.ThumbnailFile, url: URL, pixels: Int) {
+    /// The file's checksum, size and modification date, if it is here, not dataless and
+    /// the recorded length; `nil` when it must keep its symbol.
+    private static func identity(of file: ArtifactSummary.ThumbnailFile, at url: URL) -> String? {
+        var st = stat()
+        let found = url.withUnsafeFileSystemRepresentation { path in
+            path.map { stat($0, &st) == 0 } ?? false
+        }
+        guard found, !Archive.isDataless(st), Int64(st.st_size) == file.byteLength else {
+            return nil
+        }
+        return "\(file.sha256) \(st.st_size) \(st.st_mtimespec.tv_sec).\(st.st_mtimespec.tv_nsec)"
+    }
+
+    private func run(_ key: String, identity: String, url: URL, pixels: Int) {
         let wanted = state.withLock { state in
             guard state.waiting[key]?.isEmpty == false else {
                 state.waiting[key] = nil
@@ -158,7 +180,7 @@ nonisolated final class ThumbnailLoader: Sendable {
             return true
         }
         guard wanted else { return }
-        let image = draw(file, at: url, pixels: pixels)
+        let image = draw(identity, at: url, pixels: pixels)
         if let image {
             cache.setObject(
                 Box(image), forKey: key as NSString, cost: image.bytesPerRow * image.height)
@@ -167,21 +189,12 @@ nonisolated final class ThumbnailLoader: Sendable {
         for waiter in waiters.values { waiter.resume(returning: image) }
     }
 
-    private func draw(_ file: ArtifactSummary.ThumbnailFile, at url: URL, pixels: Int) -> CGImage? {
-        var st = stat()
-        let found = url.withUnsafeFileSystemRepresentation { path in
-            path.map { stat($0, &st) == 0 } ?? false
-        }
-        guard found, !Archive.isDataless(st), Int64(st.st_size) == file.byteLength else {
-            return nil
-        }
-        let memo =
-            "\(file.sha256) \(st.st_size) \(st.st_mtimespec.tv_sec).\(st.st_mtimespec.tv_nsec)"
-        guard !state.withLock({ $0.undrawable.contains(memo) }) else { return nil }
+    private func draw(_ identity: String, at url: URL, pixels: Int) -> CGImage? {
+        guard !state.withLock({ $0.undrawable.contains(identity) }) else { return nil }
         let image =
             url.pathExtension.lowercased() == "pdf"
             ? Self.renderPDF(url, pixels: pixels) : Self.renderImage(url, pixels: pixels)
-        if image == nil { state.withLock { _ = $0.undrawable.insert(memo) } }
+        if image == nil { state.withLock { _ = $0.undrawable.insert(identity) } }
         return image
     }
 

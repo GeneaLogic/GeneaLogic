@@ -94,6 +94,42 @@ import UniformTypeIdentifiers
         #expect(await load(whole, url) != nil)
     }
 
+    /// A cache hit still looks at the file: one deleted after it was drawn keeps its
+    /// symbol at once, without waiting for the size sweep.
+    @Test func aFileDeletedAfterItWasDrawnIsNotDrawnAgain() async throws {
+        let url = try png(width: 40, height: 40)
+        let file = try record(url)
+        #expect(await load(file, url) != nil)
+        try FileManager.default.removeItem(at: url)
+        #expect(await load(file, url) == nil)
+    }
+
+    /// Overwritten in place at the same length — damage only Verify Integrity's hashes
+    /// see — it is drawn from what is there now, not shown as it was (84b's hand-test).
+    @Test func aFileOverwrittenInPlaceIsDrawnFromItsNewBytes() async throws {
+        let url = try png(width: 40, height: 40)
+        let file = try record(url)
+        #expect(await load(file, url) != nil)
+
+        let length = Int(file.byteLength)
+        try Data(count: length).write(to: url)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(5)], ofItemAtPath: url.path)
+        #expect(await load(file, url) == nil)
+    }
+
+    /// Two archives holding the same file share a checksum, not a thumbnail: each copy is
+    /// judged on its own bytes (84b's hand-test).
+    @Test func twoCopiesOfOneFileAreJudgedSeparately() async throws {
+        let good = try png(width: 40, height: 40)
+        let file = try record(good)
+        let zeroed = directory.appendingPathComponent("zeroed.png")
+        try Data(count: Int(file.byteLength)).write(to: zeroed)
+
+        #expect(await load(file, good) != nil)
+        #expect(await load(file, zeroed) == nil)
+    }
+
     @Test func aMissingFileIsNotDrawn() async throws {
         let url = directory.appendingPathComponent("gone.png")
         let file = ArtifactSummary.ThumbnailFile(

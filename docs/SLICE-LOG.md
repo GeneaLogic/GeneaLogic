@@ -4437,8 +4437,10 @@ been two slices.
   record the index holds. **Gotchas** (most from `/code-review`): decodes block on reads,
   so they run two at a time on an `OperationQueue`, shared per file, and skipped once no
   row wants them; on the cooperative pool a fast scroll starved the app. The app's default
-  isolation is the main actor, so the loader is `nonisolated` explicitly. A failed decode
-  is remembered with the file's size and date, or it never retries. An embedded EXIF
+  isolation is the main actor, so the loader is `nonisolated` explicitly. Keyed by
+  checksum alone, the cache showed a zeroed same-length scan as its old picture (and one
+  archive's picture for another's copy): every request now `stat`s first (~1 µs, off
+  main), and size and date join every key, failed decodes included. An embedded EXIF
   thumbnail can be stale or letterboxed, so a mismatched aspect redraws from the image. A
   locked PDF draws white, so it counts as undrawable.
 
