@@ -25,13 +25,13 @@ rebuildable cache.
 - **Lazily, per visible row**, the symbol showing until the thumbnail arrives, and
   cached in memory.
 
-## Design forks
+## Design forks (agreed 2026-11-21)
 
 1. **How the row learns its file.** The spike decoded each visible artifact's record.
-   **Recommended:** the browse summary carries the chosen file's path, from the index,
-   so a row reads nothing it doesn't draw. The index schema changes, which means a
-   rebuild on first open (no format change).
-2. **A disk cache.** **Recommended: none, until measured.** If needed, the app's own
+   **Agreed:** the browse summary carries the chosen file's path, from the index,
+   so a row reads nothing it doesn't draw. *Built without the index schema change this
+   expected: the summary is already made from the record the index holds.*
+2. **A disk cache.** **Agreed: none, until measured.** If needed, the app's own
    Caches folder keyed by the file's checksum, never inside the archive.
 
 ## Out of scope

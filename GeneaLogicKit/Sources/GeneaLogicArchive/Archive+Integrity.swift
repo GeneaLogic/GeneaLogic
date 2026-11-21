@@ -415,8 +415,9 @@ extension Archive {
     /// the bytes down).
     ///
     /// A file that cannot be `stat`ed is not a placeholder; `verifyIntegrity()`
-    /// has already established the file exists by the time it asks.
-    static func fileIsDataless(at url: URL) -> Bool {
+    /// has already established the file exists by the time it asks. Public since
+    /// slice 84b, for the app's thumbnails, which must not download a file to draw it.
+    public static func fileIsDataless(at url: URL) -> Bool {
         var st = stat()
         let ok = url.withUnsafeFileSystemRepresentation { path in
             path.map { stat($0, &st) == 0 } ?? false

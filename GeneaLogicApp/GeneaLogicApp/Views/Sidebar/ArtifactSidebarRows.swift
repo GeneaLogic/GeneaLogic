@@ -2,7 +2,8 @@ import GeneaLogicArchive
 import GeneaLogicModel
 import SwiftUI
 
-/// An artifact's sidebar row: its media type's symbol, then the title over a one-line
+/// An artifact's sidebar row: a thumbnail of its scan, or its media type's symbol (84b),
+/// then the title over a one-line
 /// subtitle of genealogically useful facets (primary date, source tier, media type),
 /// *not* the internal UID — which is developer addressing a researcher doesn't browse
 /// by, and lives de-emphasized in the detail's Identifiers section (UI audit F1).
@@ -11,7 +12,7 @@ struct ArtifactRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            SidebarSymbol(name: summary.mediaType.systemImage)
+            ArtifactThumbnail(summary: summary)
             VStack(alignment: .leading, spacing: 2) {
                 Text(summary.title)
                     .font(.headline)
@@ -69,7 +70,8 @@ struct SidebarSymbol: View {
     var body: some View {
         Image(systemName: name)
             .foregroundStyle(
-                prominence == .increased ? AnyShapeStyle(.primary) : AnyShapeStyle(.tint))
+                prominence == .increased ? AnyShapeStyle(.primary) : AnyShapeStyle(.tint)
+            )
             .frame(width: 18)
     }
 }

@@ -314,7 +314,8 @@ extension Archive {
             sourceAuthorityTier: artifact.sourceAuthorityTier,
             primaryDate: earliestDate(of: artifact.events.map(\.date)),
             tags: artifact.tags,
-            fileCount: artifact.files.count
+            fileCount: artifact.files.count,
+            thumbnailFile: slug.flatMap { ArtifactSummary.ThumbnailFile.choose(from: artifact.files, slug: $0) }
         )
     }
 

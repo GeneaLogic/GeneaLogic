@@ -4426,6 +4426,20 @@ been two slices.
   actor under Approachable Concurrency. They are `@concurrent`, and the scan and sweep run
   one at a time, a request during one running it once more.
 
+- **84b — artifact thumbnails** (engine summary + app; no format change). 84's fork 4.
+  **Decided:** the browse summary carries `thumbnailFile` (path from the archive root,
+  and the checksum), chosen in the engine: the first image or PDF by extension, access
+  copy → preservation master → derivative, never a transcript. Drawn in-process (ImageIO,
+  Core Graphics for a PDF's first page), whole and scaled to fit a 32-pt square, cached in
+  memory by checksum. **The invariant:** a row never reads a file that isn't on this Mac
+  (`Archive.fileIsDataless`, now public), and never re-decodes the record to find one.
+  **Revised in the build:** fork 1 expected an index schema bump, but `summarize` already
+  works from the record the index holds, so no schema change. **Gotchas:** a dataless or
+  missing file is asked again next time it shows, since it may have arrived; a file that is
+  here but won't decode is remembered by checksum, so a damaged scan isn't re-read on every
+  scroll. `kCGImageSourceShouldCacheImmediately`, or the decode lands on the main thread at
+  first draw.
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the
