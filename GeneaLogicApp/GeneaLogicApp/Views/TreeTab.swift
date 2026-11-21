@@ -13,8 +13,18 @@ struct TreeTab: View {
 
     @Environment(ArchiveModel.self) private var model
 
-    @SceneStorage("treeAncestorDepth") private var ancestorDepth: Int = 3
-    @SceneStorage("treeDescendantDepth") private var descendantDepth: Int = 3
+    /// How this archive's window was left (slice 85), which keeps the two depths.
+    @Environment(ArchiveWindowState.self) private var windowState
+
+    private var ancestorDepth: Int {
+        get { windowState.treeAncestorDepth }
+        nonmutating set { windowState.treeAncestorDepth = newValue }
+    }
+
+    private var descendantDepth: Int {
+        get { windowState.treeDescendantDepth }
+        nonmutating set { windowState.treeDescendantDepth = newValue }
+    }
 
     @State private var render: TreeRender?
     @State private var isPickingFocus = false
@@ -224,9 +234,14 @@ struct TreeTab: View {
         HStack(spacing: 16) {
             focusPicker
             Spacer()
-            Stepper("Ancestors: \(ancestorDepth)", value: $ancestorDepth, in: TreeDepths.range)
             Stepper(
-                "Descendants: \(descendantDepth)", value: $descendantDepth, in: TreeDepths.range)
+                "Ancestors: \(ancestorDepth)",
+                value: Binding(get: { ancestorDepth }, set: { ancestorDepth = $0 }),
+                in: TreeDepths.range)
+            Stepper(
+                "Descendants: \(descendantDepth)",
+                value: Binding(get: { descendantDepth }, set: { descendantDepth = $0 }),
+                in: TreeDepths.range)
         }
         .font(.callout)
         .padding(.horizontal, 12)

@@ -28,7 +28,7 @@ extension ArchiveModel {
     /// twice per edit.
     ///
     /// **Selection needs no special handling here** and deliberately gets none:
-    /// selection lives in the window's `@SceneStorage` as a raw id, and the
+    /// selection lives in the window's state (`WindowState`) as a raw id, and the
     /// detail pane resolves it against `artifacts` at render time — so a
     /// surviving selection is kept and an externally-deleted one falls back to
     /// the placeholder, both for free. That is the same path a selection deleted

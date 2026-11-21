@@ -534,7 +534,7 @@ enum CommandSubject: Hashable {
     }
 }
 
-/// How far the Tree draws from its focus, mirrored from `TreeTab`'s `@SceneStorage` so
+/// How far the Tree draws from its focus, mirrored from `TreeTab`'s stored state so
 /// View's depth items can grey at the ends of the range.
 struct TreeDepths: Equatable {
     /// The one range the steppers and the menu items share.

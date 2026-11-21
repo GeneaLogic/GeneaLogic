@@ -192,7 +192,8 @@ Each is specced in `docs/slices/` before it is built.
 | **83b** — row-level commands | G1 (verbs on rows inside panes: a mention's Resolve… and Unlink, a metadata entry's Apply…, a suggestion's Record and Edit…) | `0.1` |
 | **84** — the window's structure (re-scoped from *the tab switcher stays put*) | G4 | `0.1` |
 | **84b** — artifact thumbnails | from 84 | `0.1` |
-| **85** — window and document lifecycle | G10, G11, G24; G12 investigated, split off if deep | `0.1` |
+| **85** — an archive reopens as it was left | G10 | `0.1` |
+| **85b** — recents and the welcome window | G11, G24; G12 investigated, split off if deep | `0.1` |
 | **86** — a visible trash | G7 | `0.1` |
 | **87** — copy and Quick Look | G6, G16 | `0.1` |
 | **88** — the document icon | G14 | `0.1` |

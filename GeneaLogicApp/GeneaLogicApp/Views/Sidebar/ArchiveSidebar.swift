@@ -23,11 +23,24 @@ struct ArchiveSidebar: View {
     let revealRequest: Int
     var isSearchFocused: FocusState<Bool>.Binding
 
-    /// Which sections are open, per window like the selections (slice 85 decides where
-    /// window state lives, and takes these with it).
-    @SceneStorage("sidebarReviewExpanded") private var reviewExpanded = true
-    @SceneStorage("sidebarArtifactsExpanded") private var artifactsExpanded = true
-    @SceneStorage("sidebarPeopleExpanded") private var peopleExpanded = true
+    /// How this archive's window was left (slice 85), which keeps which sections are
+    /// open.
+    @Environment(ArchiveWindowState.self) private var windowState
+
+    private var reviewExpanded: Bool {
+        get { windowState.reviewExpanded }
+        nonmutating set { windowState.reviewExpanded = newValue }
+    }
+
+    private var artifactsExpanded: Bool {
+        get { windowState.artifactsExpanded }
+        nonmutating set { windowState.artifactsExpanded = newValue }
+    }
+
+    private var peopleExpanded: Bool {
+        get { windowState.peopleExpanded }
+        nonmutating set { windowState.peopleExpanded = newValue }
+    }
 
     /// Whether Artifacts is narrowed to the uncatalogued artifacts. Not persisted: it is a
     /// working mode for a cataloguing pass, and a filter that survives a relaunch is one
@@ -87,7 +100,10 @@ struct ArchiveSidebar: View {
                 Section {
                     if reviewExpanded { reviewRows }
                 } header: {
-                    header(.review, count: reviewCount, isExpanded: $reviewExpanded) {
+                    header(
+                        .review, count: reviewCount,
+                        isExpanded: Binding(get: { reviewExpanded }, set: { reviewExpanded = $0 })
+                    ) {
                         Button {
                             model.perform(.refreshReview, fromSidebar: true)
                         } label: {
@@ -106,7 +122,7 @@ struct ArchiveSidebar: View {
                     .artifacts,
                     count: SidebarCount.text(
                         shown: artifacts.visible.count, of: model.artifacts.count),
-                    isExpanded: $artifactsExpanded
+                    isExpanded: Binding(get: { artifactsExpanded }, set: { artifactsExpanded = $0 })
                 ) {
                     if !model.artifacts.isEmpty {
                         ArtifactFilterMenu(
@@ -123,7 +139,7 @@ struct ArchiveSidebar: View {
                     .people,
                     count: SidebarCount.text(
                         shown: model.displayedPersons.count, of: model.persons.count),
-                    isExpanded: $peopleExpanded
+                    isExpanded: Binding(get: { peopleExpanded }, set: { peopleExpanded = $0 })
                 ) { EmptyView() }
             }
         }

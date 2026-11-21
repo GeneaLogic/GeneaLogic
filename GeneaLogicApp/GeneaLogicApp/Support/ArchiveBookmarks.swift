@@ -13,6 +13,9 @@ import Foundation
 ///   - **`recents`** (ordered `[path]`) is the *display* list behind File ▸ Open
 ///     Recent. "Clear Menu" empties it but leaves the bookmarks intact, so an
 ///     already-open (or restoring) window can still re-acquire access.
+///   - **window states** are how each archive's window was left (slice 85), keyed by
+///     the archive's file identity rather than its path (`identity(of:)`). They don't
+///     share the bookmarks' lifetime: only the cap below drops one.
 ///
 /// All paths are standardized file-URL paths (`url.standardizedFileURL.path`).
 /// Backed by `UserDefaults`; tiny and synchronous, fine for the handful of archives
@@ -26,14 +29,22 @@ final class ArchiveBookmarks {
     @ObservationIgnored private let bookmarksKey = "archiveBookmarks"
     @ObservationIgnored private let recentsKey = "recentArchivePaths"
     @ObservationIgnored private let recentsLimit = 10
+    @ObservationIgnored private let windowStatesKey = "archiveWindowStates"
+    /// How many archives' window states are kept, the most recently opened first. Nothing
+    /// else drops one (see `forget`), so this is what bounds them.
+    @ObservationIgnored private let windowStatesLimit: Int
+    /// The stored records, encoded, read from `defaults` once. A write re-encodes only its
+    /// own record: a selection step writes one.
+    @ObservationIgnored private var windowStatesCache: [String: Data]?
 
     /// The recent archives' standardized paths, most-recent-first. Observed source
     /// of truth for File ▸ Open Recent (so the menu updates live), mirrored into
     /// `UserDefaults` on every change.
     private(set) var recents: [String]
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, windowStatesLimit: Int = 100) {
         self.defaults = defaults
+        self.windowStatesLimit = windowStatesLimit
         self.recents = defaults.stringArray(forKey: recentsKey) ?? []
     }
 
@@ -120,7 +131,14 @@ final class ArchiveBookmarks {
     }
 
     /// Drops a single path from both the recents list and the bookmark store —
-    /// used when a resolve fails, so a vanished archive stops haunting the menu.
+    /// used when a resolve fails, so a vanished archive stops haunting the menu, and by
+    /// the welcome screen's Remove from Recents.
+    ///
+    /// **Window states are left alone** (slice 85's `/code-review`). One is keyed by its
+    /// archive's identity, so it can't be inherited by whatever takes this path, and a path
+    /// can't say which record was this archive's anyway: a record moved away from it is not
+    /// re-pathed until it is reopened. Removing a recent mustn't reset the archive's window,
+    /// and a bookmark that fails to resolve may only be on a drive that isn't mounted.
     func forget(pathKey key: String) {
         setRecents(recents.filter { $0 != key })
 
@@ -129,11 +147,85 @@ final class ArchiveBookmarks {
         setBookmarkData(all)
     }
 
+    // MARK: - Window state (slice 85)
+
+    /// How the archive with this identity (`identity(of:)`) was left on this Mac, or `nil`
+    /// if it is new here.
+    func windowState(forIdentity identity: String) -> WindowState? {
+        guard let data = windowStates()[identity] else { return nil }
+        return (try? JSONDecoder().decode(StoredWindowState.self, from: data))?.state
+    }
+
+    /// Records how the archive with this identity was left, and that it was just opened.
+    /// Past the cap, the least recently opened records go.
+    func setWindowState(_ state: WindowState, forIdentity identity: String) {
+        var states = windowStates()
+        guard let data = try? JSONEncoder().encode(StoredWindowState(state: state, opened: .now))
+        else { return }
+        states[identity] = data
+        if states.count > windowStatesLimit {
+            let decoded = states.compactMapValues {
+                try? JSONDecoder().decode(StoredWindowState.self, from: $0)
+            }
+            let oldest = decoded.sorted { $0.value.opened > $1.value.opened }
+                .dropFirst(windowStatesLimit)
+            for (evicted, _) in oldest { states[evicted] = nil }
+            // A record that no longer decodes has no date to sort by; it goes first.
+            for key in states.keys where decoded[key] == nil { states[key] = nil }
+        }
+        setWindowStates(states)
+    }
+
+    /// The key an archive's window state is stored under: its **file identity**, the
+    /// volume's UUID and the folder's inode, or its path where the volume gives none.
+    ///
+    /// A move or rename on the volume keeps the identity, and a copy doesn't get it. So a
+    /// moved archive keeps its state, and a Finder copy starts fresh, as does another
+    /// archive put where a moved one used to be. A cross-volume move or a restore from
+    /// backup starts fresh too, the accepted cost.
+    ///
+    /// Not through the bookmarks, which looked like the same thing: a bookmark resolves by
+    /// **path** first, so an archive placed at a moved one's old path would inherit its
+    /// state. Nor the kernel's document identifier, which APFS assigns lazily.
+    ///
+    /// **Read from a fresh `URL`**: a `URL` caches its resource values, so asking a
+    /// long-lived one after the folder was replaced returns the old folder's inode. Needs
+    /// the archive's sandbox access.
+    static func identity(of url: URL) -> String {
+        let path = url.standardizedFileURL.path
+        let fresh = URL(fileURLWithPath: path, isDirectory: true)
+        let values = try? fresh.resourceValues(forKeys: [.volumeUUIDStringKey, .fileIdentifierKey])
+        guard let volume = values?.volumeUUIDString, let inode = values?.fileIdentifier else {
+            return "path:\(path)"
+        }
+        return "\(volume):\(inode)"
+    }
+
+    /// A window state and when its archive was last opened, for the cap.
+    private struct StoredWindowState: Codable {
+        var state: WindowState
+        var opened: Date
+    }
+
     // MARK: - Storage
 
     private func setRecents(_ paths: [String]) {
         recents = paths
         defaults.set(paths, forKey: recentsKey)
+    }
+
+    /// The records, encoded per record so one that doesn't decode drops alone. Cached
+    /// after the first read; this object is the only writer.
+    private func windowStates() -> [String: Data] {
+        if let windowStatesCache { return windowStatesCache }
+        let raw = defaults.dictionary(forKey: windowStatesKey) as? [String: Data] ?? [:]
+        windowStatesCache = raw
+        return raw
+    }
+
+    private func setWindowStates(_ value: [String: Data]) {
+        windowStatesCache = value
+        defaults.set(value, forKey: windowStatesKey)
     }
 
     private func bookmarkData() -> [String: Data] {
