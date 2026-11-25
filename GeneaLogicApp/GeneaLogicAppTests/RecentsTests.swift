@@ -12,12 +12,18 @@ final class RecordingSystemRecents: SystemRecents {
     nonisolated init() {}
 
     func note(_ url: URL) {
-        remove(url)
+        remove([url])
         paths.insert(url.canonicalArchiveURL.path, at: 0)
     }
 
-    func remove(_ url: URL) {
-        paths.removeAll { $0 == url.canonicalArchiveURL.path }
+    func remove(_ urls: [URL]) {
+        let removed = urls.map(\.canonicalArchiveURL.path)
+        paths.removeAll { removed.contains($0) }
+    }
+
+    /// The system's entries follow a moved archive.
+    func follow(_ old: URL, to new: URL) {
+        paths = paths.map { $0 == old.canonicalArchiveURL.path ? new.canonicalArchiveURL.path : $0 }
     }
 
     func clear() {
@@ -80,14 +86,52 @@ final class RecordingSystemRecents: SystemRecents {
         #expect(bookmarks.resolve(one) != nil)
     }
 
-    @Test func aRemovedRecentLeavesBothLists() throws {
+    @Test func aRemovedRecentLeavesBothListsAndKeepsItsBookmark() throws {
         let one = try makeArchive("One")
         let two = try makeArchive("Two")
         bookmarks.remember(one)
         bookmarks.remember(two)
-        bookmarks.forget(pathKey: path(one))
+        bookmarks.removeRecent(one)
         #expect(bookmarks.recents == [path(two)])
         #expect(system.paths == [path(two)])
+        // It may be open, and its window restores through this.
+        #expect(bookmarks.resolve(one) != nil)
+    }
+
+    @Test func aMovedArchiveIsRemovedFromTheSystemsListToo() throws {
+        let one = try makeArchive("One")
+        bookmarks.remember(one)
+        let renamed = root.appending(path: "Renamed.genea", directoryHint: .isDirectory)
+        try FileManager.default.moveItem(at: one, to: renamed)
+        system.follow(one, to: renamed)
+        bookmarks.removeRecent(one)
+        #expect(bookmarks.recents.isEmpty)
+        #expect(system.paths.isEmpty)
+    }
+
+    /// The old path's entry goes, and the archive's own, under its new name, stays.
+    @Test func removingAMovedArchivesOldEntryLeavesItsNewOne() throws {
+        let one = try makeArchive("One")
+        bookmarks.remember(one)
+        let renamed = root.appending(path: "Renamed.genea", directoryHint: .isDirectory)
+        try FileManager.default.moveItem(at: one, to: renamed)
+        system.follow(one, to: renamed)
+        bookmarks.remember(renamed)
+        bookmarks.removeRecent(one)
+        #expect(bookmarks.recents == [path(renamed)])
+        #expect(system.paths == [path(renamed)])
+    }
+
+    @Test func reopeningAMovedArchiveTellsTheSystemNothing() throws {
+        let one = try makeArchive("One")
+        let two = try makeArchive("Two")
+        bookmarks.remember(one)
+        bookmarks.remember(two)
+        try FileManager.default.moveItem(
+            at: one, to: root.appending(path: "Renamed.genea", directoryHint: .isDirectory))
+        bookmarks.promote(one)
+        #expect(system.paths.first == path(two))
+        #expect(bookmarks.recents.first == path(two))
     }
 
     @Test func aRecentWhoseArchiveIsGoneDropsOut() throws {
@@ -109,6 +153,7 @@ final class RecordingSystemRecents: SystemRecents {
     @MainActor
     private final class Harness {
         var hasWindows = false
+        var isHidden = false
         var opened: [URL] = []
         var welcomes = 0
         var welcomesClosed = 0
@@ -116,11 +161,19 @@ final class RecordingSystemRecents: SystemRecents {
 
         init() {
             var windows: () -> Bool = { false }
-            coordinator = ArchiveOpenCoordinator(hasWindows: { windows() })
+            var hidden: () -> Bool = { false }
+            coordinator = ArchiveOpenCoordinator(
+                hasWindows: { windows() }, isHidden: { hidden() })
             windows = { [unowned self] in hasWindows }
+            hidden = { [unowned self] in isHidden }
             coordinator.openArchive = { [unowned self] in opened.append($0) }
             coordinator.openWelcome = { [unowned self] in welcomes += 1 }
             coordinator.closeWelcome = { [unowned self] in welcomesClosed += 1 }
+        }
+
+        func finishLaunch() {
+            coordinator.launchDidFinish()
+            coordinator.restorationDidFinish()
         }
     }
 
@@ -128,14 +181,14 @@ final class RecordingSystemRecents: SystemRecents {
 
     @Test func aLaunchWithNothingElseShowsWelcome() {
         let harness = Harness()
-        harness.coordinator.launchDidFinish()
+        harness.finishLaunch()
         #expect(harness.welcomes == 1)
     }
 
     @Test func aLaunchThatRestoredAWindowDoesNot() {
         let harness = Harness()
         harness.hasWindows = true
-        harness.coordinator.launchDidFinish()
+        harness.finishLaunch()
         #expect(harness.welcomes == 0)
     }
 
@@ -145,21 +198,21 @@ final class RecordingSystemRecents: SystemRecents {
         let harness = Harness()
         harness.coordinator.open(archive)
         #expect(harness.opened.isEmpty)
-        harness.coordinator.launchDidFinish()
+        harness.finishLaunch()
         #expect(harness.opened == [archive])
         #expect(harness.welcomes == 0)
     }
 
     @Test func anOpenWhileRunningIsImmediateAndCanonical() {
         let harness = Harness()
-        harness.coordinator.launchDidFinish()
+        harness.finishLaunch()
         harness.coordinator.open(URL(fileURLWithPath: "/a/One.genea", isDirectory: false))
         #expect(harness.opened == [archive])
     }
 
     @Test func anOpenClosesTheWelcomeWindow() {
         let harness = Harness()
-        harness.coordinator.launchDidFinish()
+        harness.finishLaunch()
         #expect(harness.welcomes == 1)
         #expect(harness.welcomesClosed == 0)
         harness.coordinator.open(archive)
@@ -169,7 +222,7 @@ final class RecordingSystemRecents: SystemRecents {
     @Test func aDockClickShowsWelcomeOnlyWithNoWindows() {
         let harness = Harness()
         harness.hasWindows = true
-        harness.coordinator.launchDidFinish()
+        harness.finishLaunch()
         // AppKit's own part: a minimized window comes back.
         #expect(harness.coordinator.reopen())
         #expect(harness.welcomes == 0)
@@ -179,13 +232,58 @@ final class RecordingSystemRecents: SystemRecents {
         #expect(harness.welcomes == 1)
     }
 
-    /// A restored window that never gets its archive closes.
-    @Test func anEmptyRestoredWindowGivesWayToWelcome() {
+    /// AppKit may finish restoring after it finishes launching.
+    @Test(arguments: [true, false])
+    func nothingIsDecidedUntilBothAreDone(launchFirst: Bool) {
+        let harness = Harness()
+        harness.coordinator.open(archive)
+        if launchFirst {
+            harness.coordinator.launchDidFinish()
+        } else {
+            harness.coordinator.restorationDidFinish()
+        }
+        #expect(harness.opened.isEmpty)
+        #expect(harness.welcomes == 0)
+        harness.finishLaunch()
+        #expect(harness.opened == [archive])
+    }
+
+    /// A hidden app's windows say they aren't visible.
+    @Test func aHiddenAppIsAskedWhenItIsShown() {
+        let harness = Harness()
+        harness.isHidden = true
+        harness.finishLaunch()
+        #expect(harness.coordinator.reopen())
+        #expect(harness.welcomes == 0)
+
+        harness.isHidden = false
+        harness.hasWindows = true
+        harness.coordinator.appDidUnhide()
+        #expect(harness.welcomes == 0)
+
+        // Hidden with nothing open: shown, it is the welcome window's turn.
+        harness.isHidden = true
+        harness.hasWindows = false
+        #expect(harness.coordinator.reopen())
+        harness.isHidden = false
+        harness.coordinator.appDidUnhide()
+        #expect(harness.welcomes == 1)
+    }
+
+    /// Asked for once, not at every unhide.
+    @Test func showingTheAppAloneDoesNotShowWelcome() {
         let harness = Harness()
         harness.hasWindows = true
-        harness.coordinator.launchDidFinish()
+        harness.finishLaunch()
         harness.hasWindows = false
-        harness.coordinator.emptyWindowDidClose()
-        #expect(harness.welcomes == 1)
+        harness.coordinator.appDidUnhide()
+        #expect(harness.welcomes == 0)
+    }
+
+    @Test func aRestoredWindowClosesAPrematureWelcome() {
+        let harness = Harness()
+        harness.finishLaunch()
+        harness.coordinator.archiveWindowDidOpen()
+        #expect(harness.welcomesClosed == 1)
     }
 }

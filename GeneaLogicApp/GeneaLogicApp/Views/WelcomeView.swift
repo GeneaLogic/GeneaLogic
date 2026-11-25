@@ -142,7 +142,7 @@ struct WelcomeView: View {
                                     NSWorkspace.shared.activateFileViewerSelecting([recent])
                                 }
                                 Button("Remove from Recents") {
-                                    bookmarks.forget(pathKey: recent.standardizedFileURL.path)
+                                    bookmarks.removeRecent(recent)
                                 }
                             }
                     }

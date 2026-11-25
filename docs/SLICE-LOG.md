@@ -4483,7 +4483,12 @@ been two slices.
   restored archive; and SwiftUI keys saved windows on the content view's type, so windows
   saved before this slice aren't restored, once. **Tabs stay off by choice (#41, parked):**
   an archive window is complex enough without them, and the HIG doesn't call for them. The
-  crash wasn't reproduced on macOS 27.2, nor its cause found; macOS 26 is untested.
+  crash wasn't reproduced on macOS 27.2, nor its cause found; macOS 26 is untested. **From
+  `/code-review`:** Remove from Recents keeps the bookmark, since the archive may now be
+  open; a launch is finished when AppKit has both launched and restored, in either order; a
+  hidden app's windows report not visible, so it is asked once shown; an empty restored
+  window is never closed (any deadline could lose an archive); welcome is dismissed
+  `.destructive`, or its open panel keeps it up.
 
 ## Carryovers and parked work
 

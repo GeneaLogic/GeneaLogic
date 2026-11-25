@@ -81,7 +81,10 @@ struct GeneaLogicAppApp: App {
         ArchiveOpenCoordinator.shared.openArchive = { openWindow(value: $0) }
         ArchiveOpenCoordinator.shared.openWelcome = { openWindow(id: WelcomeView.windowID) }
         ArchiveOpenCoordinator.shared.closeWelcome = {
-            dismissWindow(id: WelcomeView.windowID)
+            // Even with its open panel or an alert up, which an ordinary dismissal leaves.
+            withTransaction(\.dismissBehavior, .destructive) {
+                dismissWindow(id: WelcomeView.windowID)
+            }
         }
     }
 }
@@ -91,6 +94,22 @@ struct GeneaLogicAppApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        let center = NotificationCenter.default
+        center.addObserver(
+            self, selector: #selector(didFinishRestoringWindows),
+            name: NSApplication.didFinishRestoringWindowsNotification, object: nil)
+    }
+
+    /// One runloop hop, here and below, lets SwiftUI register the restored scenes.
+    @objc private func didFinishRestoringWindows() {
+        DispatchQueue.main.async { ArchiveOpenCoordinator.shared.restorationDidFinish() }
+    }
+
+    func applicationDidUnhide(_ notification: Notification) {
+        DispatchQueue.main.async { ArchiveOpenCoordinator.shared.appDidUnhide() }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Window tabs are off by choice: an archive window is complex enough without a tab
         // bar (#41, parked). They were first turned off because AppKit's tab commands
@@ -98,8 +117,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // untested, and the tab bar's + opens a window with no archive.
         NSWindow.allowsAutomaticWindowTabbing = false
 
-        // AppKit restores windows before this fires; one runloop hop lets SwiftUI
-        // register their scenes.
         DispatchQueue.main.async { ArchiveOpenCoordinator.shared.launchDidFinish() }
     }
 

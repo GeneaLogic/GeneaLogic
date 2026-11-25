@@ -7,13 +7,14 @@ import AppKit
 /// **focuses** its restored window instead of racing it and spawning a duplicate (slice
 /// 31). `openWindow(value:)` focuses an existing window for that value, but only once it
 /// is in the scene table. On relaunch the OS restores the archive's window *and* delivers
-/// the document-open; AppKit restores windows *before* `applicationDidFinishLaunching`
-/// (the ordering `NSDocument` apps rely on), so opens are buffered until then, plus one
-/// runloop hop for SwiftUI to register the restored scenes.
+/// the document-open, so opens are buffered until AppKit has both finished launching and
+/// finished restoring windows, in whichever order (`NSWindowRestoration.h` allows either),
+/// plus one runloop hop for SwiftUI to register the restored scenes.
 ///
 /// **The welcome window waits for the same moment**, when it is known whether anything
 /// else came up. That is why it isn't SwiftUI's to present at launch: a Finder open must
-/// not flash it.
+/// not flash it. It closes whenever an archive window opens, however it came to
+/// (`archiveWindowDidOpen`).
 @MainActor
 final class ArchiveOpenCoordinator {
     static let shared = ArchiveOpenCoordinator()
@@ -26,14 +27,26 @@ final class ArchiveOpenCoordinator {
 
     /// Whether the app has a window, on screen or in the Dock.
     private let hasWindows: @MainActor () -> Bool
+    /// Whether the app is hidden. Its open windows then report that they aren't visible, so
+    /// `hasWindows` can't be asked until it is shown.
+    private let isHidden: @MainActor () -> Bool
+    /// The two halves of a finished launch.
+    private var didLaunch = false
+    private var didRestore = false
     /// `true` once launch + state restoration have completed. Until then, opens are
     /// buffered rather than run against a half-restored scene table.
-    private var launchFinished = false
+    private var launchFinished: Bool { didLaunch && didRestore }
+    /// Whether to ask for the welcome window again when the app is shown.
+    private var checkWhenShown = false
     /// Archives to open that arrived during launch, in order.
     private var pending: [URL] = []
 
-    init(hasWindows: @escaping @MainActor () -> Bool = ArchiveOpenCoordinator.appHasWindows) {
+    init(
+        hasWindows: @escaping @MainActor () -> Bool = ArchiveOpenCoordinator.appHasWindows,
+        isHidden: @escaping @MainActor () -> Bool = { NSApp.isHidden }
+    ) {
         self.hasWindows = hasWindows
+        self.isHidden = isHidden
     }
 
     /// Opens an archive whose access is already held, and closes the welcome window: now if
@@ -49,11 +62,26 @@ final class ArchiveOpenCoordinator {
         }
     }
 
-    /// Called once AppKit has restored windows and SwiftUI has registered their scenes
-    /// (a runloop hop after `applicationDidFinishLaunching`). Runs the buffered opens, or
-    /// shows the welcome window if the launch brought up nothing at all.
+    /// The app has finished launching (a runloop hop after the notification, so SwiftUI has
+    /// registered the scenes).
     func launchDidFinish() {
-        launchFinished = true
+        guard !didLaunch else { return }
+        didLaunch = true
+        startIfReady()
+    }
+
+    /// AppKit has finished restoring windows (and a runloop hop, as above). Posted even when
+    /// there were none.
+    func restorationDidFinish() {
+        guard !didRestore else { return }
+        didRestore = true
+        startIfReady()
+    }
+
+    /// Runs the buffered opens, or shows the welcome window if the launch brought up nothing
+    /// at all.
+    private func startIfReady() {
+        guard launchFinished else { return }
         let urls = pending
         pending.removeAll()
         if urls.isEmpty {
@@ -75,14 +103,24 @@ final class ArchiveOpenCoordinator {
         return !showWelcomeIfEmpty()
     }
 
-    /// A restored window that never got its archive has closed, and it counted as a window
-    /// when the launch finished.
-    func emptyWindowDidClose() {
+    /// The app was shown after being hidden (and a runloop hop, so its windows are back).
+    func appDidUnhide() {
+        guard checkWhenShown else { return }
+        checkWhenShown = false
         showWelcomeIfEmpty()
+    }
+
+    /// An archive's window is up: one that was opened, or one restored.
+    func archiveWindowDidOpen() {
+        closeWelcome()
     }
 
     @discardableResult
     private func showWelcomeIfEmpty() -> Bool {
+        guard !isHidden() else {
+            checkWhenShown = true
+            return false
+        }
         guard !hasWindows() else { return false }
         openWelcome()
         return true

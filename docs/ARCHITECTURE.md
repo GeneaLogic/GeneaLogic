@@ -1144,8 +1144,8 @@ GeneaLogicKit.
 > - **What a launch, an open or a Dock click brings up** is `ArchiveOpenCoordinator`'s
 >   decision (slice 85b). Both scenes are launch-suppressed. Opens arrive at the app
 >   delegate, not at a window's `onOpenURL`, which SwiftUI spawned a window to deliver;
->   they wait for state restoration, then go through `openWindow(value:)` (preserving
->   dedup). The welcome window shows when a launch restored and opened nothing, and on a
+>   they wait until AppKit has both launched and restored, then go through
+>   `openWindow(value:)` (preserving dedup). The welcome window shows when a launch restored and opened nothing, and on a
 >   Dock click with no windows. It may sit beside open archives (Window ▸ Welcome to
 >   GeneaLogic, ⇧⌘1), and closes when one is opened, from it or any other way.
 > - **Menu-bar commands** target the key window's `ArchiveModel` via
