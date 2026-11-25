@@ -18,10 +18,11 @@ import AppKit
 final class ArchiveOpenCoordinator {
     static let shared = ArchiveOpenCoordinator()
 
-    /// Opens, or focuses, the window of the archive at a canonical URL; and the welcome
-    /// window. Set by the app's scene, where `openWindow` is available.
+    /// Opens, or focuses, the window of the archive at a canonical URL; and opens and
+    /// closes the welcome window. Set by the app's scene, where `openWindow` is available.
     var openArchive: (URL) -> Void = { _ in }
     var openWelcome: () -> Void = {}
+    var closeWelcome: () -> Void = {}
 
     /// Whether the app has a window, on screen or in the Dock.
     private let hasWindows: @MainActor () -> Bool
@@ -35,12 +36,14 @@ final class ArchiveOpenCoordinator {
         self.hasWindows = hasWindows
     }
 
-    /// Opens an archive whose access is already held: now if launch has completed (the
-    /// common "double-click while open" case), otherwise once it has.
+    /// Opens an archive whose access is already held, and closes the welcome window: now if
+    /// launch has completed (the common "double-click while open" case), otherwise once it
+    /// has. Every open goes through here, so the welcome window closes whichever way an
+    /// archive was opened.
     func open(_ url: URL) {
         let url = url.canonicalArchiveURL
         if launchFinished {
-            openArchive(url)
+            show(url)
         } else {
             pending.append(url)
         }
@@ -56,8 +59,13 @@ final class ArchiveOpenCoordinator {
         if urls.isEmpty {
             showWelcomeIfEmpty()
         } else {
-            urls.forEach(openArchive)
+            urls.forEach(show)
         }
+    }
+
+    private func show(_ url: URL) {
+        openArchive(url)
+        closeWelcome()
     }
 
     /// A Dock click, or any other reopen. Returns whether AppKit should do its own part,

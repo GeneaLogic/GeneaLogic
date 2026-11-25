@@ -1147,7 +1147,7 @@ GeneaLogicKit.
 >   they wait for state restoration, then go through `openWindow(value:)` (preserving
 >   dedup). The welcome window shows when a launch restored and opened nothing, and on a
 >   Dock click with no windows. It may sit beside open archives (Window ▸ Welcome to
->   GeneaLogic, ⇧⌘1), and closes when it opens one.
+>   GeneaLogic, ⇧⌘1), and closes when one is opened, from it or any other way.
 > - **Menu-bar commands** target the key window's `ArchiveModel` via
 >   `@FocusedValue`. Every archive verb is an `ArchiveCommand` (slice 82): title,
 >   shortcut and availability (`CommandContext.canPerform`) are spelled once, and the

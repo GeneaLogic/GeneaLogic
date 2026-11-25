@@ -35,8 +35,9 @@ window tabs are switched off, because AppKit's tab commands crash on the app's w
 2. **Welcome becomes its own `Window` scene (G24)**, single-instance, with Window ▸
    Welcome to GeneaLogic (⇧⌘1, as in Xcode; free in slice 82's table). It may sit beside
    open archives. It shows at launch when nothing is restored or opened, and on a Dock
-   click with no windows. It closes when it opens an archive, which gets its own window.
-   The URL group loses its `nil` state, and with it `RootWindow`'s
+   click with no windows. It closes when an archive is opened, which gets its own
+   window: from it, or any other way (⌘O, Finder, the Dock; widened 2026-11-24 before
+   the hand-test). The URL group loses its `nil` state, and with it `RootWindow`'s
    welcome-must-not-coexist dismissal.
 
 ## G12, investigated

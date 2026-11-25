@@ -8,7 +8,6 @@ import SwiftUI
 /// `ArchiveCommand` on whichever archive window is key, via `@FocusedValue`, and is
 /// spelled there, not here (slice 82).
 struct ArchiveCommands: Commands {
-    @Environment(\.openWindow) private var openWindow
     @Environment(\.openURL) private var openURL
     @FocusedValue(\.archiveModel) private var activeModel
     /// The persisted recents, read here so File ▸ Open Recent updates live as
@@ -202,7 +201,7 @@ struct ArchiveCommands: Commands {
     private func openRecent(_ url: URL) {
         // `reopenRecent` re-derives access + bumps Recent (the shared policy); the
         // value group de-dups so a recent that's already open just focuses its window.
-        openWindow(value: ArchiveAccessStore.shared.reopenRecent(url))
+        ArchiveOpenCoordinator.shared.open(ArchiveAccessStore.shared.reopenRecent(url))
     }
 
     /// Create-on-disk, then open a window for the new archive. The window opens
@@ -210,7 +209,7 @@ struct ArchiveCommands: Commands {
     private func newArchive() {
         guard let location = ArchiveLauncher.newArchiveLocation() else { return }
         do {
-            openWindow(value: try ArchiveLauncher.create(at: location))
+            ArchiveOpenCoordinator.shared.open(try ArchiveLauncher.create(at: location))
         } catch {
             presentFailure("Couldn't create the archive.", error)
         }
@@ -218,9 +217,10 @@ struct ArchiveCommands: Commands {
 
     private func openArchive() {
         guard let url = ArchiveLauncher.openPanelURL() else { return }
-        // Acquire on the original scoped URL; canonicalize only the window value.
+        // Acquire on the original scoped URL; the coordinator canonicalizes the window
+        // value.
         ArchiveAccessStore.shared.acquire(url)
-        openWindow(value: url.canonicalArchiveURL)
+        ArchiveOpenCoordinator.shared.open(url)
     }
 
     /// A `Commands` body isn't a view, so it can't host a SwiftUI `.alert`;

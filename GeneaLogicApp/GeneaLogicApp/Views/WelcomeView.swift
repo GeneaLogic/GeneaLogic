@@ -4,12 +4,10 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// The welcome window (slice 85b): the ways into an archive. It may sit beside open
-/// archives, and closes when it opens one, which gets a window of its own.
+/// archives, and closes when one is opened, here or anywhere else
+/// (`ArchiveOpenCoordinator`).
 struct WelcomeView: View {
     static let windowID = "welcome"
-
-    @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismissWindow) private var dismissWindow
 
     /// Drives the open `.fileImporter`, the only importer in this window (an archive's
     /// is in its own), so the "one live importer per hierarchy" constraint holds.
@@ -85,11 +83,9 @@ struct WelcomeView: View {
         }
     }
 
-    /// Opens the archive at a canonical URL in its own window, or focuses that window, and
-    /// closes this one.
+    /// Opens the archive in its own window, or focuses that window, and closes this one.
     private func open(_ url: URL) {
-        openWindow(value: url)
-        dismissWindow(id: Self.windowID)
+        ArchiveOpenCoordinator.shared.open(url)
     }
 
     /// Creates a new `.genea` package at a user-chosen location, then opens it.

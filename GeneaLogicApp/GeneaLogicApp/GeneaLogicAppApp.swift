@@ -9,6 +9,7 @@ struct GeneaLogicAppApp: App {
     // restore needs this hook.
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some Scene {
         // The delegate and its coordinator have no environment of their own to open a
@@ -79,6 +80,9 @@ struct GeneaLogicAppApp: App {
     private func wireOpenCoordinator() {
         ArchiveOpenCoordinator.shared.openArchive = { openWindow(value: $0) }
         ArchiveOpenCoordinator.shared.openWelcome = { openWindow(id: WelcomeView.windowID) }
+        ArchiveOpenCoordinator.shared.closeWelcome = {
+            dismissWindow(id: WelcomeView.windowID)
+        }
     }
 }
 

@@ -111,6 +111,7 @@ final class RecordingSystemRecents: SystemRecents {
         var hasWindows = false
         var opened: [URL] = []
         var welcomes = 0
+        var welcomesClosed = 0
         let coordinator: ArchiveOpenCoordinator
 
         init() {
@@ -119,6 +120,7 @@ final class RecordingSystemRecents: SystemRecents {
             windows = { [unowned self] in hasWindows }
             coordinator.openArchive = { [unowned self] in opened.append($0) }
             coordinator.openWelcome = { [unowned self] in welcomes += 1 }
+            coordinator.closeWelcome = { [unowned self] in welcomesClosed += 1 }
         }
     }
 
@@ -153,6 +155,15 @@ final class RecordingSystemRecents: SystemRecents {
         harness.coordinator.launchDidFinish()
         harness.coordinator.open(URL(fileURLWithPath: "/a/One.genea", isDirectory: false))
         #expect(harness.opened == [archive])
+    }
+
+    @Test func anOpenClosesTheWelcomeWindow() {
+        let harness = Harness()
+        harness.coordinator.launchDidFinish()
+        #expect(harness.welcomes == 1)
+        #expect(harness.welcomesClosed == 0)
+        harness.coordinator.open(archive)
+        #expect(harness.welcomesClosed == 1)
     }
 
     @Test func aDockClickShowsWelcomeOnlyWithNoWindows() {
