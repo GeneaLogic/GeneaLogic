@@ -50,8 +50,13 @@ parked.
 Move Tab to New Window, closing a tab and the tab bar's + don't crash on macOS 27.2. Nor do
 Show Tab Bar, Merge All Windows and + on `main` before this slice, with tabs switched on.
 All with the app in the background, Show All Tabs driven from code. So the crash wasn't reproduced, its cause wasn't found, and
-macOS 26 (the floor) wasn't available. Tabs stay off. Turning them on also needs an answer
-for +, which opens a window with no archive.
+macOS 26 (the floor) wasn't available. Turning tabs on also needs an answer for +, which
+opens a window with no archive.
+
+**Decided (2026-11-24): tabs stay off, and #41 is parked.** An archive window is complex
+enough without a tab bar, and the HIG doesn't call for one: it only names the menu items "in
+a tab-based window". Un-parks when people using the app ask for tabs, or the HIG recommends
+them for this kind of app.
 
 ## Out of scope
 

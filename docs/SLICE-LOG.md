@@ -4481,9 +4481,9 @@ been two slices.
   **Gotchas:** a restored `WindowGroup(for:)` window has a `nil` value when it first
   appears and gets it ~60 ms later, so closing a `nil` window on appearing lost every
   restored archive; and SwiftUI keys saved windows on the content view's type, so windows
-  saved before this slice aren't restored, once. **Tabs stay off (#41):** on macOS 27.2
-  the tab commands don't crash, nor those tried on `main` before it, so the cause wasn't
-  found, and macOS 26, the floor, wasn't available to test. The tab bar's + opens an empty window.
+  saved before this slice aren't restored, once. **Tabs stay off by choice (#41, parked):**
+  an archive window is complex enough without them, and the HIG doesn't call for them. The
+  crash wasn't reproduced on macOS 27.2, nor its cause found; macOS 26 is untested.
 
 ## Carryovers and parked work
 

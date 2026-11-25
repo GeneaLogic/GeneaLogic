@@ -88,10 +88,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Window tabs are off: AppKit's tab commands crashed on these windows (slice 35).
-        // 85b couldn't reproduce it on macOS 27.2, where every tab command works, but the
-        // floor is macOS 26 and the cause wasn't found (#41). Turning them on also needs
-        // an answer for the tab bar's +, which opens a window with no archive.
+        // Window tabs are off by choice: an archive window is complex enough without a tab
+        // bar (#41, parked). They were first turned off because AppKit's tab commands
+        // crashed (slice 35), which 85b couldn't reproduce on macOS 27.2; macOS 26 is
+        // untested, and the tab bar's + opens a window with no archive.
         NSWindow.allowsAutomaticWindowTabbing = false
 
         // AppKit restores windows before this fires; one runloop hop lets SwiftUI
