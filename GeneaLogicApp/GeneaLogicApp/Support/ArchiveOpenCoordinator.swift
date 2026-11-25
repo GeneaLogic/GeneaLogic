@@ -67,8 +67,8 @@ final class ArchiveOpenCoordinator {
         return !showWelcomeIfEmpty()
     }
 
-    /// A window that had no archive after all has closed, and it counted as one when the
-    /// launch finished.
+    /// A restored window that never got its archive has closed, and it counted as a window
+    /// when the launch finished.
     func emptyWindowDidClose() {
         showWelcomeIfEmpty()
     }

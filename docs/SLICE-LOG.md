@@ -4465,6 +4465,26 @@ been two slices.
   can't say whose it was and Remove from Recents mustn't reset a window; the identity is
   read once, at a successful open.
 
+- **85b — recents and the welcome window** (app; no format change). G11 and G24, the rest
+  of #40; G12 (#41) investigated. **Decided:** the app's recents stay the list, and the
+  system's (Dock menu, Apple ▸ Recent Items) is told of every open, clear and removal
+  (`SystemRecents`). The spike was split: the system's URLs keep sandbox access across a
+  relaunch, but SwiftUI discards an AppKit Open Recent menu when it rebuilds the File
+  menu, an **ad-hoc-signed build loses the system's list at every rebuild** (our bookmarks
+  survive), and it has no remove-one (clear, then note the rest again from its own URLs).
+  Choosing from the Dock arrives as an ordinary open, so no `NSDocumentController`
+  subclass. Welcome is a `Window` scene; the URL group comes first, because a primary
+  `Window` quits the app when it closes. **The invariant:** `ArchiveOpenCoordinator`
+  alone decides what a launch, an open or a Dock click brings up; both scenes are
+  launch-suppressed. Opens arrive at `application(_:open:)`, not `onOpenURL`, which
+  needed a spawned window; `handlesExternalEvents(matching: [])` stops the spawning.
+  **Gotchas:** a restored `WindowGroup(for:)` window has a `nil` value when it first
+  appears and gets it ~60 ms later, so closing a `nil` window on appearing lost every
+  restored archive; and SwiftUI keys saved windows on the content view's type, so windows
+  saved before this slice aren't restored, once. **Tabs stay off (#41):** on macOS 27.2
+  the tab commands don't crash, nor those tried on `main` before it, so the cause wasn't
+  found, and macOS 26, the floor, wasn't available to test. The tab bar's + opens an empty window.
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the

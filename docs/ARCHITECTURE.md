@@ -1127,8 +1127,8 @@ GeneaLogicKit.
 >
 > **Window model → multi-archive, one archive per window (slice 4, as built).**
 > Slices 1–3 used a single app-wide model (one archive at a time). Slice 4 moved to
-> a **single value-based `WindowGroup(for: URL.self)`** whose bound value drives the
-> window: `nil` is the welcome screen, a non-`nil` URL is that archive. Each archive
+> a **single value-based `WindowGroup(for: URL.self)`** whose value is the archive's URL.
+> The welcome window is a `Window` scene of its own (slice 85b). Each archive
 > window owns a **per-window `ArchiveModel`** (`.id(url)`-keyed), not one shared
 > model. The group *deduplicates by value*, so `openWindow(value:)` for an
 > already-open archive focuses its window instead of spawning a second — which also
@@ -1141,14 +1141,13 @@ GeneaLogicKit.
 >   scope while we still hold the original picker URL — *before* `openWindow` — and
 >   retains it, so the sandbox extension stays active process-wide until the window
 >   closes. Idempotent `acquire` + release-on-close stays balanced under value dedup.
-> - **Finder-open spawns a transient welcome window.** SwiftUI delivers each
->   external `onOpenURL` to a *freshly spawned* window (starting at `nil`), so a
->   welcome window already on screen is left behind. `onOpenURL` therefore always
->   routes through `openWindow(value:)` (preserving dedup), and a welcome window
->   dismisses itself once any archive is open (`hasOpenArchive` + `initial: true`),
->   guarded by `url == nil` so the window *becoming* an archive is spared. Opening
->   from the welcome screen's own buttons instead writes the window's `url` binding,
->   transforming it in place.
+> - **What a launch, an open or a Dock click brings up** is `ArchiveOpenCoordinator`'s
+>   decision (slice 85b). Both scenes are launch-suppressed. Opens arrive at the app
+>   delegate, not at a window's `onOpenURL`, which SwiftUI spawned a window to deliver;
+>   they wait for state restoration, then go through `openWindow(value:)` (preserving
+>   dedup). The welcome window shows when a launch restored and opened nothing, and on a
+>   Dock click with no windows. It may sit beside open archives (Window ▸ Welcome to
+>   GeneaLogic, ⇧⌘1), and closes when it opens one.
 > - **Menu-bar commands** target the key window's `ArchiveModel` via
 >   `@FocusedValue`. Every archive verb is an `ArchiveCommand` (slice 82): title,
 >   shortcut and availability (`CommandContext.canPerform`) are spelled once, and the
@@ -1166,7 +1165,9 @@ GeneaLogicKit.
 > this Mac, never in the archive, and **keyed by the archive's file identity** (volume
 > and folder inode), so reopening an archive restores it as well as a relaunch does: a
 > moved or renamed archive keeps it, and a copy starts fresh (slice 85). Not keyed
-> through the bookmark, which resolves by path first.
+> through the bookmark, which resolves by path first. Recents are `ArchiveBookmarks`' own
+> list; the system's (the Dock menu, Apple ▸ Recent Items) is told of every change to it
+> and never read for the app's menus (slice 85b).
 
 **Shipped so far (Phase 2, slices 1–10):** open/create + browse a `.genea`;
 drag-in / Add Media ingest via `GeneaLogicExtract` with read-only embedded-metadata

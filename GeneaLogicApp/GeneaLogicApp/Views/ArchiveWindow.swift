@@ -16,8 +16,8 @@ struct ArchiveWindow: View {
                 .id(url)
         } else {
             // A restored window has no value yet when it first appears; SwiftUI sets it a
-            // moment later (about 60 ms, measured). One that stays empty is a welcome
-            // window saved before 85b, so it closes.
+            // moment later (about 60 ms, measured), so closing it at once lost the archive.
+            // One that stays empty has nothing to show.
             Color.clear
                 .task {
                     try? await Task.sleep(for: .seconds(3))

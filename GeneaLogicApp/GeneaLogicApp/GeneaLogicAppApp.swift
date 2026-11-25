@@ -88,11 +88,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Turn off automatic window tabbing app-wide. Our archive windows are
-        // value-based `WindowGroup(for: URL.self)` scenes, not tabbable documents,
-        // so AppKit's "Show Tab Bar"/"Show All Tabs"/merge-into-tabs machinery just
-        // crashes when exercised — remove those View-menu items entirely (Enter Full
-        // Screen is separate and stays).
+        // Window tabs are off: AppKit's tab commands crashed on these windows (slice 35).
+        // 85b couldn't reproduce it on macOS 27.2, where every tab command works, but the
+        // floor is macOS 26 and the cause wasn't found (#41). Turning them on also needs
+        // an answer for the tab bar's +, which opens a window with no archive.
         NSWindow.allowsAutomaticWindowTabbing = false
 
         // AppKit restores windows before this fires; one runloop hop lets SwiftUI

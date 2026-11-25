@@ -168,7 +168,7 @@ final class RecordingSystemRecents: SystemRecents {
         #expect(harness.welcomes == 1)
     }
 
-    /// A pre-85b welcome window restores as a window with no archive, which closes.
+    /// A restored window that never gets its archive closes.
     @Test func anEmptyRestoredWindowGivesWayToWelcome() {
         let harness = Harness()
         harness.hasWindows = true
