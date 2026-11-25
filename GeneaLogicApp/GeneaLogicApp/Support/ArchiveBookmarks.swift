@@ -12,7 +12,9 @@ import Foundation
 ///     reopen. Pruned only when a bookmark fails to resolve (archive deleted).
 ///   - **`recents`** (ordered `[path]`) is the *display* list behind File ▸ Open
 ///     Recent. "Clear Menu" empties it but leaves the bookmarks intact, so an
-///     already-open (or restoring) window can still re-acquire access.
+///     already-open (or restoring) window can still re-acquire access. The system's own
+///     recents (the Dock menu, Apple ▸ Recent Items) are kept in step with it
+///     (`SystemRecents`, slice 85b).
 ///   - **window states** are how each archive's window was left (slice 85), keyed by
 ///     the archive's file identity rather than its path (`identity(of:)`). They don't
 ///     share the bookmarks' lifetime: only the cap below drops one.
@@ -23,9 +25,10 @@ import Foundation
 @MainActor
 @Observable
 final class ArchiveBookmarks {
-    static let shared = ArchiveBookmarks()
+    static let shared = ArchiveBookmarks(systemRecents: SharedSystemRecents())
 
     @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let systemRecents: any SystemRecents
     @ObservationIgnored private let bookmarksKey = "archiveBookmarks"
     @ObservationIgnored private let recentsKey = "recentArchivePaths"
     @ObservationIgnored private let recentsLimit = 10
@@ -42,8 +45,12 @@ final class ArchiveBookmarks {
     /// `UserDefaults` on every change.
     private(set) var recents: [String]
 
-    init(defaults: UserDefaults = .standard, windowStatesLimit: Int = 100) {
+    init(
+        defaults: UserDefaults = .standard, systemRecents: any SystemRecents,
+        windowStatesLimit: Int = 100
+    ) {
         self.defaults = defaults
+        self.systemRecents = systemRecents
         self.windowStatesLimit = windowStatesLimit
         self.recents = defaults.stringArray(forKey: recentsKey) ?? []
     }
@@ -64,6 +71,7 @@ final class ArchiveBookmarks {
             setBookmarkData(all)
         }
         moveToFront(key)
+        systemRecents.note(url)
     }
 
     /// Moves an already-recorded archive to the front of the recents list **without**
@@ -73,6 +81,7 @@ final class ArchiveBookmarks {
     /// recently opened archive on top.
     func promote(_ url: URL) {
         moveToFront(url.standardizedFileURL.path)
+        systemRecents.note(url)
     }
 
     /// Front-inserts `key` into the recents list, de-duplicated and capped.
@@ -128,6 +137,7 @@ final class ArchiveBookmarks {
     /// window still open (or restoring) can re-acquire access.
     func clearRecents() {
         setRecents([])
+        systemRecents.clear()
     }
 
     /// Drops a single path from both the recents list and the bookmark store —
@@ -141,6 +151,7 @@ final class ArchiveBookmarks {
     /// and a bookmark that fails to resolve may only be on a drive that isn't mounted.
     func forget(pathKey key: String) {
         setRecents(recents.filter { $0 != key })
+        systemRecents.remove(URL(fileURLWithPath: key, isDirectory: true))
 
         var all = bookmarkData()
         all[key] = nil

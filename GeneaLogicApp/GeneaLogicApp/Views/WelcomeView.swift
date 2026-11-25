@@ -3,16 +3,16 @@ import GeneaLogicArchive
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The empty-state shown by a window with no archive (`url == nil`). Opening or
-/// creating an archive writes the bound `url`, which transforms this same window
-/// into the archive (see `RootWindow`).
+/// The welcome window (slice 85b): the ways into an archive. It may sit beside open
+/// archives, and closes when it opens one, which gets a window of its own.
 struct WelcomeView: View {
-    @Binding var url: URL?
+    static let windowID = "welcome"
 
-    /// Drives the open `.fileImporter`. This is the *only* importer live while
-    /// the welcome screen is shown (the add-media importer lives on the archive
-    /// container, a sibling branch that's never on screen at the same time), so
-    /// the "one live importer per hierarchy" constraint isn't at risk.
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
+
+    /// Drives the open `.fileImporter`, the only importer in this window (an archive's
+    /// is in its own), so the "one live importer per hierarchy" constraint holds.
     @State private var isOpening = false
     /// Local create/open failure message, shown as an alert.
     @State private var errorMessage: String?
@@ -47,7 +47,7 @@ struct WelcomeView: View {
             .padding(.top, 8)
 
             // Quieter than Open and New: a way in for someone with no archive yet,
-            // offered always, because this screen only shows with no archive open.
+            // offered always.
             Button("Explore a Sample Archive") { openSample() }
                 .buttonStyle(.link)
                 .disabled(isPreparingSample)
@@ -57,7 +57,9 @@ struct WelcomeView: View {
             }
         }
         .padding(40)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(width: Layout.WelcomeWindow.width)
+        // The window is the content's size (`.windowResizability(.contentSize)`).
+        .fixedSize(horizontal: false, vertical: true)
         .fileImporter(
             isPresented: $isOpening,
             allowedContentTypes: [.geneaArchive],
@@ -67,11 +69,11 @@ struct WelcomeView: View {
             case .success(let urls):
                 // Acquire on the **original** scoped URL (canonicalizing rebuilds it
                 // from a path and would drop the security scope); canonicalize only
-                // the value that becomes this window's binding — it's persisted for
-                // state restoration, and a later Finder-open must dedup against it (slice 31).
+                // the value of the archive's window — it's persisted for state
+                // restoration, and a later Finder-open must dedup against it (slice 31).
                 guard let picked = urls.first else { return }
                 ArchiveAccessStore.shared.acquire(picked)
-                url = picked.canonicalArchiveURL
+                open(picked.canonicalArchiveURL)
             case .failure(let error):
                 errorMessage = String(describing: error)
             }
@@ -83,18 +85,24 @@ struct WelcomeView: View {
         }
     }
 
-    /// Creates a new `.genea` package at a user-chosen location, then opens it in
-    /// this window by writing the bound `url`.
+    /// Opens the archive at a canonical URL in its own window, or focuses that window, and
+    /// closes this one.
+    private func open(_ url: URL) {
+        openWindow(value: url)
+        dismissWindow(id: Self.windowID)
+    }
+
+    /// Creates a new `.genea` package at a user-chosen location, then opens it.
     private func createArchive() {
         guard let location = ArchiveLauncher.newArchiveLocation() else { return }
         do {
-            url = try ArchiveLauncher.create(at: location)
+            open(try ArchiveLauncher.create(at: location))
         } catch {
             errorMessage = (error as? ArchiveError)?.description ?? String(describing: error)
         }
     }
 
-    /// Opens the sample in this window, building it first if it isn't there yet
+    /// Opens the sample, building it first if it isn't there yet
     /// (slice 74b). Its home is the app's container; see `SampleArchiveLauncher`.
     private func openSample() {
         isPreparingSample = true
@@ -106,7 +114,7 @@ struct WelcomeView: View {
                     try SampleArchiveLauncher.prepare(at: location)
                 }.value
                 ArchiveAccessStore.shared.acquire(sample)
-                url = sample.canonicalArchiveURL
+                open(sample.canonicalArchiveURL)
             } catch {
                 errorMessage = (error as? ArchiveError)?.description ?? String(describing: error)
             }
@@ -150,17 +158,11 @@ struct WelcomeView: View {
         .padding(.top, 8)
     }
 
-    /// Reopens a recent archive by transforming *this* welcome window into it —
-    /// the same in-place transform the Open/New buttons use. Re-derives sandbox
-    /// access from the persisted bookmark first (`ensureAccess` self-prunes a dead
-    /// entry); if the archive moved or was deleted, `ArchiveModel.load()` shows its
-    /// "can no longer reach this archive" state. An already-open archive is handled
-    /// by the single-window registry (slice 31), which dismisses this window onto
-    /// the existing one.
+    /// Reopens a recent archive (`reopenRecent` is the policy, shared with File ▸ Open
+    /// Recent). If it moved or was deleted, its window shows the "can no longer reach this
+    /// archive" state.
     private func openRecent(_ recent: URL) {
-        // `reopenRecent` re-derives access + bumps Recent (the shared policy); here we
-        // transform this welcome window into the archive by writing the bound `url`.
-        url = ArchiveAccessStore.shared.reopenRecent(recent)
+        open(ArchiveAccessStore.shared.reopenRecent(recent))
     }
 
     private var hasError: Binding<Bool> {

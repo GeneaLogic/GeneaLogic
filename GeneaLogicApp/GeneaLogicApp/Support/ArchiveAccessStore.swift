@@ -26,7 +26,6 @@ import Foundation
 /// app-scoped bookmark, and `ensureAccess` re-derives a live scope from one when a
 /// restored / reopened window arrives without it (ARCHITECTURE.md §7).
 @MainActor
-@Observable
 final class ArchiveAccessStore {
     static let shared = ArchiveAccessStore()
     private init() {}
@@ -48,12 +47,6 @@ final class ArchiveAccessStore {
     /// window `WindowGroup(for:)` can't dedup on its own (slice 31). See
     /// `claimWindow`.
     private var windowClaims: [URL: UUID] = [:]
-
-    /// Whether at least one archive is currently open in the session. A welcome
-    /// window observes this to dismiss itself once it's redundant (SwiftUI
-    /// spawns a fresh window to deliver each Finder-open, leaving the prior
-    /// welcome window behind — see `RootWindow`).
-    var hasOpenArchive: Bool { !held.isEmpty }
 
     // MARK: - Single-window-per-archive registry
 
@@ -94,7 +87,7 @@ final class ArchiveAccessStore {
 
     /// Begins (or no-ops, if already held) session access to `url`. Call this
     /// while still holding the original picker URL, immediately before
-    /// `openWindow(value:)` / setting a window's URL binding. Also records an
+    /// `openWindow(value:)`. Also records an
     /// app-scoped bookmark so this archive can be reopened/restored next launch.
     func acquire(_ url: URL) {
         let key = url.canonicalArchiveURL
@@ -127,7 +120,7 @@ final class ArchiveAccessStore {
     /// Reopens a **recent** archive: canonicalizes `url`, re-derives sandbox access
     /// from its persisted bookmark, and — on success — bumps it to the top of Recent
     /// (TextEdit-style). Returns the canonical URL the caller opens a window for
-    /// (`openWindow(value:)`) or binds a welcome window to. A failed reopen isn't
+    /// (`openWindow(value:)`). A failed reopen isn't
     /// promoted — `ensureAccess` self-prunes the dead bookmark, and the opened window
     /// then shows the "couldn't reopen" state. The single source of the recent-reopen
     /// policy, shared by File ▸ Open Recent and the welcome-screen Recent list.
