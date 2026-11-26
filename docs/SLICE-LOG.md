@@ -4465,33 +4465,24 @@ been two slices.
   can't say whose it was and Remove from Recents mustn't reset a window; the identity is
   read once, at a successful open.
 
-- **85b — recents and the welcome window** (app; no format change). G11 and G24, the rest
-  of #40; G12 (#41) investigated. **Decided:** the app's recents stay the list, and the
-  system's (Dock menu, Apple ▸ Recent Items) is told of every open, clear and removal
-  (`SystemRecents`). The spike was split: the system's URLs keep sandbox access across a
-  relaunch, but SwiftUI discards an AppKit Open Recent menu when it rebuilds the File
-  menu, an **ad-hoc-signed build loses the system's list at every rebuild** (our bookmarks
-  survive), and it has no remove-one (clear, then note the rest again from its own URLs).
-  Choosing from the Dock arrives as an ordinary open, so no `NSDocumentController`
-  subclass. Welcome is a `Window` scene; the URL group comes first, because a primary
-  `Window` quits the app when it closes. **The invariant:** `ArchiveOpenCoordinator`
-  alone decides what a launch, an open or a Dock click brings up; both scenes are
-  launch-suppressed. Opens arrive at `application(_:open:)`, not `onOpenURL`, which
-  needed a spawned window; `handlesExternalEvents(matching: [])` stops the spawning.
-  **Gotchas:** a restored `WindowGroup(for:)` window has a `nil` value when it first
-  appears and gets it ~60 ms later, so closing a `nil` window on appearing lost every
-  restored archive; and SwiftUI keys saved windows on the content view's type, so windows
-  saved before this slice aren't restored, once. **Tabs stay off by choice (#41, parked):**
-  an archive window is complex enough without them, and the HIG doesn't call for them. The
-  crash wasn't reproduced on macOS 27.2, nor its cause found; macOS 26 is untested. **From
-  `/code-review`:** Remove from Recents keeps the bookmark, since the archive may now be
-  open; a launch is finished when AppKit has both launched and restored, in either order; a
-  hidden app's windows report not visible, so it is asked once shown; an empty restored
-  window is never closed (any deadline could lose an archive); welcome is dismissed
-  `.destructive`, or its open panel keeps it up. **Fixed on the way:** reopening a moved or
-  renamed archive from Recents opened its old path and failed, though the bookmark had
-  found it; it now opens where the bookmark finds it, and its entry moves there. A window
-  restored for a moved archive still fails, as before.
+- **85b — recents and the welcome window** (app; no format change). G11, G24 (#40); G12
+  (#41) parked. **Decided:** the app's recents stay the list; the system's (Dock menu,
+  Apple ▸ Recent Items) is told of each open and of Clear Menu, never of a removal. The
+  spike was split: its URLs keep sandbox access, but SwiftUI discards an AppKit Open Recent
+  menu, an **ad-hoc-signed build loses the system's list at every rebuild**, and there is
+  no remove-one (clearing and re-noting the rest wiped what AppKit couldn't hand back, in
+  the hand-test). A recent reopened after a move opens where its bookmark finds it. Welcome
+  is a `Window` scene, after the URL group (a primary `Window` quits the app on close).
+  **The invariant:** `ArchiveOpenCoordinator` alone decides what a launch, an open or a
+  Dock click brings up, once AppKit has both launched and restored (either order); opens
+  arrive at `application(_:open:)`, and `handlesExternalEvents(matching: [])` stops SwiftUI
+  spawning windows for them. **Gotchas:** a restored `WindowGroup(for:)` window gets its
+  value ~60 ms after it appears, so an empty one is never closed; a hidden app's windows
+  report not visible; welcome must be dismissed `.destructive`, or its open panel keeps it
+  up; saved windows are keyed on the content view's type, so pre-85b ones don't restore.
+  **Tabs stay off by choice:** the old crash didn't reproduce on macOS 27.2 (26 untested),
+  and an archive window is complex enough without them. A window restored for a moved
+  archive still fails: #86.
 
 ## Carryovers and parked work
 

@@ -1166,8 +1166,8 @@ GeneaLogicKit.
 > and folder inode), so reopening an archive restores it as well as a relaunch does: a
 > moved or renamed archive keeps it, and a copy starts fresh (slice 85). Not keyed
 > through the bookmark, which resolves by path first. Recents are `ArchiveBookmarks`' own
-> list; the system's (the Dock menu, Apple ▸ Recent Items) is told of every change to it
-> and never read for the app's menus (slice 85b). Reopening a recent follows its bookmark,
+> list. The system's (the Dock menu, and Apple ▸ Recent Items) is told of each open and of
+> Clear Menu, never of a removal, and never read for the app's menus (slice 85b). Reopening a recent follows its bookmark,
 > so a moved or renamed archive opens where it is now, and its recent moves with it.
 
 **Shipped so far (Phase 2, slices 1–10):** open/create + browse a `.genea`;

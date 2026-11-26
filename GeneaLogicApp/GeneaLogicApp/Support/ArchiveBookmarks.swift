@@ -13,8 +13,8 @@ import Foundation
 ///   - **`recents`** (ordered `[path]`) is the *display* list behind File ▸ Open
 ///     Recent. "Clear Menu" empties it but leaves the bookmarks intact, so an
 ///     already-open (or restoring) window can still re-acquire access. The system's own
-///     recents (the Dock menu, Apple ▸ Recent Items) are told of each change to it
-///     (`SystemRecents`, slice 85b), not seeded from it or held to its length.
+///     recents (the Dock menu, and Apple ▸ Recent Items) are told of each open and of
+///     Clear Menu, not of a removal (`SystemRecents`, slice 85b).
 ///   - **window states** are how each archive's window was left (slice 85), keyed by
 ///     the archive's file identity rather than its path (`identity(of:)`). They don't
 ///     share the bookmarks' lifetime: only the cap below drops one.
@@ -166,24 +166,10 @@ final class ArchiveBookmarks {
 
     /// Takes one archive out of the recents (the welcome window's Remove from Recents). Its
     /// bookmark is **kept**, as by Clear Menu: the archive may be open, and its window needs
-    /// it to restore.
+    /// it to restore. The system's lists keep it (`SystemRecents`).
     func removeRecent(_ url: URL) {
         let key = url.standardizedFileURL.path
         setRecents(recents.filter { $0 != key })
-
-        // The system's entry follows a moved archive, so look where the bookmark finds it
-        // too, unless that is another recent's place. Without mounting a volume for it.
-        var places = [URL(fileURLWithPath: key, isDirectory: true)]
-        var isStale = false
-        if let data = bookmarkData()[key],
-            let moved = try? URL(
-                resolvingBookmarkData: data, options: [.withSecurityScope, .withoutMounting],
-                relativeTo: nil, bookmarkDataIsStale: &isStale),
-            !recents.contains(moved.standardizedFileURL.path)
-        {
-            places.append(moved)
-        }
-        systemRecents.remove(places)
     }
 
     /// Drops a single path from both the recents list and the bookmark store —
@@ -196,7 +182,6 @@ final class ArchiveBookmarks {
     /// and a bookmark that fails to resolve may only be on a drive that isn't mounted.
     func forget(pathKey key: String) {
         setRecents(recents.filter { $0 != key })
-        systemRecents.remove([URL(fileURLWithPath: key, isDirectory: true)])
 
         var all = bookmarkData()
         all[key] = nil

@@ -12,13 +12,9 @@ final class RecordingSystemRecents: SystemRecents {
     nonisolated init() {}
 
     func note(_ url: URL) {
-        remove([url])
-        paths.insert(url.canonicalArchiveURL.path, at: 0)
-    }
-
-    func remove(_ urls: [URL]) {
-        let removed = urls.map(\.canonicalArchiveURL.path)
-        paths.removeAll { removed.contains($0) }
+        let path = url.canonicalArchiveURL.path
+        paths.removeAll { $0 == path }
+        paths.insert(path, at: 0)
     }
 
     /// The system's entries follow a moved archive.
@@ -31,7 +27,7 @@ final class RecordingSystemRecents: SystemRecents {
     }
 }
 
-/// Slice 85b — the app's recents, and the system's kept in step with them.
+/// Slice 85b — the app's recents, and what the system's list is told of them.
 @MainActor
 @Suite final class RecentsTests {
     private let root: URL
@@ -86,40 +82,28 @@ final class RecordingSystemRecents: SystemRecents {
         #expect(bookmarks.resolve(one) != nil)
     }
 
-    @Test func aRemovedRecentLeavesBothListsAndKeepsItsBookmark() throws {
+    /// The system has no way to remove one archive, and clearing and noting the rest again
+    /// lost what AppKit couldn't hand back.
+    @Test func aRemovedRecentLeavesTheAppsListOnlyAndKeepsItsBookmark() throws {
         let one = try makeArchive("One")
         let two = try makeArchive("Two")
         bookmarks.remember(one)
         bookmarks.remember(two)
         bookmarks.removeRecent(one)
         #expect(bookmarks.recents == [path(two)])
-        #expect(system.paths == [path(two)])
+        #expect(system.paths == [path(two), path(one)])
         // It may be open, and its window restores through this.
         #expect(bookmarks.resolve(one) != nil)
     }
 
-    @Test func aMovedArchiveIsRemovedFromTheSystemsListToo() throws {
+    @Test func aRecentWhoseArchiveIsGoneDropsOut() throws {
         let one = try makeArchive("One")
+        let two = try makeArchive("Two")
         bookmarks.remember(one)
-        let renamed = root.appending(path: "Renamed.genea", directoryHint: .isDirectory)
-        try FileManager.default.moveItem(at: one, to: renamed)
-        system.follow(one, to: renamed)
-        bookmarks.removeRecent(one)
-        #expect(bookmarks.recents.isEmpty)
-        #expect(system.paths.isEmpty)
-    }
-
-    /// The old path's entry goes, and the archive's own, under its new name, stays.
-    @Test func removingAMovedArchivesOldEntryLeavesItsNewOne() throws {
-        let one = try makeArchive("One")
-        bookmarks.remember(one)
-        let renamed = root.appending(path: "Renamed.genea", directoryHint: .isDirectory)
-        try FileManager.default.moveItem(at: one, to: renamed)
-        system.follow(one, to: renamed)
-        bookmarks.remember(renamed)
-        bookmarks.removeRecent(one)
-        #expect(bookmarks.recents == [path(renamed)])
-        #expect(system.paths == [path(renamed)])
+        bookmarks.remember(two)
+        try FileManager.default.removeItem(at: one)
+        #expect(bookmarks.resolve(one) == nil)
+        #expect(bookmarks.recents == [path(two)])
     }
 
     /// The bookmark follows a move or rename, and the reopen follows the bookmark.
@@ -137,7 +121,7 @@ final class RecordingSystemRecents: SystemRecents {
         #expect(opened == renamed.canonicalArchiveURL)
         #expect(ArchiveAccessStore.shared.isHolding(renamed))
         #expect(bookmarks.recents == [path(renamed), path(two)])
-        #expect(system.paths == bookmarks.recents)
+        #expect(system.paths.first == path(renamed))
         // The bookmark moved with it, so the next reopen and a restore find it.
         #expect(bookmarks.resolve(renamed) != nil)
         #expect(bookmarks.resolve(one) == nil)
