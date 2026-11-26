@@ -4468,22 +4468,25 @@ been two slices.
 - **85b — recents and the welcome window** (app; no format change). G11, G24 (#40); G12
   (#41) parked. **Decided:** the app's recents stay the list; the system's (Dock menu,
   Apple ▸ Recent Items) is told of each open and of Clear Menu, never of a removal. The
-  spike was split: its URLs keep sandbox access, but SwiftUI discards an AppKit Open Recent
-  menu, an **ad-hoc-signed build loses the system's list at every rebuild**, and there is
-  no remove-one (clearing and re-noting the rest wiped what AppKit couldn't hand back, in
-  the hand-test). A recent reopened after a move opens where its bookmark finds it. Welcome
-  is a `Window` scene, after the URL group (a primary `Window` quits the app on close).
-  **The invariant:** `ArchiveOpenCoordinator` alone decides what a launch, an open or a
-  Dock click brings up, once AppKit has both launched and restored (either order); opens
-  arrive at `application(_:open:)`, and `handlesExternalEvents(matching: [])` stops SwiftUI
-  spawning windows for them. **Gotchas:** a restored `WindowGroup(for:)` window gets its
-  value ~60 ms after it appears, so an empty one is never closed; a hidden app's windows
-  report not visible, and a minimized one `canBecomeMain == false`; welcome must be
-  dismissed `.destructive`, or its open panel keeps it up; saved windows are keyed on the
-  content view's type, so pre-85b ones don't restore.
-  **Tabs stay off by choice:** the old crash didn't reproduce on macOS 27.2 (26 untested),
-  and an archive window is complex enough without them. A window restored for a moved
-  archive still fails: #86.
+  spike was split: its URLs keep sandbox access, but SwiftUI discards an AppKit Open
+  Recent menu, an **ad-hoc-signed build loses the system's list at every rebuild**, and
+  there is no remove-one (clearing and re-noting the rest wiped what AppKit couldn't hand
+  back, in the hand-test). A recent reopened after a move opens where its bookmark finds
+  it: a move by file identity, not path spelling (a firmlink resolves to another), and not
+  into the Trash. A Dock click returns `true` only for a minimized window, since AppKit's
+  default otherwise is a window with no archive. Welcome is a `Window` scene, after the
+  URL group (a primary `Window` quits the app on close). **The invariant:**
+  `ArchiveOpenCoordinator` alone decides what a launch, an open or a Dock click brings up,
+  once AppKit has both launched and restored (either order, with a deadline if restoration
+  never says so); opens arrive at `application(_:open:)`, and
+  `handlesExternalEvents(matching: [])` stops SwiftUI spawning windows for them.
+  **Gotchas:** a restored `WindowGroup(for:)` window gets its value ~60 ms after it
+  appears, so an empty one is never closed; a hidden app's windows report not visible, and
+  a minimized one `canBecomeMain == false`; welcome must be dismissed `.destructive`, or
+  its open panel keeps it up; saved windows are keyed on the content view's type, so
+  pre-85b ones don't restore. **Tabs stay off by choice:** the old crash didn't reproduce
+  on macOS 27.2 (26 untested), and an archive window is complex enough without them. A
+  window restored for a moved archive still fails: #86.
 
 ## Carryovers and parked work
 

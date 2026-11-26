@@ -87,8 +87,9 @@ final class ArchiveAccessStore {
 
     /// Begins (or no-ops, if already held) session access to `url`. Call this
     /// while still holding the original picker URL, immediately before
-    /// `openWindow(value:)`. Also records an
-    /// app-scoped bookmark so this archive can be reopened/restored next launch.
+    /// `ArchiveOpenCoordinator.open`, which opens the window (once launch has finished).
+    /// Also records an app-scoped bookmark so this archive can be reopened/restored next
+    /// launch.
     func acquire(_ url: URL) {
         let key = url.canonicalArchiveURL
         if held[key] == nil {
@@ -131,17 +132,17 @@ final class ArchiveAccessStore {
         // Already open, so already reachable here: its window takes the focus.
         if held[target] == nil {
             guard let resolved = bookmarks.resolveRecent(target) else { return target }
-            target = resolved.canonicalArchiveURL
+            target = resolved.location.canonicalArchiveURL
             if held[target] == nil {
-                let started = resolved.startAccessingSecurityScopedResource()
-                held[target] = Entry(url: resolved, started: started)
+                let started = resolved.scoped.startAccessingSecurityScopedResource()
+                held[target] = Entry(url: resolved.scoped, started: started)
             }
         }
         bookmarks.promote(target)
         return target
     }
 
-    /// Whether session access to `url` is held: for tests.
+    /// Whether session access to `url` is held, which an open archive's is.
     func isHolding(_ url: URL) -> Bool { held[url.canonicalArchiveURL] != nil }
 
     /// Records session access to `url` **without** starting a scope or storing a

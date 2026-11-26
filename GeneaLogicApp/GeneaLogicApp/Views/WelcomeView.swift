@@ -14,8 +14,8 @@ struct WelcomeView: View {
     @State private var isOpening = false
     /// Local create/open failure message, shown as an alert.
     @State private var errorMessage: String?
-    /// True while the sample is being built, so a second click can't start another.
-    @State private var isPreparingSample = false
+    /// The sample's build, which outlives this window.
+    @State private var sample = SampleArchivePreparation.shared
 
     /// The persisted recents (F4), read here so the list updates live as archives
     /// are opened or removed (`ArchiveBookmarks` is `@Observable`).
@@ -48,7 +48,7 @@ struct WelcomeView: View {
             // offered always.
             Button("Explore a Sample Archive") { openSample() }
                 .buttonStyle(.link)
-                .disabled(isPreparingSample)
+                .disabled(sample.isPreparing)
 
             if !bookmarks.recents.isEmpty {
                 recentsSection
@@ -99,16 +99,12 @@ struct WelcomeView: View {
     }
 
     /// Opens the sample, building it first if it isn't there yet
-    /// (slice 74b). Its home is the app's container; see `SampleArchiveLauncher`.
+    /// (slice 74b). Its home is the app's container; see `SampleArchiveLauncher`. It opens
+    /// once built even if this window has closed meanwhile: it was asked for.
     private func openSample() {
-        isPreparingSample = true
         Task {
-            defer { isPreparingSample = false }
             do {
-                let location = try SampleArchiveLauncher.defaultLocation()
-                let sample = try await Task.detached {
-                    try SampleArchiveLauncher.prepare(at: location)
-                }.value
+                let sample = try await sample.prepare()
                 ArchiveAccessStore.shared.acquire(sample)
                 open(sample.canonicalArchiveURL)
             } catch {
@@ -142,7 +138,9 @@ struct WelcomeView: View {
                                     NSWorkspace.shared.activateFileViewerSelecting([recent])
                                 }
                                 Button("Remove from Recents") {
-                                    bookmarks.removeRecent(recent)
+                                    bookmarks.removeRecent(
+                                        recent,
+                                        isOpen: ArchiveAccessStore.shared.isHolding(recent))
                                 }
                             }
                     }

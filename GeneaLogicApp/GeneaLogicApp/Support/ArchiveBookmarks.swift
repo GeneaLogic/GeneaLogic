@@ -76,9 +76,8 @@ final class ArchiveBookmarks {
 
     /// Moves an already-recorded archive to the front of the recents list **without**
     /// touching its bookmark — the "opened again from Open Recent" bump (TextEdit-style).
-    /// The reopen paths re-derive access via `ensureAccess` (which doesn't record a
-    /// bookmark, unlike `acquire`/`remember`), so they call this to keep the most
-    /// recently opened archive on top.
+    /// `ArchiveAccessStore.reopenRecent` calls it once it holds access (a reopen records no
+    /// new bookmark, unlike `acquire`/`remember`).
     func promote(_ url: URL) {
         // Nothing there: the archive moved, and its bookmark followed it. The window that
         // opens says so, and a dead path mustn't be told to the system.
@@ -129,25 +128,46 @@ final class ArchiveBookmarks {
         return resolved
     }
 
+    /// A recent, resolved to reopen it: the security-scoped URL to start access on, and
+    /// where to open the archive.
+    struct ResolvedRecent {
+        let scoped: URL
+        let location: URL
+    }
+
     /// Resolves a **recent** to reopen it, following the archive if it has moved: when its
     /// bookmark finds it somewhere else, the bookmark and the recent take that path, so the
-    /// archive opens where it is. Returns the security-scoped URL to start access on, or
-    /// `nil` (and the entry is pruned) as `resolve` does. The caller promotes it.
+    /// archive opens where it is. `nil` when there is nothing to open: no bookmark, one that
+    /// no longer resolves (and the entry is pruned, as `resolve` does), or an archive moved
+    /// to the Trash, which is left listed in case it is put back. The caller promotes it.
     ///
     /// Only a move the bookmark saw: one resolves by path first, so an archive put at the
-    /// old path is the one that opens, as before.
-    func resolveRecent(_ url: URL) -> URL? {
+    /// old path is the one that opens, as before. And only a move: a path spelled another
+    /// way for the same folder (`/var` and `/private/var`, a firmlink) keeps its key, by
+    /// file identity, so one archive never gets two window values.
+    func resolveRecent(_ url: URL) -> ResolvedRecent? {
         guard let resolved = resolve(url) else { return nil }
         let old = url.standardizedFileURL.path
         let new = resolved.standardizedFileURL.path
-        guard new != old else { return resolved }
+        guard new != old else { return ResolvedRecent(scoped: resolved, location: url) }
+        // Opening it there would edit an archive that emptying the Trash destroys.
+        guard !Self.isInTrash(resolved) else { return nil }
+        let started = resolved.startAccessingSecurityScopedResource()
+        let moved = Self.identity(of: URL(fileURLWithPath: old)) != Self.identity(of: resolved)
+        if started { resolved.stopAccessingSecurityScopedResource() }
+        guard moved else { return ResolvedRecent(scoped: resolved, location: url) }
         var all = bookmarkData()
         all[new] = all.removeValue(forKey: old)
         setBookmarkData(all)
         // The new path goes to the front when the caller promotes it.
         setRecents(recents.filter { $0 != old })
         // The system's entry followed the move already.
-        return resolved
+        return ResolvedRecent(scoped: resolved, location: resolved)
+    }
+
+    /// Whether `url` is in a Trash: the home folder's, or a volume's `.Trashes`.
+    nonisolated static func isInTrash(_ url: URL) -> Bool {
+        url.standardizedFileURL.pathComponents.contains { $0 == ".Trash" || $0 == ".Trashes" }
     }
 
     // MARK: - Recents (Open Recent menu)
@@ -165,11 +185,15 @@ final class ArchiveBookmarks {
     }
 
     /// Takes one archive out of the recents (the welcome window's Remove from Recents). Its
-    /// bookmark is **kept**, as by Clear Menu: the archive may be open, and its window needs
-    /// it to restore. The system's lists keep it (`SystemRecents`).
-    func removeRecent(_ url: URL) {
+    /// bookmark goes too, unless the archive `isOpen`: its window restores through it. The
+    /// system's lists keep it (`SystemRecents`).
+    func removeRecent(_ url: URL, isOpen: Bool) {
         let key = url.standardizedFileURL.path
         setRecents(recents.filter { $0 != key })
+        guard !isOpen else { return }
+        var all = bookmarkData()
+        all[key] = nil
+        setBookmarkData(all)
     }
 
     /// Drops a single path from both the recents list and the bookmark store —

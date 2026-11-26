@@ -89,11 +89,50 @@ final class RecordingSystemRecents: SystemRecents {
         let two = try makeArchive("Two")
         bookmarks.remember(one)
         bookmarks.remember(two)
-        bookmarks.removeRecent(one)
+        bookmarks.removeRecent(one, isOpen: true)
         #expect(bookmarks.recents == [path(two)])
         #expect(system.paths == [path(two), path(one)])
-        // It may be open, and its window restores through this.
+        // It is open, and its window restores through this.
         #expect(bookmarks.resolve(one) != nil)
+    }
+
+    /// One that isn't open keeps no access it isn't listed for.
+    @Test func aRemovedRecentThatIsntOpenLosesItsBookmark() throws {
+        let one = try makeArchive("One")
+        bookmarks.remember(one)
+        bookmarks.removeRecent(one, isOpen: false)
+        #expect(bookmarks.recents.isEmpty)
+        #expect(bookmarks.resolve(one) == nil)
+    }
+
+    /// Opening it there would edit an archive that emptying the Trash destroys. It stays
+    /// listed, in case it is put back.
+    @Test func aRecentInTheTrashIsNotReopenedThere() throws {
+        let one = try makeArchive("One")
+        bookmarks.remember(one)
+        let trash = root.appending(path: ".Trash", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
+        try FileManager.default.moveItem(
+            at: one, to: trash.appending(path: "One.genea", directoryHint: .isDirectory))
+        let opened = ArchiveAccessStore.shared.reopenRecent(one, bookmarks: bookmarks)
+        #expect(opened == one.canonicalArchiveURL)
+        #expect(!ArchiveAccessStore.shared.isHolding(opened))
+        #expect(bookmarks.recents == [path(one)])
+    }
+
+    /// The same folder spelled another way is not a move: the recent keeps its key, so the
+    /// archive never gets two window values.
+    @Test func anotherSpellingOfTheSameFolderIsNotAMove() throws {
+        let one = try makeArchive("One")
+        // The firmlinked spelling: a bookmark made from it resolves to the plain one.
+        let alias = URL(fileURLWithPath: "/System/Volumes/Data" + one.path, isDirectory: true)
+        bookmarks.remember(alias)
+        let resolved = try #require(bookmarks.resolve(alias))
+        try #require(resolved.standardizedFileURL.path != alias.standardizedFileURL.path)
+        let opened = ArchiveAccessStore.shared.reopenRecent(alias, bookmarks: bookmarks)
+        defer { ArchiveAccessStore.shared.release(opened) }
+        #expect(opened == alias.canonicalArchiveURL)
+        #expect(bookmarks.recents == [path(alias)])
     }
 
     @Test func aRecentWhoseArchiveIsGoneDropsOut() throws {
@@ -161,7 +200,10 @@ final class RecordingSystemRecents: SystemRecents {
     @MainActor
     private final class Harness {
         var hasWindows = false
+        var hasMinimizedWindows = false
         var isHidden = false
+        /// The restoration deadline, when one was set.
+        var deadline: (@MainActor () -> Void)?
         var opened: [URL] = []
         var welcomes = 0
         var welcomesClosed = 0
@@ -169,11 +211,16 @@ final class RecordingSystemRecents: SystemRecents {
 
         init() {
             var windows: () -> Bool = { false }
+            var minimized: () -> Bool = { false }
             var hidden: () -> Bool = { false }
+            var schedule: (@escaping @MainActor () -> Void) -> Void = { _ in }
             coordinator = ArchiveOpenCoordinator(
-                hasWindows: { windows() }, isHidden: { hidden() })
+                hasWindows: { windows() }, hasMinimizedWindows: { minimized() },
+                isHidden: { hidden() }, after: { _, work in schedule(work) })
             windows = { [unowned self] in hasWindows }
+            minimized = { [unowned self] in hasMinimizedWindows }
             hidden = { [unowned self] in isHidden }
+            schedule = { [unowned self] in deadline = $0 }
             coordinator.openArchive = { [unowned self] in opened.append($0) }
             coordinator.openWelcome = { [unowned self] in welcomes += 1 }
             coordinator.closeWelcome = { [unowned self] in welcomesClosed += 1 }
@@ -240,6 +287,35 @@ final class RecordingSystemRecents: SystemRecents {
         #expect(harness.welcomes == 1)
     }
 
+    /// Before the launch is decided, AppKit's default would be a window with no archive.
+    @Test func aDockClickDuringTheLaunchLeavesItToTheLaunch() {
+        let harness = Harness()
+        #expect(!harness.coordinator.reopen())
+        harness.finishLaunch()
+        #expect(harness.welcomes == 1)
+    }
+
+    /// No restoration notification must not hold opens and the welcome window for ever.
+    @Test func theRestorationDeadlineStandsInForAMissingNotification() throws {
+        let harness = Harness()
+        harness.coordinator.open(archive)
+        harness.coordinator.launchDidFinish()
+        #expect(harness.opened.isEmpty)
+        let deadline = try #require(harness.deadline)
+        deadline()
+        #expect(harness.opened == [archive])
+        // A notification arriving after the deadline changes nothing.
+        harness.coordinator.restorationDidFinish()
+        #expect(harness.opened == [archive])
+    }
+
+    @Test func noDeadlineWhenRestorationCameFirst() {
+        let harness = Harness()
+        harness.coordinator.restorationDidFinish()
+        harness.coordinator.launchDidFinish()
+        #expect(harness.deadline == nil)
+    }
+
     /// AppKit may finish restoring after it finishes launching.
     @Test(arguments: [true, false])
     func nothingIsDecidedUntilBothAreDone(launchFirst: Bool) {
@@ -261,7 +337,8 @@ final class RecordingSystemRecents: SystemRecents {
         let harness = Harness()
         harness.isHidden = true
         harness.finishLaunch()
-        #expect(harness.coordinator.reopen())
+        // Nothing minimized to bring back, and a new window would have no archive.
+        #expect(!harness.coordinator.reopen())
         #expect(harness.welcomes == 0)
 
         harness.isHidden = false
@@ -272,7 +349,7 @@ final class RecordingSystemRecents: SystemRecents {
         // Hidden with nothing open: shown, it is the welcome window's turn.
         harness.isHidden = true
         harness.hasWindows = false
-        #expect(harness.coordinator.reopen())
+        #expect(!harness.coordinator.reopen())
         harness.isHidden = false
         harness.coordinator.appDidUnhide()
         #expect(harness.welcomes == 1)
@@ -293,5 +370,15 @@ final class RecordingSystemRecents: SystemRecents {
         harness.finishLaunch()
         harness.coordinator.archiveWindowDidOpen()
         #expect(harness.welcomesClosed == 1)
+    }
+
+    /// Hidden with a window minimized: AppKit brings it back.
+    @Test func aHiddenAppWithAMinimizedWindowLetsAppKitBringItBack() {
+        let harness = Harness()
+        harness.hasWindows = true
+        harness.hasMinimizedWindows = true
+        harness.finishLaunch()
+        harness.isHidden = true
+        #expect(harness.coordinator.reopen())
     }
 }
