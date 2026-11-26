@@ -4478,8 +4478,9 @@ been two slices.
   arrive at `application(_:open:)`, and `handlesExternalEvents(matching: [])` stops SwiftUI
   spawning windows for them. **Gotchas:** a restored `WindowGroup(for:)` window gets its
   value ~60 ms after it appears, so an empty one is never closed; a hidden app's windows
-  report not visible, and a minimized one `canBecomeMain == false`; welcome must be dismissed `.destructive`, or its open panel keeps it
-  up; saved windows are keyed on the content view's type, so pre-85b ones don't restore.
+  report not visible, and a minimized one `canBecomeMain == false`; welcome must be
+  dismissed `.destructive`, or its open panel keeps it up; saved windows are keyed on the
+  content view's type, so pre-85b ones don't restore.
   **Tabs stay off by choice:** the old crash didn't reproduce on macOS 27.2 (26 untested),
   and an archive window is complex enough without them. A window restored for a moved
   archive still fails: #86.
