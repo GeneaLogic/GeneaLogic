@@ -122,27 +122,51 @@ final class RecordingSystemRecents: SystemRecents {
         #expect(system.paths == [path(renamed)])
     }
 
-    @Test func reopeningAMovedArchiveTellsTheSystemNothing() throws {
+    /// The bookmark follows a move or rename, and the reopen follows the bookmark.
+    @Test func reopeningAMovedArchiveOpensItWhereItIs() throws {
         let one = try makeArchive("One")
         let two = try makeArchive("Two")
         bookmarks.remember(one)
         bookmarks.remember(two)
-        try FileManager.default.moveItem(
-            at: one, to: root.appending(path: "Renamed.genea", directoryHint: .isDirectory))
-        bookmarks.promote(one)
-        #expect(system.paths.first == path(two))
-        #expect(bookmarks.recents.first == path(two))
+        let renamed = root.appending(path: "Renamed.genea", directoryHint: .isDirectory)
+        try FileManager.default.moveItem(at: one, to: renamed)
+        system.follow(one, to: renamed)
+
+        let opened = ArchiveAccessStore.shared.reopenRecent(one, bookmarks: bookmarks)
+        defer { ArchiveAccessStore.shared.release(opened) }
+        #expect(opened == renamed.canonicalArchiveURL)
+        #expect(ArchiveAccessStore.shared.isHolding(renamed))
+        #expect(bookmarks.recents == [path(renamed), path(two)])
+        #expect(system.paths == bookmarks.recents)
+        // The bookmark moved with it, so the next reopen and a restore find it.
+        #expect(bookmarks.resolve(renamed) != nil)
+        #expect(bookmarks.resolve(one) == nil)
     }
 
-    @Test func aRecentWhoseArchiveIsGoneDropsOut() throws {
+    /// A promote is told only of a path that is there.
+    @Test func aMissingArchiveIsNotPromoted() throws {
         let one = try makeArchive("One")
         let two = try makeArchive("Two")
         bookmarks.remember(one)
         bookmarks.remember(two)
         try FileManager.default.removeItem(at: one)
-        #expect(bookmarks.resolve(one) == nil)
-        #expect(bookmarks.recents == [path(two)])
-        #expect(system.paths == [path(two)])
+        bookmarks.promote(one)
+        #expect(bookmarks.recents.first == path(two))
+        #expect(system.paths.first == path(two))
+    }
+
+    /// An archive put at a moved one's old path is the one that opens there: a bookmark
+    /// resolves by path first.
+    @Test func aNewcomerAtTheOldPathIsWhatOpens() throws {
+        let one = try makeArchive("One")
+        bookmarks.remember(one)
+        try FileManager.default.moveItem(
+            at: one, to: root.appending(path: "Renamed.genea", directoryHint: .isDirectory))
+        _ = try makeArchive("One")
+        let opened = ArchiveAccessStore.shared.reopenRecent(one, bookmarks: bookmarks)
+        defer { ArchiveAccessStore.shared.release(opened) }
+        #expect(opened == one.canonicalArchiveURL)
+        #expect(bookmarks.recents == [path(one)])
     }
 }
 

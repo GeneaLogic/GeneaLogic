@@ -129,6 +129,27 @@ final class ArchiveBookmarks {
         return resolved
     }
 
+    /// Resolves a **recent** to reopen it, following the archive if it has moved: when its
+    /// bookmark finds it somewhere else, the bookmark and the recent take that path, so the
+    /// archive opens where it is. Returns the security-scoped URL to start access on, or
+    /// `nil` (and the entry is pruned) as `resolve` does. The caller promotes it.
+    ///
+    /// Only a move the bookmark saw: one resolves by path first, so an archive put at the
+    /// old path is the one that opens, as before.
+    func resolveRecent(_ url: URL) -> URL? {
+        guard let resolved = resolve(url) else { return nil }
+        let old = url.standardizedFileURL.path
+        let new = resolved.standardizedFileURL.path
+        guard new != old else { return resolved }
+        var all = bookmarkData()
+        all[new] = all.removeValue(forKey: old)
+        setBookmarkData(all)
+        // The new path goes to the front when the caller promotes it.
+        setRecents(recents.filter { $0 != old })
+        // The system's entry followed the move already.
+        return resolved
+    }
+
     // MARK: - Recents (Open Recent menu)
 
     /// The recent archives, most-recent-first, as URLs for the Open Recent menu.

@@ -120,18 +120,29 @@ final class ArchiveAccessStore {
     /// Reopens a **recent** archive: canonicalizes `url`, re-derives sandbox access
     /// from its persisted bookmark, and — on success — bumps it to the top of Recent
     /// (TextEdit-style). Returns the canonical URL the caller opens a window for
-    /// (`openWindow(value:)`). A failed reopen isn't
-    /// promoted — `ensureAccess` self-prunes the dead bookmark, and the opened window
-    /// then shows the "couldn't reopen" state. The single source of the recent-reopen
-    /// policy, shared by File ▸ Open Recent and the welcome-screen Recent list.
+    /// (`openWindow(value:)`): **where the archive is now**, if its bookmark followed a
+    /// move or rename (slice 85b). A failed reopen isn't promoted — the dead bookmark is
+    /// pruned, and the opened window then shows the "couldn't reopen" state. The single
+    /// source of the recent-reopen policy, shared by File ▸ Open Recent and the welcome
+    /// window's Recent list.
     @discardableResult
-    func reopenRecent(_ url: URL) -> URL {
-        let canonical = url.canonicalArchiveURL
-        if ensureAccess(to: canonical) {
-            ArchiveBookmarks.shared.promote(canonical)
+    func reopenRecent(_ url: URL, bookmarks: ArchiveBookmarks = .shared) -> URL {
+        var target = url.canonicalArchiveURL
+        // Already open, so already reachable here: its window takes the focus.
+        if held[target] == nil {
+            guard let resolved = bookmarks.resolveRecent(target) else { return target }
+            target = resolved.canonicalArchiveURL
+            if held[target] == nil {
+                let started = resolved.startAccessingSecurityScopedResource()
+                held[target] = Entry(url: resolved, started: started)
+            }
         }
-        return canonical
+        bookmarks.promote(target)
+        return target
     }
+
+    /// Whether session access to `url` is held: for tests.
+    func isHolding(_ url: URL) -> Bool { held[url.canonicalArchiveURL] != nil }
 
     /// Records session access to `url` **without** starting a scope or storing a
     /// bookmark — for a path this process can already reach on its own.

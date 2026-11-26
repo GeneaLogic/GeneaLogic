@@ -4488,7 +4488,10 @@ been two slices.
   open; a launch is finished when AppKit has both launched and restored, in either order; a
   hidden app's windows report not visible, so it is asked once shown; an empty restored
   window is never closed (any deadline could lose an archive); welcome is dismissed
-  `.destructive`, or its open panel keeps it up.
+  `.destructive`, or its open panel keeps it up. **Fixed on the way:** reopening a moved or
+  renamed archive from Recents opened its old path and failed, though the bookmark had
+  found it; it now opens where the bookmark finds it, and its entry moves there. A window
+  restored for a moved archive still fails, as before.
 
 ## Carryovers and parked work
 
