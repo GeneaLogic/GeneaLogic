@@ -126,8 +126,14 @@ final class ArchiveOpenCoordinator {
         return true
     }
 
-    /// An ordinary window: not a panel, and not one of the helpers AppKit keeps.
+    /// An ordinary window, on screen or minimized: titled, and not a panel. Not
+    /// `canBecomeMain`, which a minimized window reports `false` (85b's hand-test: a Dock
+    /// click with one minimized brought up the welcome window). A closed window SwiftUI
+    /// keeps around is neither visible nor minimized.
     private static func appHasWindows() -> Bool {
-        NSApp.windows.contains { ($0.isVisible || $0.isMiniaturized) && $0.canBecomeMain }
+        NSApp.windows.contains {
+            ($0.isVisible || $0.isMiniaturized) && $0.styleMask.contains(.titled)
+                && !($0 is NSPanel)
+        }
     }
 }
