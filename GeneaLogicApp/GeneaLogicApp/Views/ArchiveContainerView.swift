@@ -129,6 +129,7 @@ struct ArchiveContainerView: View {
                     dismiss()
                     return
                 }
+                ArchiveOpenCoordinator.shared.archiveWindowDidOpen()
                 model.load()
                 // In the same synchronous step, so the archive's first frame is already
                 // as it was left (slice 85); after `load()`, whose `ensureAccess` gives

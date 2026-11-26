@@ -22,7 +22,8 @@ import Testing
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         suiteName = "genealogic-window-state-tests-\(UUID().uuidString)"
         defaults = try #require(UserDefaults(suiteName: suiteName))
-        bookmarks = ArchiveBookmarks(defaults: defaults, windowStatesLimit: 2)
+        bookmarks = ArchiveBookmarks(
+            defaults: defaults, systemRecents: RecordingSystemRecents(), windowStatesLimit: 2)
     }
 
     deinit {

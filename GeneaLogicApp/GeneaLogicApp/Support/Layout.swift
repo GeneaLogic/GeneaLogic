@@ -97,6 +97,11 @@ enum Layout {
         static let minHeight: CGFloat = 520
     }
 
+    /// The welcome window (slice 85b): a fixed width, and as tall as its recents need.
+    enum WelcomeWindow {
+        static let width: CGFloat = 520
+    }
+
     /// Floor for a popped-out file-preview window.
     enum PreviewWindow {
         static let minWidth: CGFloat = 480

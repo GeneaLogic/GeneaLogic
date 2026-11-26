@@ -35,3 +35,27 @@ nonisolated enum SampleArchiveLauncher {
         return url
     }
 }
+
+/// The sample being built, kept outside the welcome window (85b's `/code-review`): the
+/// window can close while it builds, when another archive opens, and a reopened one must
+/// not start a second build into the same folder, which would open half of the first.
+@MainActor
+@Observable
+final class SampleArchivePreparation {
+    static let shared = SampleArchivePreparation()
+
+    private var build: Task<URL, any Error>?
+
+    var isPreparing: Bool { build != nil }
+
+    /// The sample, built first if it isn't there yet; one build at a time.
+    func prepare() async throws -> URL {
+        if let build { return try await build.value }
+        let build = Task.detached {
+            try SampleArchiveLauncher.prepare(at: SampleArchiveLauncher.defaultLocation())
+        }
+        self.build = build
+        defer { self.build = nil }
+        return try await build.value
+    }
+}

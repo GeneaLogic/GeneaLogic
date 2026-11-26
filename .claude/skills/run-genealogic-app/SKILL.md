@@ -108,9 +108,9 @@ open "$APP"
 open ~/Library/Developer/GeneaLogicApp-DD/Build/Products/Debug/GeneaLogic.app
 ```
 
-The app opens to an empty-state window with **Open Archive…** / **New Archive…**.
-Double-clicking a `.genea` in Finder (or `open some.genea`) opens it via
-`onOpenURL`.
+With nothing to restore, the app opens to the welcome window (**Open Archive…** /
+**New Archive…**). Double-clicking a `.genea` in Finder (or `open some.genea`) opens it
+via `AppDelegate.application(_:open:)`.
 
 ## Giving it data to browse
 
@@ -168,7 +168,7 @@ trigger it (this split landed in slice 4):
 
 So open + ingest + attach + replace + browse are fully drivable; only the
 File-menu New/Open AppKit panels need a human — or seed an archive with the `genea`
-CLI and open it from the shell (`open some.genea`, which routes through `onOpenURL`).
+CLI and open it from the shell (`open some.genea`, which the app delegate receives).
 
 **SwiftUI gotcha (learned the hard way):** only **one** `.fileImporter` may be
 live in a view hierarchy at a time — a second one (even on a different view) is

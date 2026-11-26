@@ -26,11 +26,18 @@ window tabs are switched off, because AppKit's tab commands crash on the app's w
    **If the scope comes through,** `ArchiveBookmarks`' recents list goes, and its
    bookmarks stay for restoration and 85's state. **If it doesn't,** the fallback: feed
    the system, and keep the menu and the welcome list on the app's own list.
+   **The spike (2026-11-24) was split, and the fallback was chosen.** The scope comes
+   through: `recentDocumentURLs` can be read and written after a relaunch. But Open Recent
+   can't be AppKit's own menu (SwiftUI discards the items when it rebuilds File), an
+   ad-hoc-signed build's list is emptied at every rebuild, and the list can't be observed
+   or have one entry removed. No subclass is needed: choosing from the Dock arrives as an
+   ordinary open.
 2. **Welcome becomes its own `Window` scene (G24)**, single-instance, with Window ▸
    Welcome to GeneaLogic (⇧⌘1, as in Xcode; free in slice 82's table). It may sit beside
    open archives. It shows at launch when nothing is restored or opened, and on a Dock
-   click with no windows. It closes when it opens an archive, which gets its own window.
-   The URL group loses its `nil` state, and with it `RootWindow`'s
+   click with no windows. It closes when an archive is opened, which gets its own
+   window: from it, or any other way (⌘O, Finder, the Dock; widened 2026-11-24 before
+   the hand-test). The URL group loses its `nil` state, and with it `RootWindow`'s
    welcome-must-not-coexist dismissal.
 
 ## G12, investigated
@@ -39,6 +46,18 @@ With the `nil` state gone, retest the tab crash. **Time-boxed to one sitting.** 
 cause is found and the fix is small, turn tabs back on (Show Tab Bar, Merge All Windows).
 Otherwise, record what was found in #41, leave tabs off, and #41 gets its own slice or is
 parked.
+
+**Found (2026-11-24):** Show Tab Bar, Show All Tabs, Merge All Windows, Show Next Tab,
+Move Tab to New Window, closing a tab and the tab bar's + don't crash on macOS 27.2. Nor do
+Show Tab Bar, Merge All Windows and + on `main` before this slice, with tabs switched on.
+All with the app in the background, Show All Tabs driven from code. So the crash wasn't reproduced, its cause wasn't found, and
+macOS 26 (the floor) wasn't available. Turning tabs on also needs an answer for +, which
+opens a window with no archive.
+
+**Decided (2026-11-24): tabs stay off, and #41 is parked.** An archive window is complex
+enough without a tab bar, and the HIG doesn't call for one: it only names the menu items "in
+a tab-based window". Un-parks when people using the app ask for tabs, or the HIG recommends
+them for this kind of app.
 
 ## Out of scope
 
