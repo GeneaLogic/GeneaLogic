@@ -278,7 +278,22 @@ struct ArchiveSidebar: View {
             .badge(count)
             .tag(SidebarItem.trash)
             .id(SidebarRowID.item(.trash))
-            .accessibilityValue(count == 0 ? "Empty" : count == 1 ? "1 item" : "\(count) items")
+            // One element, its count in its name (86's hand-test). With a value added to
+            // the `Label`, VoiceOver read the row as "2 items" and never said "Trash"; named
+            // outright, it read the name and dropped the value. Mail's rows say their count
+            // the same way. Nothing at zero, where the badge hides too.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Self.trashAccessibilityLabel(count: count))
+    }
+
+    /// What VoiceOver calls the Trash row: "Trash", "Trash, 1 item", "Trash, 3 items".
+    static func trashAccessibilityLabel(count: Int) -> String {
+        let title = SidebarSection.trash.title
+        switch count {
+        case 0: return title
+        case 1: return "\(title), 1 item"
+        default: return "\(title), \(count) items"
+        }
     }
 
     // MARK: - Rows shared by the sections

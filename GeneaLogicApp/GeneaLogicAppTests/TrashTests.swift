@@ -179,6 +179,13 @@ import Testing
         #expect(ArchiveCommand.showTab(.trash) == .showTrash)
     }
 
+    /// VoiceOver hears the row's count in its name, and nothing at zero (86's hand-test).
+    @Test func theRowSaysItsCount() {
+        #expect(ArchiveSidebar.trashAccessibilityLabel(count: 0) == "Trash")
+        #expect(ArchiveSidebar.trashAccessibilityLabel(count: 1) == "Trash, 1 item")
+        #expect(ArchiveSidebar.trashAccessibilityLabel(count: 2) == "Trash, 2 items")
+    }
+
     /// The Trash has no ⌘-number, and the View menu doesn't list it.
     @Test func theTrashHasNoNumber() {
         #expect(!ArchiveTab.numbered.contains(.trash))
