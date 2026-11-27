@@ -9,7 +9,11 @@ struct ArchiveWindow: View {
     @Binding var url: URL?
     /// The URL whose move has been followed, so the archive can be built there.
     @State private var followed: URL?
+    /// Access this window's `restore` took, which it releases if nothing claimed the
+    /// archive (85c's `/code-review`): only a claiming container releases otherwise.
+    @State private var tookAccess: URL?
     @State private var isSettled = false
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         Group {
@@ -42,12 +46,25 @@ struct ArchiveWindow: View {
         // leaves it as it is.
         .onChange(of: url, initial: true) { _, url in
             guard let url else { return }
-            let location = ArchiveAccessStore.shared.restore(url)
-            if location != url.canonicalArchiveURL {
-                self.url = location
-            } else {
+            let store = ArchiveAccessStore.shared
+            let restored = store.restore(url)
+            if restored.tookAccess { tookAccess = restored.location }
+            guard restored.location != url.canonicalArchiveURL else {
                 followed = url
+                return
             }
+            // Another window has the archive at its new path: one opened from Finder at
+            // launch, before this window's value arrived. This one is the duplicate, and
+            // closes before building anything (85c's `/code-review`).
+            if store.isClaimed(restored.location) {
+                dismiss()
+            } else {
+                self.url = restored.location
+            }
+        }
+        .onDisappear {
+            guard let tookAccess, !ArchiveAccessStore.shared.isClaimed(tookAccess) else { return }
+            ArchiveAccessStore.shared.release(tookAccess)
         }
     }
 }

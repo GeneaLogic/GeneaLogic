@@ -132,8 +132,8 @@ struct ArchiveContainerView: View {
                 ArchiveOpenCoordinator.shared.archiveWindowDidOpen()
                 model.load()
                 // In the same synchronous step, so the archive's first frame is already
-                // as it was left (slice 85); after `load()`, whose `ensureAccess` gives
-                // the access reading the archive's identity needs. Not for an archive
+                // as it was left (slice 85); after `load()`, which checks the access
+                // reading the archive's identity needs. Not for an archive
                 // that couldn't be opened: it has no identity to read, and a record for
                 // it would be junk (85's `/code-review`).
                 if model.archive != nil { windowState.load() }

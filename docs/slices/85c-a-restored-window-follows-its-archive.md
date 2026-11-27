@@ -66,4 +66,7 @@ window the same "can no longer reach this archive" state as today.
   - repeat with a move to another folder, and with a move to the Trash, which shows the
     "can't reach" state;
   - with the window restored at its new path, double-click the archive in Finder. The
-    same window comes to the front, with no second window.
+    same window comes to the front, with no second window;
+  - quit with the archive open, rename it, and launch by double-clicking it in Finder.
+    One window opens, at the new path, and Open Recent lists it first (found in
+    `/code-review`: the open and the restore race).

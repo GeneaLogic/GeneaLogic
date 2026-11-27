@@ -8,7 +8,7 @@ import Foundation
 ///
 /// Two concerns, deliberately separate:
 ///   - **`bookmarks`** (`path → Data`) is the *access* mechanism — the source of
-///     truth that `ArchiveAccessStore.ensureAccess` resolves on window restore /
+///     truth that `ArchiveAccessStore.restore` resolves on window restore /
 ///     reopen. Pruned only when a bookmark fails to resolve (archive deleted).
 ///   - **`recents`** (ordered `[path]`) is the *display* list behind File ▸ Open
 ///     Recent. "Clear Menu" empties it but leaves the bookmarks intact, so an
@@ -157,14 +157,21 @@ final class ArchiveBookmarks {
         let moved = Self.identity(of: URL(fileURLWithPath: old)) != Self.identity(of: resolved)
         if started { resolved.stopAccessingSecurityScopedResource() }
         guard moved else { return ResolvedRecent(scoped: resolved, location: url) }
+        // The old path's bookmark moves to the new one, unless the new path has its own: an
+        // open there (a Finder double-click at launch) minted a fresher one (85c's
+        // `/code-review`).
         var all = bookmarkData()
-        all[new] = all.removeValue(forKey: old)
+        let carried = all.removeValue(forKey: old)
+        if all[new] == nil { all[new] = carried }
         setBookmarkData(all)
         // The new path takes the old one's place: a restore doesn't promote, and a reopen
-        // brings it to the front itself (slice 85c). A cleared menu stays cleared.
-        var paths = recents.filter { $0 != new }
-        if let index = paths.firstIndex(of: old) { paths[index] = new }
-        setRecents(paths)
+        // brings it to the front itself (slice 85c). One already listed keeps its own place,
+        // and a cleared menu stays cleared.
+        if recents.contains(new) {
+            setRecents(recents.filter { $0 != old })
+        } else {
+            setRecents(recents.map { $0 == old ? new : $0 })
+        }
         // The system's entry followed the move already.
         return ResolvedRecent(scoped: resolved, location: resolved)
     }

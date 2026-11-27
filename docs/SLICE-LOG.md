@@ -4494,12 +4494,15 @@ been two slices.
   claim, the title, 85's state and the next launch's restore all take the new path at
   once, and `ArchiveModel.url` stays a `let`. Reopening in a second window instead would
   flash two and race the coordinator's deferred Finder-open. **The invariant:** one
-  resolve, `ArchiveAccessStore.restore`, behind a restored window, Open Recent
-  (`reopenRecent` = `restore` + `promote`) and `load()`'s `ensureAccess`, so all three
-  keep 85b's rules. A restore doesn't promote: the moved recent takes the old one's
-  place. **Gotcha:** `ensureAccess` resolved the bookmark on its own, so it reported
-  access to an archive moved into the Trash and to a moved one while `load()` opened the
-  old path. Only Open Recent had the rules.
+  resolve on the way to a window, `ArchiveAccessStore.restore` (Open Recent is it plus
+  `promote`), keeping 85b's rules; `load()` only checks that access is held. A second
+  resolve there could follow a move the window hadn't. A restore doesn't promote: the
+  moved recent takes the old one's place, unless an open already listed the new path.
+  **Gotchas:** the old `ensureAccess` resolved on its own, so it opened an archive in the
+  Trash. Launching by double-clicking the renamed archive records the new path before
+  the old window restores, so the restore must keep that open's place and bookmark, and
+  the restored window closes as the duplicate. Access `restore` takes is released by its
+  window if no container claimed it (`/code-review`).
 
 ## Carryovers and parked work
 

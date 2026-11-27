@@ -207,14 +207,14 @@ final class RecordingSystemRecents: SystemRecents {
         system.follow(one, to: renamed)
 
         let restored = ArchiveAccessStore.shared.restore(one, bookmarks: bookmarks)
-        defer { ArchiveAccessStore.shared.release(restored) }
-        #expect(restored == renamed.canonicalArchiveURL)
+        defer { ArchiveAccessStore.shared.release(restored.location) }
+        #expect(restored.location == renamed.canonicalArchiveURL)
+        #expect(restored.tookAccess)
         #expect(ArchiveAccessStore.shared.isHolding(renamed))
         #expect(!ArchiveAccessStore.shared.isHolding(one))
         #expect(bookmarks.recents == [path(two), path(renamed)])
         #expect(system.paths == [path(two), path(renamed)])
-        // The model opens at the window's new URL, and the next launch restores it there.
-        #expect(ArchiveAccessStore.shared.ensureAccess(to: renamed, bookmarks: bookmarks))
+        // The next launch restores it there.
         #expect(bookmarks.resolve(renamed) != nil)
     }
 
@@ -222,8 +222,8 @@ final class RecordingSystemRecents: SystemRecents {
         let one = try makeArchive("One")
         bookmarks.remember(one)
         let restored = ArchiveAccessStore.shared.restore(one, bookmarks: bookmarks)
-        defer { ArchiveAccessStore.shared.release(restored) }
-        #expect(restored == one.canonicalArchiveURL)
+        defer { ArchiveAccessStore.shared.release(restored.location) }
+        #expect(restored.location == one.canonicalArchiveURL)
         #expect(ArchiveAccessStore.shared.isHolding(one))
         #expect(bookmarks.recents == [path(one)])
     }
@@ -237,13 +237,14 @@ final class RecordingSystemRecents: SystemRecents {
             at: one, to: root.appending(path: "Renamed.genea", directoryHint: .isDirectory))
         _ = try makeArchive("One")
         let restored = ArchiveAccessStore.shared.restore(one, bookmarks: bookmarks)
-        defer { ArchiveAccessStore.shared.release(restored) }
-        #expect(restored == one.canonicalArchiveURL)
+        defer { ArchiveAccessStore.shared.release(restored.location) }
+        #expect(restored.location == one.canonicalArchiveURL)
         #expect(bookmarks.recents == [path(one)])
     }
 
     /// Opening it there would edit an archive that emptying the Trash destroys. Before 85c,
-    /// `ensureAccess` resolved the bookmark straight into the Trash and reported access.
+    /// `load()`'s access check resolved the bookmark straight into the Trash and reported
+    /// access; now it only asks whether the window's `restore` took any.
     @Test func anArchiveInTheTrashIsNotRestoredThere() throws {
         let one = try makeArchive("One")
         bookmarks.remember(one)
@@ -252,9 +253,9 @@ final class RecordingSystemRecents: SystemRecents {
         try FileManager.default.moveItem(
             at: one, to: trash.appending(path: "One.genea", directoryHint: .isDirectory))
         let restored = ArchiveAccessStore.shared.restore(one, bookmarks: bookmarks)
-        #expect(restored == one.canonicalArchiveURL)
-        #expect(!ArchiveAccessStore.shared.isHolding(restored))
-        #expect(!ArchiveAccessStore.shared.ensureAccess(to: one, bookmarks: bookmarks))
+        #expect(restored.location == one.canonicalArchiveURL)
+        #expect(!restored.tookAccess)
+        #expect(!ArchiveAccessStore.shared.isHolding(one))
         #expect(bookmarks.recents == [path(one)])
     }
 
@@ -267,8 +268,65 @@ final class RecordingSystemRecents: SystemRecents {
         defer { ArchiveAccessStore.shared.release(one) }
         try FileManager.default.moveItem(
             at: one, to: root.appending(path: "Renamed.genea", directoryHint: .isDirectory))
-        #expect(ArchiveAccessStore.shared.restore(one, bookmarks: bookmarks) == one.canonicalArchiveURL)
+        let restored = ArchiveAccessStore.shared.restore(one, bookmarks: bookmarks)
+        #expect(restored.location == one.canonicalArchiveURL)
+        #expect(!restored.tookAccess)
         #expect(bookmarks.recents == [path(one)])
+    }
+
+    /// Launched by double-clicking the renamed archive: its open recorded the new path, with
+    /// a fresh bookmark, before the window for the old one was restored. The restore must
+    /// not demote it, drop it from a cleared menu, or overwrite its bookmark (85c's
+    /// `/code-review`).
+    @Test func aRestoreKeepsAnOpenAlreadyRecordedAtTheNewPath() throws {
+        let one = try makeArchive("One")
+        bookmarks.remember(one)
+        bookmarks.clearRecents()
+        let renamed = root.appending(path: "Renamed.genea", directoryHint: .isDirectory)
+        try FileManager.default.moveItem(at: one, to: renamed)
+        bookmarks.remember(renamed)
+        let fresh = try #require(storedBookmarks()[path(renamed)])
+
+        let restored = ArchiveAccessStore.shared.restore(one, bookmarks: bookmarks)
+        defer { ArchiveAccessStore.shared.release(restored.location) }
+        #expect(restored.location == renamed.canonicalArchiveURL)
+        #expect(bookmarks.recents == [path(renamed)])
+        #expect(storedBookmarks()[path(renamed)] == fresh)
+        #expect(storedBookmarks()[path(one)] == nil)
+    }
+
+    /// The same launch with the old path still listed: it goes, and the new path keeps the
+    /// front its open gave it.
+    @Test func aRestoreDropsTheOldPathBehindAnOpenAtTheNewOne() throws {
+        let one = try makeArchive("One")
+        let two = try makeArchive("Two")
+        bookmarks.remember(one)
+        bookmarks.remember(two)
+        let renamed = root.appending(path: "Renamed.genea", directoryHint: .isDirectory)
+        try FileManager.default.moveItem(at: one, to: renamed)
+        bookmarks.remember(renamed)
+
+        let restored = ArchiveAccessStore.shared.restore(one, bookmarks: bookmarks)
+        defer { ArchiveAccessStore.shared.release(restored.location) }
+        #expect(bookmarks.recents == [path(renamed), path(two)])
+    }
+
+    /// A restore that finds the new path already held (that open again) took nothing, so
+    /// its window has nothing to release: the open's window owns the access.
+    @Test func aRestoreOntoAHeldPathTakesNothing() throws {
+        let one = try makeArchive("One")
+        bookmarks.remember(one)
+        let renamed = root.appending(path: "Renamed.genea", directoryHint: .isDirectory)
+        try FileManager.default.moveItem(at: one, to: renamed)
+        ArchiveAccessStore.shared.adoptAlreadyReachable(renamed)
+        defer { ArchiveAccessStore.shared.release(renamed) }
+        let restored = ArchiveAccessStore.shared.restore(one, bookmarks: bookmarks)
+        #expect(restored.location == renamed.canonicalArchiveURL)
+        #expect(!restored.tookAccess)
+    }
+
+    private func storedBookmarks() -> [String: Data] {
+        defaults.dictionary(forKey: "archiveBookmarks") as? [String: Data] ?? [:]
     }
 }
 
