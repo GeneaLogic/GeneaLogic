@@ -30,6 +30,8 @@ struct TrashView: View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .safeAreaInset(edge: .top, spacing: 0) { header }
+            // Before the first frame, so the area never opens on the last listing.
+            .onAppear { model.reloadTrash(listing: true) }
             .confirmationDialog(
                 pendingArtifactDelete.map { "Permanently delete “\(Self.title(of: $0))”?" } ?? "",
                 isPresented: Binding(
@@ -132,8 +134,8 @@ struct TrashView: View {
                                 icon: "doc.text",
                                 title: Self.name(of: item),
                                 subtitle:
-                                    "From “\(item.artifactTitle)” · Deleted \(displayDate(item.deletedAt))",
-                                restoreHelp: "Re-attach this file to “\(item.artifactTitle)”.",
+                                    "From “\(Self.artifactTitle(of: item))” · Deleted \(displayDate(item.deletedAt))",
+                                restoreHelp: "Re-attach this file to “\(Self.artifactTitle(of: item))”.",
                                 deleteHelp: "Remove this file for good. This can't be undone.",
                                 onRestore: { model.restoreFile(item) },
                                 onDelete: { pendingFileDelete = item })
@@ -146,8 +148,15 @@ struct TrashView: View {
     }
 
     private static func title(of item: TrashedArtifact) -> String {
-        item.title.isEmpty ? "Untitled Artifact" : item.title
+        item.title.isEmpty ? untitledArtifact : item.title
     }
+
+    /// The artifact a trashed file came from, named as a trashed artifact is.
+    private static func artifactTitle(of item: TrashedFile) -> String {
+        item.artifactTitle.isEmpty ? untitledArtifact : item.artifactTitle
+    }
+
+    private static let untitledArtifact = "Untitled Artifact"
 
     private static func name(of item: TrashedFile) -> String {
         item.originalName.isEmpty ? "Untitled File" : item.originalName

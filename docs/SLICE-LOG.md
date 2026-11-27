@@ -4517,11 +4517,14 @@ been two slices.
   `trashedItemCount()` (one directory listing); the listings are read only while the
   Trash shows. **Measured, as the spec asked** (1,000 entries, release): the two listings
   take ~60 ms, all I/O on each entry's `deletion.json`. A `stat` per record to make the
-  count exact costs ~10 ms, and the listing alone ~1.5 ms. The count can run high only by
+  count exact costs ~10 ms, and the listing alone ~2 ms. The count can run high only by
   a torn or undecodable entry, and where the list shows, its own count stands in.
-  **Gotcha:** a purge by another process (`genea trash empty`) commits nothing to the
-  index, so the window's poll doesn't notice it until its next refresh. An mtime cache
-  for `.trash/` was rejected: an entry's folder appears before its record does.
+  **Gotchas:** a purge by another process (`genea trash empty`) commits nothing to the
+  index, so the poll's token can't see it; the poll compares the count each tick, against
+  the last cheap count, since the listings skip a damaged entry and would differ forever.
+  An mtime cache for `.trash/` was rejected: an entry's folder appears before its record.
+  With no confirmation, a double ⌘⌫ reached the engine twice and the second failed, so a
+  move still on its way drops a repeat (`/code-review`).
 
 ## Carryovers and parked work
 

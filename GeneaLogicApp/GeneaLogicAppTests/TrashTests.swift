@@ -97,6 +97,60 @@ import Testing
         #expect(ArchiveCommand.deleteFile.title == "Move to Trash")
     }
 
+    /// A second Move to Trash for an item still on its way is dropped, not sent to the
+    /// engine to fail (86's `/code-review`: a double ⌘⌫ raised an error for a delete that
+    /// worked). The Edit menu names the move as the menu did.
+    @Test func aSecondMoveOnItsWayIsDropped() async throws {
+        let (model, root) = try AppTestSupport.makeModel()
+        defer { AppTestSupport.remove(root) }
+        let (first, second, file) = try await makeTwo(in: model, root: root)
+
+        await model.act {
+            model.deleteArtifact(first)
+            model.deleteArtifact(first)
+        }
+        #expect(model.actionError == nil)
+        #expect(model.undoManager?.undoActionName == "Move to Trash")
+
+        await model.act {
+            model.detachFile(file, from: second)
+            model.detachFile(file, from: second)
+        }
+        #expect(model.actionError == nil)
+        #expect(model.undoManager?.undoActionName == "Move to Trash")
+        #expect(model.trashCount == 2)
+        #expect(model.trashMovesInFlight.isEmpty)
+    }
+
+    /// Another process emptying the trash commits nothing the poll's token sees, so the
+    /// poll counts the trash itself (86's `/code-review`).
+    @Test(arguments: [ArchiveTab.artifacts, .trash])
+    func anEmptyElsewhereReachesTheWindow(on area: ArchiveTab) async throws {
+        let (model, root) = try AppTestSupport.makeModel()
+        defer { AppTestSupport.remove(root) }
+        let (first, _, _) = try await makeTwo(in: model, root: root)
+        await model.act { model.deleteArtifact(first) }
+        model.activeTab = area
+        #expect(model.trashCount == 1)
+
+        try Archive.open(at: root).emptyTrash()
+        model.refreshIfChangedExternally()
+        #expect(model.trashCount == 0)
+        #expect(model.trashedArtifacts.isEmpty || area != .trash)
+    }
+
+    /// The Trash's view asks for the listings as it appears, before `activeTab` follows.
+    @Test func theListingsCanBeReadOnTheWayIn() async throws {
+        let (model, root) = try AppTestSupport.makeModel()
+        defer { AppTestSupport.remove(root) }
+        let (first, _, _) = try await makeTwo(in: model, root: root)
+        await model.act { model.deleteArtifact(first) }
+        #expect(model.trashedArtifacts.isEmpty)
+
+        model.reloadTrash(listing: true)
+        #expect(model.trashedArtifacts.map(\.uid) == [first])
+    }
+
     /// A deleted person is undone only in this session (#11), so it still asks.
     @Test func deletePersonStillAsks() async throws {
         let (model, root) = try AppTestSupport.makeModel()

@@ -385,14 +385,24 @@ extension ArchiveModel {
         }
     }
 
-    /// Detaches `fileID` from `artifactID` (the per-file "Delete" action), undoably —
-    /// the engine stages the file's bytes so the deletion can be reverted.
+    /// Detaches `fileID` from `artifactID` (the per-file Move to Trash), undoably —
+    /// the engine stages the file's bytes in the Trash so the deletion can be reverted.
+    ///
+    /// **A second request for a file still on its way is dropped** (slice 86's
+    /// `/code-review`). Nothing asks first any more, so a double click reached the
+    /// engine twice and the second, finding the file gone, raised an error for a
+    /// delete that worked. The confirmation had been what stopped it.
     func detachFile(_ fileID: FileID, from artifactID: ArtifactID) {
+        guard trashMovesInFlight.insert(fileID.raw).inserted else { return }
         mutate(unopened: "Open an archive before deleting files.") { archive in
             try archive.detachFile(fileID, in: artifactID)
         } commit: { [self] change in
-            registerFileRevert(change, actionName: "Delete File")
+            trashMovesInFlight.remove(fileID.raw)
+            registerFileRevert(change, actionName: "Move to Trash")
             bumpAndRefresh()
+        } failure: { [self] _ in
+            trashMovesInFlight.remove(fileID.raw)
+            return false
         }
     }
 
@@ -443,8 +453,8 @@ extension ArchiveModel {
     /// add/remove/replace undo and redo ping-pong like the metadata path above.
     ///
     /// A detached file's bytes live in the persistent `.trash/` (not in-session temp),
-    /// so an undo/redo step can find its bytes **permanently removed** (Empty Trash /
-    /// Delete Permanently from the sheet) or its file/artifact gone out-of-band. Those
+    /// so an undo/redo step can find its bytes **permanently removed** (Empty Trash… /
+    /// Delete Permanently… in the Trash) or its file/artifact gone out-of-band. Those
     /// no-op **gracefully**: a benign notice (not an error), with no inverse
     /// re-registered, so the stack simply advances — exactly like the artifact
     /// delete/restore path (the menu title can't be relabeled after the fact, NSUndoManager).
@@ -519,23 +529,29 @@ extension ArchiveModel {
         }
     }
 
-    /// Deletes the artifact `id` and its files (the sidebar "Delete Artifact"
-    /// action), undoably — the engine stages the whole folder so the deletion can be
-    /// reverted. If the deleted artifact was the selection, the detail pane falls
-    /// back to its placeholder on its own (the id stops resolving).
+    /// Moves the artifact `id` and its files to the Trash (Move to Trash, which asks
+    /// nothing since slice 86), undoably — the engine stages the whole folder so the
+    /// deletion can be reverted. If the deleted artifact was the selection, the detail
+    /// pane falls back to its placeholder on its own (the id stops resolving). A second
+    /// request while the first is on its way is dropped, as `detachFile`'s is.
     func deleteArtifact(_ id: ArtifactID) {
+        guard trashMovesInFlight.insert(id.raw).inserted else { return }
         mutate(unopened: "Open an archive before deleting.") { archive in
             try archive.removeArtifact(id)
         } commit: { [self] deletion in
-            registerArtifactRestore(of: id, deletion: deletion, actionName: "Delete Artifact")
+            trashMovesInFlight.remove(id.raw)
+            registerArtifactRestore(of: id, deletion: deletion, actionName: "Move to Trash")
             bumpAndRefresh()
+        } failure: { [self] _ in
+            trashMovesInFlight.remove(id.raw)
+            return false
         }
     }
 
     /// Registers an undo that **restores** a deleted artifact, then registers the
     /// symmetric redo (delete again, producing a fresh staged folder) — the undo
     /// side of a *deletion*. Undo and redo ping-pong as in the file/metadata paths.
-    /// `actionName` names the originating action in the Edit menu ("Delete Artifact").
+    /// `actionName` names the originating action in the Edit menu ("Move to Trash").
     func registerArtifactRestore(
         of id: ArtifactID, deletion: ArtifactDeletion, actionName: String
     ) {
@@ -587,7 +603,7 @@ extension ArchiveModel {
     /// side of a deletion). `ingest` calls this directly so adding a new artifact is
     /// undoable: the first ⌘Z removes it (the engine stages its folder so it can come
     /// back), ⌘⇧Z restores it (uid faithful). `actionName` names it in the Edit menu
-    /// ("Add Artifact" for ingest, "Delete Artifact" when reached via the delete redo).
+    /// ("Add Artifact" for ingest, "Move to Trash" when reached via the delete redo).
     func registerArtifactRedelete(of id: ArtifactID, actionName: String) {
         registerUndoStep(actionName: actionName) { model in
             // This is the one counterpart shape that *must* wait for its payload

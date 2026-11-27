@@ -120,6 +120,14 @@ final class ArchiveModel {
     var trashedArtifacts: [TrashedArtifact] = []
     var trashedFiles: [TrashedFile] = []
 
+    /// What `trashedItemCount()` said at the last `reloadTrash`, for the poll to compare
+    /// against (`reloadTrashIfChangedExternally`). Never shown.
+    @ObservationIgnored var trashEntryCount = 0
+
+    /// The artifacts and files (by raw uid) whose Move to Trash is still on its way, so a
+    /// second press for the same one is dropped (`deleteArtifact`, `detachFile`).
+    var trashMovesInFlight: Set<String> = []
+
     // MARK: Integrity
 
     /// What `Archive.standingFindings()` last reported: records that could not be

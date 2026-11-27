@@ -6,16 +6,21 @@ import GeneaLogicModel
 extension ArchiveModel {
     // MARK: - Trash (recoverable deletes)
 
-    /// Re-reads the archive's `.trash/`: `trashCount` always, and while the Trash shows
-    /// the listings too, whose own count then stands in for the cheap one, so the badge
-    /// and the list can't disagree where both are on screen.
-    func reloadTrash() {
+    /// Re-reads the archive's `.trash/`: `trashCount` always, and the listings too when
+    /// `listing` (by default, while the Trash shows), whose own count then stands in for
+    /// the cheap one, so the badge and the list can't disagree where both are on screen.
+    /// The Trash's view asks for the listings as it appears, before its first frame:
+    /// `activeTab` follows the area a render later, which showed the last listing for a
+    /// moment (86's `/code-review`).
+    func reloadTrash(listing: Bool? = nil) {
         guard let archive else {
             trashCount = 0
+            trashEntryCount = 0
             return
         }
-        guard activeTab == .trash else {
-            trashCount = archive.trashedItemCount()
+        trashEntryCount = archive.trashedItemCount()
+        guard listing ?? (activeTab == .trash) else {
+            trashCount = trashEntryCount
             return
         }
         let artifacts = archive.trashedArtifacts()
@@ -23,6 +28,22 @@ extension ArchiveModel {
         if artifacts != trashedArtifacts { trashedArtifacts = artifacts }
         if files != trashedFiles { trashedFiles = files }
         trashCount = artifacts.count + files.count
+    }
+
+    /// Reloads the trash if another process changed it (the window's poll, each tick).
+    ///
+    /// **The poll's token can't see a trash purge** (86's `/code-review`): `genea trash
+    /// empty` deletes files and commits nothing to the index, so `data_version` stays put
+    /// and the badge and the Trash's rows went on offering entries that were gone. The
+    /// count is one directory listing, cheap enough for every tick. It misses a change
+    /// that leaves the count where it was, a purge and a delete together, which the next
+    /// refresh picks up.
+    ///
+    /// Against the last cheap count, not `trashCount`: on the Trash that is the listings',
+    /// which skip a damaged entry, so it would differ on every tick and re-read them all.
+    func reloadTrashIfChangedExternally() {
+        guard let archive, archive.trashedItemCount() != trashEntryCount else { return }
+        reloadTrash()
     }
 
     /// Restores a trashed artifact back into the archive (the Trash's Restore

@@ -95,18 +95,24 @@ enum TrashStore {
     }
 
     /// How many entries the trash holds, **without reading any** (slice 86): one
-    /// directory listing, about a millisecond for a thousand entries, where the full
-    /// listing takes some 30 ms (measured, release). Cheap enough to ask on every refresh.
+    /// directory listing, about 2 ms for a thousand entries, where the two full listings
+    /// take some 60 ms (measured, release). Cheap enough to ask on every refresh.
     ///
-    /// It can count higher than `entries(in:)` lists, by an entry whose `deletion.json`
-    /// is missing or won't decode. The first is a torn stash, which the next open drops
-    /// (`reconcileAfterInterruptedWrite`); the second is damage. A `stat` of each record
-    /// would rule out the first and cost nine times the listing.
+    /// Only folders count, as only folders are entries: a stray file left in `.trash/`
+    /// (by a sync tool, say) is no entry. It can still count higher than `entries(in:)`
+    /// lists, by a folder whose `deletion.json` is missing or won't decode. The first is a
+    /// torn stash, which the next open drops (`reconcileAfterInterruptedWrite`); the
+    /// second is damage. A `stat` of each record would rule out the first, at ~10 ms.
     static func entryCount(in root: URL) -> Int {
         let trashDir = ArchiveLayout.trashDirectory(in: root)
-        let dirs = try? FileManager.default.contentsOfDirectory(
-            at: trashDir, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
-        return dirs?.count ?? 0
+        guard
+            let items = try? FileManager.default.contentsOfDirectory(
+                at: trashDir, includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles])
+        else { return 0 }
+        return items.count { item in
+            (try? item.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+        }
     }
 
     /// The decoded `deletion.json` for `uid`, or `nil` if absent/undecodable.

@@ -436,6 +436,10 @@ import Testing
         _ = try archive.removeArtifact(gone.uid)
         #expect(archive.trashedItemCount() == 2 && agrees())
 
+        // A stray file in `.trash/` is no entry, so it isn't counted (86's `/code-review`).
+        try Data("stray".utf8).write(to: root.appendingPathComponent(".trash/notes.txt"))
+        #expect(archive.trashedItemCount() == 2 && agrees())
+
         _ = try archive.restoreFromTrash(gone.uid)
         #expect(archive.trashedItemCount() == 1 && agrees())
 
