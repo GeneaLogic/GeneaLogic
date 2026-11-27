@@ -86,6 +86,14 @@ final class ArchiveBookmarks {
         systemRecents.note(url)
     }
 
+    /// Tells the system's list (the Dock menu) that a restored archive is now at `url`,
+    /// leaving the app's own list as it is: a restore doesn't promote. The system's entry
+    /// takes the new name, with no second entry, but goes to the front — its list has no
+    /// rename (85c's hand-test). Needs `url`'s sandbox access.
+    func noteMove(to url: URL) {
+        systemRecents.note(url)
+    }
+
     /// Front-inserts `key` into the recents list, de-duplicated and capped.
     private func moveToFront(_ key: String) {
         var paths = recents
@@ -172,7 +180,9 @@ final class ArchiveBookmarks {
         } else {
             setRecents(recents.map { $0 == old ? new : $0 })
         }
-        // The system's entry followed the move already.
+        // The system's entry keeps working, its bookmark following the move, but it keeps the
+        // old name until it is told the new path (85c's hand-test). The caller tells it,
+        // holding access: `noteMove`.
         return ResolvedRecent(scoped: resolved, location: resolved)
     }
 

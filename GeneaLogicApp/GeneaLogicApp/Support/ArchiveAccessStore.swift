@@ -138,6 +138,8 @@ final class ArchiveAccessStore {
         guard held[target] == nil else { return Restored(location: target, tookAccess: false) }
         let started = resolved.scoped.startAccessingSecurityScopedResource()
         held[target] = Entry(url: resolved.scoped, started: started)
+        // Already held, it was opened there, which told the system's list.
+        if target != key { bookmarks.noteMove(to: target) }
         return Restored(location: target, tookAccess: true)
     }
 

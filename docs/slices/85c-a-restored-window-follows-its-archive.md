@@ -36,7 +36,10 @@ where it is now.
    takes the old one's place in the list. It doesn't jump to the front. Today
    `resolveRecent` removes the old path and leaves the new one to `promote`; it changes
    to replace the old path where it stands. Open Recent still promotes, so nothing
-   changes there.
+   changes there. **The system's list is told** (found in the hand-test, 2026-11-26): its
+   entry follows the move by bookmark but keeps the old name in the Dock until it is told
+   the new path. Telling it renames the entry, with no duplicate, and moves it to the
+   front, because AppKit's list has no rename.
 
 What stays as it is: an archive the bookmark can't find, or one in the Trash, gives the
 window the same "can no longer reach this archive" state as today.

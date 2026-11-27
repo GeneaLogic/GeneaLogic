@@ -196,7 +196,9 @@ final class RecordingSystemRecents: SystemRecents {
     // MARK: - Restoring a window (slice 85c)
 
     /// A window restored for a moved or renamed archive opens it where it is, and its
-    /// recent keeps its place: relaunching isn't opening.
+    /// recent keeps its place: relaunching isn't opening. The system's list is told the new
+    /// path, or the Dock keeps the old name (85c's hand-test); it has no rename, so that
+    /// entry goes to the front.
     @Test func aMovedArchiveRestoresWhereItIs() throws {
         let one = try makeArchive("One")
         let two = try makeArchive("Two")
@@ -213,7 +215,7 @@ final class RecordingSystemRecents: SystemRecents {
         #expect(ArchiveAccessStore.shared.isHolding(renamed))
         #expect(!ArchiveAccessStore.shared.isHolding(one))
         #expect(bookmarks.recents == [path(two), path(renamed)])
-        #expect(system.paths == [path(two), path(renamed)])
+        #expect(system.paths == [path(renamed), path(two)])
         // The next launch restores it there.
         #expect(bookmarks.resolve(renamed) != nil)
     }
