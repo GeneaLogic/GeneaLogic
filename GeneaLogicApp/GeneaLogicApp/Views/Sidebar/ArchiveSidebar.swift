@@ -1,3 +1,4 @@
+import AppKit
 import GeneaLogicArchive
 import GeneaLogicModel
 import SwiftUI
@@ -60,6 +61,13 @@ struct ArchiveSidebar: View {
     /// Bound straight to `selection`, the list's dropped selection never came back:
     /// nothing it reads changed.
     @State private var listSelection: SidebarItem?
+
+    /// Whether the Trash's row has the keyboard focus, which turns its highlight from gray
+    /// to the accent, as a list's does.
+    @FocusState private var isTrashFocused: Bool
+
+    /// Whether the window is the active one: an inactive window's selections are all gray.
+    @Environment(\.appearsActive) private var appearsActive
 
     var body: some View {
         // Filtered once per draw: the rows, the header's count, the Filter menu and the
@@ -281,11 +289,13 @@ struct ArchiveSidebar: View {
 
     // MARK: - Trash
 
-    /// The Trash, pinned under the main list: a button drawn as a sidebar row (86's
-    /// hand-test). A one-row list of its own took Tab focus without selecting anything,
-    /// and selecting on focus would switch the detail as Tab passed by; a button is a Tab
-    /// stop that Space opens, as any other is. Selected, it draws the sidebar's highlight
-    /// itself: the main list's real one is a neutral rounded fill.
+    /// The Trash, pinned under the main list: a focusable row drawn as the sidebar's are
+    /// (86's hand-test). A one-row list of its own took Tab focus without selecting
+    /// anything, and selecting on focus would switch the detail as Tab passed by. A
+    /// `Button` was a Tab stop, but never takes focus from a click, so its highlight could
+    /// only be the unfocused gray. This takes focus from a click or Tab, as a list does, and
+    /// draws the sidebar's own selection (`SidebarSelectionHighlight`): the accent while it
+    /// has focus in an active window, gray otherwise. Space and Return open it.
     ///
     /// The count hides at zero, and the icon dims while there is nothing in the can. The
     /// spec kept the icon fixed (fork 2, against `trash.fill`, which reads as decoration);
@@ -293,42 +303,76 @@ struct ArchiveSidebar: View {
     private var trashFooter: some View {
         let count = model.trashCount
         let isSelected = selection.area == .trash
-        return Button {
-            selection.select(.trash)
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: ArchiveTab.trash.systemImage)
-                    .foregroundStyle(count == 0 ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
-                    .frame(width: 20)
-                Text(SidebarSection.trash.title)
-                Spacer(minLength: 0)
-                if count > 0 {
-                    Text("\(count)")
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                }
+        let isEmphasized = isSelected && isTrashFocused && appearsActive
+        return HStack(spacing: 6) {
+            Image(systemName: ArchiveTab.trash.systemImage)
+                .foregroundStyle(trashIconStyle(isEmpty: count == 0, emphasized: isEmphasized))
+                .frame(width: 20)
+            Text(SidebarSection.trash.title)
+            Spacer(minLength: 0)
+            if count > 0 {
+                Text("\(count)")
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        isEmphasized
+                            ? AnyShapeStyle(Self.emphasizedText.opacity(0.75))
+                            : AnyShapeStyle(.secondary))
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous).fill(.quaternary)
-                }
-            }
-            .contentShape(.rect)
         }
-        .buttonStyle(.plain)
+        .foregroundStyle(
+            isEmphasized ? AnyShapeStyle(Self.emphasizedText) : AnyShapeStyle(.primary)
+        )
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background {
+            if isSelected {
+                SidebarSelectionHighlight(isEmphasized: isEmphasized)
+                    .clipShape(.rect(cornerRadius: 8, style: .continuous))
+            }
+        }
+        .contentShape(.rect)
+        .focusable()
+        .focused($isTrashFocused)
+        // Selected, the highlight shows the focus, as a list row's does; the ring is for
+        // focus on the row while another area shows.
+        .focusEffectDisabled(isSelected)
+        .onTapGesture { openTrash() }
+        .onKeyPress(keys: [.space, .return]) { _ in
+            openTrash()
+            return .handled
+        }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .contextMenu { CommandButton(.emptyTrash, on: .archive, fromSidebar: true) }
-        // Its count in its name (86's hand-test). With the count as a value, VoiceOver
-        // read the row as "2 items" and never said "Trash"; named outright, it read the
-        // name and dropped the value. Mail's rows say their count the same way. Not
-        // `.accessibilityElement(children: .ignore)`: on a button that makes a new element
-        // without the button's action, so pressing it through accessibility did nothing.
+        // One element, its count in its name (86's hand-test). With the count as a value,
+        // VoiceOver read the row as "2 items" and never said "Trash"; named outright, it
+        // read the name and dropped the value. Mail's rows say their count the same way.
+        // Not a `Button`, so its press is given outright.
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(Self.trashAccessibilityLabel(count: count))
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { openTrash() }
     }
+
+    /// Selects the Trash and gives its row the focus, as a click in a list does.
+    private func openTrash() {
+        selection.select(.trash)
+        isTrashFocused = true
+    }
+
+    /// The can's color: dimmed while empty, in the accent while full, and in the selected
+    /// text color (dimmed or not) on the focused highlight, where the accent wouldn't show.
+    private func trashIconStyle(isEmpty: Bool, emphasized: Bool) -> AnyShapeStyle {
+        switch (emphasized, isEmpty) {
+        case (true, true): AnyShapeStyle(Self.emphasizedText.opacity(0.5))
+        case (true, false): AnyShapeStyle(Self.emphasizedText)
+        case (false, true): AnyShapeStyle(.secondary)
+        case (false, false): AnyShapeStyle(.tint)
+        }
+    }
+
+    /// Text on the focused selection's highlight, as AppKit draws it.
+    private static let emphasizedText = Color(nsColor: .alternateSelectedControlTextColor)
 
     /// What VoiceOver calls the Trash row: "Trash", "Trash, 1 item", "Trash, 3 items".
     static func trashAccessibilityLabel(count: Int) -> String {
@@ -508,5 +552,26 @@ private struct SidebarSectionHeader<Controls: View>: View {
 
     private func toggle() {
         withAnimation(.snappy(duration: 0.2)) { isExpanded.toggle() }
+    }
+}
+
+/// A sidebar row's selection highlight, as AppKit draws it: the `.selection` material,
+/// emphasized while the row has focus (86's hand-test). A sidebar's selection is a
+/// vibrant material that blends with the translucent sidebar behind it, so a flat fill of
+/// the system's selection colors came out a shade off from the list's rows beside it.
+private struct SidebarSelectionHighlight: NSViewRepresentable {
+    let isEmphasized: Bool
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .selection
+        view.blendingMode = .withinWindow
+        view.state = .followsWindowActiveState
+        view.isEmphasized = isEmphasized
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        view.isEmphasized = isEmphasized
     }
 }

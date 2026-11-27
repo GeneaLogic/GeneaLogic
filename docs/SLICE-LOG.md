@@ -4510,8 +4510,11 @@ been two slices.
 - **86 — a visible trash** (app, plus engine reads; no format change). G7: #42, #4.
   **Decided:** the trash is an area (`ArchiveTab.trash`), pinned under the sidebar's
   list with a count hidden at zero, and the sheet is gone. **From the hand-test:** a
-  footer, since as the list's last row it scrolled away below People; a button drawn as
-  a row, since a one-row list took Tab focus without selecting; the empty can dims (a
+  footer, since as the list's last row it scrolled away below People; a focusable row
+  drawn as the list's, since a one-row list took Tab focus without selecting and a
+  `Button` never takes focus from a click, so it could only show the unfocused gray. Its
+  highlight is the `.selection` material, not the flat selection colors, which came out a
+  shade off beside the list's vibrant one. The empty can dims (a
   full-trash symbol is #92); Empty Trash… is a command (⇧⌘⌫, the row's context menu);
   the Trash's rows are in a scroll view, since a `List` row's buttons are no Tab stops.
   VoiceOver reads one string for the row, so the count is in its label, and
