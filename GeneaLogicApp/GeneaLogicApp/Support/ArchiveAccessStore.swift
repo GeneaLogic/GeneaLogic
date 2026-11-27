@@ -23,7 +23,7 @@ import Foundation
 ///
 /// Live scope is session-scoped (it holds URL objects, not bookmarks). Persistence
 /// *across* relaunch is delegated to `ArchiveBookmarks`: `acquire` records an
-/// app-scoped bookmark, and `ensureAccess` re-derives a live scope from one when a
+/// app-scoped bookmark, and `restore` re-derives a live scope from one when a
 /// restored / reopened window arrives without it (ARCHITECTURE.md §7).
 @MainActor
 final class ArchiveAccessStore {
@@ -73,6 +73,10 @@ final class ArchiveAccessStore {
         return true
     }
 
+    /// Whether a window holds `url`'s slot: a window restored for a moved archive, finding
+    /// its new path already claimed, is the duplicate (85c's `/code-review`).
+    func isClaimed(_ url: URL) -> Bool { windowClaims[url.canonicalArchiveURL] != nil }
+
     /// Relinquishes `url`'s window slot if `token` owns it. Returns `true` when this
     /// window was the owner — the signal to also `release(_:)` the archive's access
     /// (a dismissed *duplicate* was never the owner, so it must **not** release the
@@ -101,43 +105,53 @@ final class ArchiveAccessStore {
         ArchiveBookmarks.shared.remember(url)
     }
 
-    /// Ensures session access to `url` is held — the restore/reopen path. If a live
-    /// scope already exists (e.g. `acquire` ran first), it's a no-op success. Else
-    /// it resolves the persisted bookmark for `url`, starts a scope on the resolved
-    /// URL, and retains it under `url`'s key (so the later `release(url)` balances).
-    /// Returns whether access is now available — `false` means no usable bookmark
-    /// (never opened here, or the archive moved/was deleted), and the caller should
-    /// surface a "couldn't reopen" state.
-    @discardableResult
-    func ensureAccess(to url: URL) -> Bool {
-        let key = url.canonicalArchiveURL
-        if held[key] != nil { return true }
-        guard let resolved = ArchiveBookmarks.shared.resolve(url) else { return false }
-        let started = resolved.startAccessingSecurityScopedResource()
-        held[key] = Entry(url: resolved, started: started)
-        return true
+    /// What `restore` found: where to open the archive, and whether the call took access
+    /// to it. The window that took access releases it if nothing claimed the archive
+    /// (85c's `/code-review`): until a container claims the window, nothing else would.
+    struct Restored {
+        let location: URL
+        let tookAccess: Bool
     }
 
-    /// Reopens a **recent** archive: canonicalizes `url`, re-derives sandbox access
-    /// from its persisted bookmark, and — on success — bumps it to the top of Recent
-    /// (TextEdit-style). Returns the canonical URL the caller opens a window for
-    /// (`openWindow(value:)`): **where the archive is now**, if its bookmark followed a
-    /// move or rename (slice 85b). A failed reopen isn't promoted — the dead bookmark is
-    /// pruned, and the opened window then shows the "couldn't reopen" state. The single
-    /// source of the recent-reopen policy, shared by File ▸ Open Recent and the welcome
-    /// window's Recent list.
+    /// Re-derives access to the archive a window was restored with (slice 85c), or one
+    /// reopened from Recent, and returns the canonical URL to open it at: **where the
+    /// archive is now**, if its bookmark followed a move or rename. Already held — an open
+    /// in this session — it is left alone. When nothing resolves, `url` comes back with no
+    /// access held, and the window shows the "couldn't reopen" state.
+    ///
+    /// The rules are `ArchiveBookmarks.resolveRecent`'s: only a move the bookmark saw,
+    /// another spelling of the same folder is not one, and an archive in the Trash is not
+    /// opened there. A restore doesn't promote the recent; relaunching isn't opening.
+    ///
+    /// **The one resolve on the way to a window.** `ArchiveModel.load()` only checks
+    /// `isHolding`: when it resolved too (`ensureAccess`, before 85c's `/code-review`), a
+    /// second resolve could follow a move the window hadn't, re-keying the bookmark to a
+    /// path the window would never restore at.
+    @discardableResult
+    func restore(_ url: URL, bookmarks: ArchiveBookmarks = .shared) -> Restored {
+        let key = url.canonicalArchiveURL
+        guard held[key] == nil else { return Restored(location: key, tookAccess: false) }
+        guard let resolved = bookmarks.resolveRecent(key) else {
+            return Restored(location: key, tookAccess: false)
+        }
+        let target = resolved.location.canonicalArchiveURL
+        guard held[target] == nil else { return Restored(location: target, tookAccess: false) }
+        let started = resolved.scoped.startAccessingSecurityScopedResource()
+        held[target] = Entry(url: resolved.scoped, started: started)
+        // Already held, it was opened there, which told the system's list.
+        if target != key { bookmarks.noteMove(to: target) }
+        return Restored(location: target, tookAccess: true)
+    }
+
+    /// Reopens a **recent** archive: `restore`, then — on success — bumps it to the top of
+    /// Recent (TextEdit-style). Returns the canonical URL the caller opens a window for
+    /// (`openWindow(value:)`), where the archive is now (slice 85b). A failed reopen isn't
+    /// promoted — the dead bookmark is pruned, and the opened window then shows the
+    /// "couldn't reopen" state. The single source of the recent-reopen policy, shared by
+    /// File ▸ Open Recent and the welcome window's Recent list.
     @discardableResult
     func reopenRecent(_ url: URL, bookmarks: ArchiveBookmarks = .shared) -> URL {
-        var target = url.canonicalArchiveURL
-        // Already open, so already reachable here: its window takes the focus.
-        if held[target] == nil {
-            guard let resolved = bookmarks.resolveRecent(target) else { return target }
-            target = resolved.location.canonicalArchiveURL
-            if held[target] == nil {
-                let started = resolved.scoped.startAccessingSecurityScopedResource()
-                held[target] = Entry(url: resolved.scoped, started: started)
-            }
-        }
+        let target = restore(url, bookmarks: bookmarks).location
         bookmarks.promote(target)
         return target
     }
@@ -150,8 +164,8 @@ final class ArchiveAccessStore {
     ///
     /// A test seam (slice 52's app test target), in the same spirit as
     /// `Archive.lockTimeout`. Tests build archives under the host's own container,
-    /// which needs no security scope, but `ensureAccess` still refuses them
-    /// because there is neither a live entry nor a saved bookmark. Going through
+    /// which needs no security scope, but `load()` still refuses them
+    /// because there is no live entry. Going through
     /// `acquire` instead would mint a real security-scoped bookmark and write it
     /// into the *developer's own* app defaults, which is both a side effect on the
     /// user's Open Recent menu and slow enough under the test host's sandbox to

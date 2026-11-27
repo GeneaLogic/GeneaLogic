@@ -8,7 +8,7 @@ import Foundation
 ///
 /// Two concerns, deliberately separate:
 ///   - **`bookmarks`** (`path → Data`) is the *access* mechanism — the source of
-///     truth that `ArchiveAccessStore.ensureAccess` resolves on window restore /
+///     truth that `ArchiveAccessStore.restore` resolves on window restore /
 ///     reopen. Pruned only when a bookmark fails to resolve (archive deleted).
 ///   - **`recents`** (ordered `[path]`) is the *display* list behind File ▸ Open
 ///     Recent. "Clear Menu" empties it but leaves the bookmarks intact, so an
@@ -86,6 +86,14 @@ final class ArchiveBookmarks {
         systemRecents.note(url)
     }
 
+    /// Tells the system's list (the Dock menu) that a restored archive is now at `url`,
+    /// leaving the app's own list as it is: a restore doesn't promote. The system's entry
+    /// takes the new name, with no second entry, but goes to the front — its list has no
+    /// rename (85c's hand-test). Needs `url`'s sandbox access.
+    func noteMove(to url: URL) {
+        systemRecents.note(url)
+    }
+
     /// Front-inserts `key` into the recents list, de-duplicated and capped.
     private func moveToFront(_ key: String) {
         var paths = recents
@@ -139,7 +147,8 @@ final class ArchiveBookmarks {
     /// bookmark finds it somewhere else, the bookmark and the recent take that path, so the
     /// archive opens where it is. `nil` when there is nothing to open: no bookmark, one that
     /// no longer resolves (and the entry is pruned, as `resolve` does), or an archive moved
-    /// to the Trash, which is left listed in case it is put back. The caller promotes it.
+    /// to the Trash, which is left listed in case it is put back. Its recent keeps its place;
+    /// a reopen promotes it, a restore doesn't.
     ///
     /// Only a move the bookmark saw: one resolves by path first, so an archive put at the
     /// old path is the one that opens, as before. And only a move: a path spelled another
@@ -156,12 +165,24 @@ final class ArchiveBookmarks {
         let moved = Self.identity(of: URL(fileURLWithPath: old)) != Self.identity(of: resolved)
         if started { resolved.stopAccessingSecurityScopedResource() }
         guard moved else { return ResolvedRecent(scoped: resolved, location: url) }
+        // The old path's bookmark moves to the new one, unless the new path has its own: an
+        // open there (a Finder double-click at launch) minted a fresher one (85c's
+        // `/code-review`).
         var all = bookmarkData()
-        all[new] = all.removeValue(forKey: old)
+        let carried = all.removeValue(forKey: old)
+        if all[new] == nil { all[new] = carried }
         setBookmarkData(all)
-        // The new path goes to the front when the caller promotes it.
-        setRecents(recents.filter { $0 != old })
-        // The system's entry followed the move already.
+        // The new path takes the old one's place: a restore doesn't promote, and a reopen
+        // brings it to the front itself (slice 85c). One already listed keeps its own place,
+        // and a cleared menu stays cleared.
+        if recents.contains(new) {
+            setRecents(recents.filter { $0 != old })
+        } else {
+            setRecents(recents.map { $0 == old ? new : $0 })
+        }
+        // The system's entry keeps working, its bookmark following the move, but it keeps the
+        // old name until it is told the new path (85c's hand-test). The caller tells it,
+        // holding access: `noteMove`.
         return ResolvedRecent(scoped: resolved, location: resolved)
     }
 

@@ -486,15 +486,15 @@ final class ArchiveModel {
     /// Opens the archive at `url` and loads its artifact list. Idempotent — a
     /// no-op once the archive is open.
     ///
-    /// Ensures security-scoped access first: for a freshly opened archive the
-    /// opener already `acquire`d it (no-op here); for a window **restored across
-    /// relaunch** (or reopened from a stale URL) no live scope exists, so this
-    /// re-derives one from the persisted bookmark. If that fails — the archive was
-    /// moved or deleted since it was last open — it reports a clear, actionable
-    /// error instead of an opaque permissions failure.
+    /// Checks security-scoped access first, without resolving anything: for a freshly
+    /// opened archive the opener already `acquire`d it, and for a window **restored
+    /// across relaunch** `ArchiveWindow` re-derived it from the persisted bookmark,
+    /// following a move (`ArchiveAccessStore.restore`, slice 85c). If there is none — the
+    /// archive was deleted, or is in the Trash — it reports a clear, actionable error
+    /// instead of an opaque permissions failure.
     func load() {
         guard archive == nil else { return }
-        guard ArchiveAccessStore.shared.ensureAccess(to: url) else {
+        guard ArchiveAccessStore.shared.isHolding(url) else {
             openError =
                 "GeneaLogic can no longer reach this archive — it may have been moved, "
                 + "renamed, or deleted. Open it again from File ▸ Open Archive…"

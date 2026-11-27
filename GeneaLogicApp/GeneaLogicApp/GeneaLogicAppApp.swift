@@ -25,7 +25,7 @@ struct GeneaLogicAppApp: App {
         // First, so it is the app's primary scene: a primary `Window` quits the app when
         // it closes.
         WindowGroup(for: URL.self) { $url in
-            ArchiveWindow(url: url)
+            ArchiveWindow(url: $url)
         }
         // The delegate opens documents. Without this, SwiftUI also spawned an empty window
         // to deliver each one to.
@@ -38,10 +38,10 @@ struct GeneaLogicAppApp: App {
         // (clean-slate users get a clean slate; restore users get their windows
         // back). The system persists each window's bare `URL` value, which carries
         // no live sandbox scope, so a restored window re-derives one from that
-        // archive's app-scoped bookmark in `ArchiveModel.load()` (via
-        // `ArchiveAccessStore.ensureAccess`); a window whose archive has since been
-        // moved/deleted shows a clear "can no longer reach this archive" state.
-        // (ARCHITECTURE.md §7.)
+        // archive's app-scoped bookmark (`ArchiveAccessStore.restore`, in
+        // `ArchiveWindow`). One whose archive was moved or renamed takes its new URL
+        // (slice 85c); one whose archive is gone or in the Trash shows a clear "can no
+        // longer reach this archive" state. (ARCHITECTURE.md §7.)
         .restorationBehavior(.automatic)
         // An archive's first window opens at this size; a reopened one keeps its own. The minimum is `ArchiveContainerView`'s (slice 81, G9).
         .defaultSize(width: Layout.ArchiveWindow.defaultWidth, height: Layout.ArchiveWindow.defaultHeight)
