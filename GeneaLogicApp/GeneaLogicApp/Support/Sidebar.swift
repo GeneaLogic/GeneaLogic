@@ -2,13 +2,14 @@ import GeneaLogicArchive
 import GeneaLogicModel
 
 /// The window's one sidebar (slice 84): **Review, Artifacts and People** as sections of
-/// one list, each section an area's collection, and the **Trash** row at its foot (86). The types here are the sidebar's logic
-/// with no SwiftUI in it, so it can be tested as values: which area a row belongs to,
+/// one list, each section an area's collection, and the **Trash** pinned below it (86).
+/// The types here are the sidebar's logic with no SwiftUI in it, so it can be tested as values: which area a row belongs to,
 /// where a switch of area scrolls to, what a header's count says, and the order of
 /// Review's rows.
 
 /// One of the sidebar's sections, in the sidebar's order. Review is first: it is the work
-/// owed. Trash is last, and is one row with no header, so it never collapses.
+/// owed. Trash is last: one row, pinned under the list rather than in it, so it neither
+/// collapses nor scrolls away.
 enum SidebarSection: String, CaseIterable, Identifiable {
     case review, artifacts, people, trash
 

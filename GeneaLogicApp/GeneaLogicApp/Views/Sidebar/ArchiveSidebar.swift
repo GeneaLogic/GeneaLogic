@@ -3,9 +3,14 @@ import GeneaLogicModel
 import SwiftUI
 
 /// The window's one sidebar (slice 84): **Review, Artifacts and People** as collapsible
-/// sections of one list, each an area's collection, and the **Trash** row at its foot
-/// (slice 86), as Notes and Mail end theirs with Recently Deleted. Selecting a row sets
-/// the area (`SidebarSelection`); the detail column shows that area's item.
+/// sections of one list, each an area's collection, and the **Trash** pinned below the
+/// list (slice 86), always in view: a delete asks nothing, so where it went must not
+/// scroll away (86's hand-test). Selecting a row sets the area (`SidebarSelection`); the
+/// detail column shows that area's item.
+///
+/// The Trash is a one-row list of its own, so it keeps the sidebar's selection, badge
+/// and VoiceOver. The arrow keys don't cross from the main list into it, as they don't
+/// reach a Finder sidebar's footer; a click, Tab or File ▸ Show Trash does.
 ///
 /// **Why one sidebar** ([#39](https://github.com/GeneaLogic/GeneaLogic/issues/39)): the
 /// area was a toolbar control and its collection the sidebar, so the switcher read as,
@@ -62,17 +67,31 @@ struct ArchiveSidebar: View {
         let artifacts = ShownArtifacts(
             displayed: model.displayedArtifacts, uncataloguedOnly: uncataloguedOnly)
         let selectedRowShows = selection.item.map { rowShows($0, artifacts: artifacts) } ?? false
-        ScrollViewReader { proxy in
-            list(artifacts)
-                .onChange(of: revealRequest) { reveal(proxy, artifacts: artifacts) }
+        // The Trash, pinned below the list so it stays in view however long the sections
+        // run (86's hand-test). Under the list rather than inset into it: an inset drew
+        // over the rows, which showed through.
+        VStack(spacing: 0) {
+            ScrollViewReader { proxy in
+                list(artifacts)
+                    .onChange(of: revealRequest) { reveal(proxy, artifacts: artifacts) }
                 // `List` doesn't follow a selection set from outside, and plenty sets it:
                 // the List | Tree control, a refocus in the tree, Review's keys walking
                 // down the worklist, a record just created. Whatever moved the area or its
                 // selection, the selected row is brought into view, no further than it
                 // has to go — so a row just clicked doesn't move (84's hand-test).
-                .onChange(of: selection.area) { keepSelectionInView(proxy) }
-                .onChange(of: selection.item) { keepSelectionInView(proxy) }
+                    .onChange(of: selection.area) { keepSelectionInView(proxy) }
+                    .onChange(of: selection.item) { keepSelectionInView(proxy) }
+            }
+            if !isSearching {
+                Divider()
+                trashFooter
+            }
         }
+        // On the sidebar column's root, which keeps it a sidebar field: on a view that
+        // isn't the leading column's root it becomes a toolbar field (seen in 84's
+        // prototype).
+        .searchable(text: searchText, placement: .sidebar, prompt: "Search")
+        .searchFocused(isSearchFocused)
         .onChange(of: listSelection) { _, item in
             if let item, item != selection.item { selection.select(item) }
         }
@@ -144,15 +163,8 @@ struct ArchiveSidebar: View {
                     isExpanded: Binding(get: { peopleExpanded }, set: { peopleExpanded = $0 })
                 ) { EmptyView() }
             }
-            if !isSearching {
-                Section { trashRow }
-            }
         }
         .listStyle(.sidebar)
-        // On the sidebar column, which keeps it a sidebar field: on a list that isn't the
-        // leading column it becomes a toolbar field (seen in 84's prototype).
-        .searchable(text: searchText, placement: .sidebar, prompt: "Search")
-        .searchFocused(isSearchFocused)
         // ⌫ does what the context menu does: an artifact moves to the Trash at once
         // (slice 86), a person asks first. On the selected row, so from the tree too.
         .onDeleteCommand {
@@ -268,6 +280,21 @@ struct ArchiveSidebar: View {
     }
 
     // MARK: - Trash
+
+    /// The Trash row as a one-row list of its own, so it keeps the sidebar's selection,
+    /// badge and VoiceOver, pinned under the main list.
+    private var trashFooter: some View {
+        List(
+            selection: Binding(
+                get: { selection.area == .trash ? SidebarItem.trash : nil },
+                set: { if $0 == .trash { selection.select(.trash) } })
+        ) {
+            trashRow
+        }
+        .listStyle(.sidebar)
+        .scrollDisabled(true)
+        .frame(height: 44)
+    }
 
     /// The Trash row (slice 86): the place, with how much it holds. The icon names the
     /// place and doesn't report state, as a sidebar's icons don't (fork 2); the count
