@@ -139,7 +139,8 @@ final class ArchiveBookmarks {
     /// bookmark finds it somewhere else, the bookmark and the recent take that path, so the
     /// archive opens where it is. `nil` when there is nothing to open: no bookmark, one that
     /// no longer resolves (and the entry is pruned, as `resolve` does), or an archive moved
-    /// to the Trash, which is left listed in case it is put back. The caller promotes it.
+    /// to the Trash, which is left listed in case it is put back. Its recent keeps its place;
+    /// a reopen promotes it, a restore doesn't.
     ///
     /// Only a move the bookmark saw: one resolves by path first, so an archive put at the
     /// old path is the one that opens, as before. And only a move: a path spelled another
@@ -159,8 +160,11 @@ final class ArchiveBookmarks {
         var all = bookmarkData()
         all[new] = all.removeValue(forKey: old)
         setBookmarkData(all)
-        // The new path goes to the front when the caller promotes it.
-        setRecents(recents.filter { $0 != old })
+        // The new path takes the old one's place: a restore doesn't promote, and a reopen
+        // brings it to the front itself (slice 85c). A cleared menu stays cleared.
+        var paths = recents.filter { $0 != new }
+        if let index = paths.firstIndex(of: old) { paths[index] = new }
+        setRecents(paths)
         // The system's entry followed the move already.
         return ResolvedRecent(scoped: resolved, location: resolved)
     }

@@ -4488,6 +4488,19 @@ been two slices.
   on macOS 27.2 (26 untested), and an archive window is complex enough without them. A
   window restored for a moved archive still fails: #86.
 
+- **85c — a restored window follows its archive** (app; no format change). #86.
+  **Decided:** the window's value is rewritten through the `WindowGroup(for: URL.self)`
+  binding, in `ArchiveWindow`, before the archive's view exists. So the dedup key, the
+  claim, the title, 85's state and the next launch's restore all take the new path at
+  once, and `ArchiveModel.url` stays a `let`. Reopening in a second window instead would
+  flash two and race the coordinator's deferred Finder-open. **The invariant:** one
+  resolve, `ArchiveAccessStore.restore`, behind a restored window, Open Recent
+  (`reopenRecent` = `restore` + `promote`) and `load()`'s `ensureAccess`, so all three
+  keep 85b's rules. A restore doesn't promote: the moved recent takes the old one's
+  place. **Gotcha:** `ensureAccess` resolved the bookmark on its own, so it reported
+  access to an archive moved into the Trash and to a moved one while `load()` opened the
+  old path. Only Open Recent had the rules.
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the

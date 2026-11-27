@@ -1167,8 +1167,9 @@ GeneaLogicKit.
 > moved or renamed archive keeps it, and a copy starts fresh (slice 85). Not keyed
 > through the bookmark, which resolves by path first. Recents are `ArchiveBookmarks`' own
 > list. The system's (the Dock menu, and Apple ▸ Recent Items) is told of each open and of
-> Clear Menu, never of a removal, and never read for the app's menus (slice 85b). Reopening a recent follows its bookmark,
-> so a moved or renamed archive opens where it is now, and its recent moves with it.
+> Clear Menu, never of a removal, and never read for the app's menus (slice 85b). Reopening a recent, and
+> restoring a window, follow its bookmark (`ArchiveAccessStore.restore`), so a moved or renamed archive opens where
+> it is now and its recent moves with it; a restored window takes the new URL as its value (slice 85c).
 
 **Shipped so far (Phase 2, slices 1–10):** open/create + browse a `.genea`;
 drag-in / Add Media ingest via `GeneaLogicExtract` with read-only embedded-metadata
