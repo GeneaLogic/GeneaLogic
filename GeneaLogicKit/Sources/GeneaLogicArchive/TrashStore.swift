@@ -94,6 +94,21 @@ enum TrashStore {
         return result.sorted { $0.entry.deletedAt > $1.entry.deletedAt }
     }
 
+    /// How many entries the trash holds, **without reading any** (slice 86): one
+    /// directory listing, about a millisecond for a thousand entries, where the full
+    /// listing takes some 30 ms (measured, release). Cheap enough to ask on every refresh.
+    ///
+    /// It can count higher than `entries(in:)` lists, by an entry whose `deletion.json`
+    /// is missing or won't decode. The first is a torn stash, which the next open drops
+    /// (`reconcileAfterInterruptedWrite`); the second is damage. A `stat` of each record
+    /// would rule out the first and cost nine times the listing.
+    static func entryCount(in root: URL) -> Int {
+        let trashDir = ArchiveLayout.trashDirectory(in: root)
+        let dirs = try? FileManager.default.contentsOfDirectory(
+            at: trashDir, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
+        return dirs?.count ?? 0
+    }
+
     /// The decoded `deletion.json` for `uid`, or `nil` if absent/undecodable.
     static func entry(uid: String, in root: URL) -> TrashEntry? {
         let recordURL = ArchiveLayout.trashRecordURL(in: root, uid: uid)

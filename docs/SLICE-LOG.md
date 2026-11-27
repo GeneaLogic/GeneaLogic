@@ -4507,6 +4507,22 @@ been two slices.
   restore tells it, which also brings it to the front (hand-test; 85b's "it follows"
   was half true).
 
+- **86 — a visible trash** (app, plus engine reads; no format change). G7: #42, #4.
+  **Decided:** the trash is an area (`ArchiveTab.trash`), the sidebar's last row with a
+  count hidden at zero, and the sheet is gone. File ▸ Show Trash selects it; it has no
+  ⌘-number, so the View menu walks `ArchiveTab.numbered`, not `allCases`. Moving an
+  artifact or a file to the Trash no longer asks; Delete Person… still does (#11). #4 is
+  fixed at read time: `trashedFiles()` names the artifact's current title, else its trashed
+  entry's, else the one `deletion.json` stored. **The invariant:** a refresh reads only
+  `trashedItemCount()` (one directory listing); the listings are read only while the
+  Trash shows. **Measured, as the spec asked** (1,000 entries, release): the two listings
+  take ~60 ms, all I/O on each entry's `deletion.json`. A `stat` per record to make the
+  count exact costs ~10 ms, and the listing alone ~1.5 ms. The count can run high only by
+  a torn or undecodable entry, and where the list shows, its own count stands in.
+  **Gotcha:** a purge by another process (`genea trash empty`) commits nothing to the
+  index, so the window's poll doesn't notice it until its next refresh. An mtime cache
+  for `.trash/` was rejected: an entry's folder appears before its record does.
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the

@@ -105,6 +105,21 @@ final class ArchiveModel {
     /// moves the scene-stored selection there, and clears it back to `nil`.
     var lastCreatedPerson: PersonID?
 
+    // MARK: Trash
+
+    /// What the sidebar's Trash row counts: trashed artifacts plus trashed files (slice
+    /// 86, fork 2). Reloaded by `load()`, every `refresh()` and the trash's own purges
+    /// (`reloadTrash`), so it stays live.
+    var trashCount = 0
+
+    /// The archive's trashed artifacts and files, most recently deleted first: what the
+    /// Trash area lists. **Read only while the Trash shows**, and on the way in: the full
+    /// listing reads every entry's `deletion.json`, about 60 ms per thousand entries
+    /// (measured, release), which is too much to add to every mutation. Elsewhere they
+    /// are left as they were, and the count comes from one directory listing.
+    var trashedArtifacts: [TrashedArtifact] = []
+    var trashedFiles: [TrashedFile] = []
+
     // MARK: Integrity
 
     /// What `Archive.standingFindings()` last reported: records that could not be
@@ -332,7 +347,10 @@ final class ArchiveModel {
     /// The active window tab, mirrored from the window's stored state. Commands
     /// that belong to a tab gate on it (`CommandContext.canPerform`), so they don't act
     /// on a stale selection while another tab is showing.
-    var activeTab: ArchiveTab = .artifacts
+    var activeTab: ArchiveTab = .artifacts {
+        // The Trash's listings are read only while it shows (`trashedArtifacts`).
+        didSet { if activeTab == .trash, oldValue != .trash { reloadTrash() } }
+    }
 
     /// The command a view owns, waiting for that view to run it (slice 82). One intent
     /// for every such command; each owning view claims the ones it runs
@@ -376,9 +394,6 @@ final class ArchiveModel {
 
     /// Drives the integrity-report sheet (File ▸ Verify Integrity…).
     var isShowingIntegrityReport = false
-
-    /// Drives the trash sheet (File ▸ Show Trash…).
-    var isShowingTrash = false
 
     /// Drives the New Person sheet (File ▸ New Person…, the People toolbar's +).
     var isCreatingPerson = false
@@ -507,6 +522,7 @@ final class ArchiveModel {
             reloadPersons()
             reloadStandingFindings()
             reloadFileDamage()
+            reloadTrash()
             // Baseline for external-change detection: everything on screen is
             // current as of this token, so only a *later* value means somebody
             // else wrote.
@@ -561,6 +577,9 @@ final class ArchiveModel {
         // 57's half of the same idea, and the one that catches damage nothing has
         // recorded yet. Off the main actor, so it does not ride this call's cost.
         reloadFileDamage()
+        // The count is one directory listing, about 2 ms for a thousand entries (slice 86),
+        // so it rides every refresh; the listings only while the Trash shows.
+        reloadTrash()
         // After the people list, which the worklist's candidate names read. Every window
         // loads the worklist at open since slice 84, for Review's count in the sidebar, so
         // every mutation pays this sweep (see `refreshReviewWorklist`).
@@ -658,8 +677,9 @@ final class ArchiveModel {
     /// tear something down a write depends on — and 52's `/code-review` found
     /// that all three had been left behind by the move to async writes:
     ///
-    /// - `TrashSheet` holds its own `trashedArtifacts()`/`trashedFiles()` arrays
+    /// - The trash sheet held its own `trashedArtifacts()`/`trashedFiles()` arrays
     ///   and reloaded them in the same turn as the mutation, so rows never left.
+    ///   (Since slice 86 the model holds them, and the sheet is gone.)
     /// - `IntegrityReportSheet` re-runs its own sweep after a repair, and reads
     ///   `actionError` to report a failure the sheet would otherwise hide.
     /// - The archive window releases its security scope on close, which must not

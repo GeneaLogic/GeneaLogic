@@ -395,6 +395,59 @@ import Testing
         #expect(!(trashed.first?.deletedAt.isEmpty ?? true))
     }
 
+    /// Slice 86 (#4): a trashed file names its artifact as it is now — renamed, then in
+    /// the trash itself — and only falls back to the title stored at deletion once the
+    /// artifact is gone for good.
+    @Test func trashedFileNamesItsArtifactsCurrentTitle() throws {
+        let root = TestSupport.makeTempDirectory()
+        let archive = try Archive.create(at: root)
+        let artifact = try archive.addArtifact(.sample(title: "Old title"))
+        let source = try TestSupport.makeSourceFile(named: "cert.pdf", contents: "certificate")
+        let attached = try archive.attachFile(
+            copyingFrom: source, to: artifact.uid, role: .accessCopy)
+        try archive.detachFile(attached.entry.uid, in: artifact.uid)
+
+        try archive.updateMetadata(of: artifact.uid) { $0.title = "New title" }
+        #expect(archive.trashedFiles().map(\.artifactTitle) == ["New title"])
+
+        _ = try archive.removeArtifact(artifact.uid)
+        #expect(archive.trashedFiles().map(\.artifactTitle) == ["New title"])
+
+        try archive.deleteFromTrash(artifact.uid)
+        #expect(archive.trashedFiles().map(\.artifactTitle) == ["Old title"])
+    }
+
+    /// Slice 86: the count a trash badge shows agrees with the two listings, through a
+    /// detach, an artifact delete, a restore, a purge and an empty.
+    @Test func trashedItemCountFollowsTheListings() throws {
+        let root = TestSupport.makeTempDirectory()
+        let archive = try Archive.create(at: root)
+        func agrees() -> Bool {
+            archive.trashedItemCount()
+                == archive.trashedArtifacts().count + archive.trashedFiles().count
+        }
+        #expect(archive.trashedItemCount() == 0)
+
+        let kept = try archive.addArtifact(.sample(title: "Keeps a file"))
+        let source = try TestSupport.makeSourceFile(named: "a.txt", contents: "a")
+        let attached = try archive.attachFile(copyingFrom: source, to: kept.uid, role: .accessCopy)
+        try archive.detachFile(attached.entry.uid, in: kept.uid)
+        let gone = try archive.addArtifact(.sample(title: "Goes"))
+        _ = try archive.removeArtifact(gone.uid)
+        #expect(archive.trashedItemCount() == 2 && agrees())
+
+        _ = try archive.restoreFromTrash(gone.uid)
+        #expect(archive.trashedItemCount() == 1 && agrees())
+
+        try archive.deleteFileFromTrash(attached.entry.uid)
+        #expect(archive.trashedItemCount() == 0 && agrees())
+
+        _ = try archive.removeArtifact(gone.uid)
+        #expect(archive.trashedItemCount() == 1 && agrees())
+        try archive.emptyTrash()
+        #expect(archive.trashedItemCount() == 0 && agrees())
+    }
+
     @Test func restoreFileReattachesItAndClearsEntry() throws {
         let root = TestSupport.makeTempDirectory()
         let archive = try Archive.create(at: root)

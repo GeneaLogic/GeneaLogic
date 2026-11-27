@@ -90,6 +90,22 @@ import Testing
         #expect(decoded.treeAncestorDepth == 3)
     }
 
+    /// Slice 86: a window left on Trash comes back to it. A build that doesn't know an
+    /// area reads the record and falls back to Artifacts rather than failing, as one
+    /// before 86 does with `"trash"` (its `ArchiveTab(rawValue:) ?? .artifacts`).
+    @Test func aWindowLeftOnTrashRestoresToIt() throws {
+        var left = WindowState()
+        left.tab = ArchiveTab.trash.rawValue
+        let decoded = try JSONDecoder().decode(
+            WindowState.self, from: JSONEncoder().encode(left))
+        #expect(ArchiveTab(stored: decoded.tab) == .trash)
+
+        let later = try JSONDecoder().decode(
+            WindowState.self, from: Data(#"{"tab":"somewhereLater","sidebarWidth":300}"#.utf8))
+        #expect(ArchiveTab(stored: later.tab) == .artifacts)
+        #expect(later.sidebarWidth == 300)
+    }
+
     // MARK: - Finding it again
 
     @Test func aReopenFindsIt() throws {

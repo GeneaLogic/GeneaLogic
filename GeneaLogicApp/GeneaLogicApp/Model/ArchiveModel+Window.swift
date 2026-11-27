@@ -96,7 +96,7 @@ extension ArchiveModel {
     /// drives, and the ones views report (`reportsModal`).
     var isPresentingModal: Bool {
         !presentedModals.isEmpty || isImporterPresented || isShowingIntegrityReport
-            || isShowingTrash || isCreatingPerson || isShowingError || isShowingInfo
+            || isCreatingPerson || isShowingError || isShowingInfo
     }
 
     /// Runs `command` on `subject`, if it can run now. Commands the model can run itself
@@ -115,8 +115,16 @@ extension ArchiveModel {
         case .newPerson:
             isCreatingPerson = true
         case .verifyIntegrity: beginVerifyIntegrity()
-        case .showTrash: beginShowTrash()
-        case .showArtifacts, .showPeople, .showTree, .showReview: pendingTab = command.shownTab
+        case .showArtifacts, .showPeople, .showTree, .showReview, .showTrash:
+            pendingTab = command.shownTab
+        // The two trash-backed deletes run at once (slice 86, fork 3): ⌘Z undoes them and
+        // the Trash keeps them across a quit. Delete Person… still confirms, in its view.
+        case .deleteArtifact:
+            if case .artifact(let id) = subject { deleteArtifact(id) }
+        case .deleteFile:
+            if case .file(let fileID, let artifactID) = subject {
+                detachFile(fileID, from: artifactID)
+            }
         // Straight to the file importer, *not* the Continuity connected menu: an AppKit
         // `popUpContextMenu` invoked from a menu-bar command has no anchor view and
         // floats as a disconnected menu. The in-pane Attach File… keeps the scan options
@@ -247,11 +255,6 @@ extension ArchiveModel {
     /// runs the verification itself, off this synchronous call.
     func beginVerifyIntegrity() {
         isShowingIntegrityReport = true
-    }
-
-    /// Presents the trash sheet (File ▸ Show Trash…).
-    func beginShowTrash() {
-        isShowingTrash = true
     }
 
     // MARK: - Navigation

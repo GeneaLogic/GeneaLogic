@@ -3,8 +3,9 @@ import GeneaLogicModel
 import SwiftUI
 
 /// The window's one sidebar (slice 84): **Review, Artifacts and People** as collapsible
-/// sections of one list, each an area's collection. Selecting a row sets the area
-/// (`SidebarSelection`); the detail column shows that area's item.
+/// sections of one list, each an area's collection, and the **Trash** row at its foot
+/// (slice 86), as Notes and Mail end theirs with Recently Deleted. Selecting a row sets
+/// the area (`SidebarSelection`); the detail column shows that area's item.
 ///
 /// **Why one sidebar** ([#39](https://github.com/GeneaLogic/GeneaLogic/issues/39)): the
 /// area was a toolbar control and its collection the sidebar, so the switcher read as,
@@ -12,9 +13,10 @@ import SwiftUI
 /// column of areas left the document 30 pt at the window's minimum width with the
 /// inspector open; this keeps what the two-column window had.
 ///
-/// One search field filters Artifacts and People. **Review's section hides while a
-/// search is active**, so the results start at the top and nothing unfiltered sits
-/// among them: the worklist was never searchable, because filtering work owed hides it.
+/// One search field filters Artifacts and People. **Review's section and the Trash row
+/// hide while a search is active**, so the results start at the top and nothing
+/// unfiltered sits among them: the worklist was never searchable, because filtering work
+/// owed hides it, and the trash isn't searched.
 struct ArchiveSidebar: View {
     @Environment(ArchiveModel.self) private var model
     @Binding var selection: SidebarSelection
@@ -142,24 +144,26 @@ struct ArchiveSidebar: View {
                     isExpanded: Binding(get: { peopleExpanded }, set: { peopleExpanded = $0 })
                 ) { EmptyView() }
             }
+            if !isSearching {
+                Section { trashRow }
+            }
         }
         .listStyle(.sidebar)
         // On the sidebar column, which keeps it a sidebar field: on a list that isn't the
         // leading column it becomes a toolbar field (seen in 84's prototype).
         .searchable(text: searchText, placement: .sidebar, prompt: "Search")
         .searchFocused(isSearchFocused)
-        // ⌫ raises the same confirm as the context menu, not a silent delete. On the
-        // selected row, so from the tree too.
+        // ⌫ does what the context menu does: an artifact moves to the Trash at once
+        // (slice 86), a person asks first. On the selected row, so from the tree too.
         .onDeleteCommand {
             switch selection.item {
             case .artifact(let id):
                 model.perform(.deleteArtifact, on: .artifact(id), fromSidebar: true)
             case .person(let id):
                 model.perform(.deletePerson, on: .person(id), fromSidebar: true)
-            case .review, nil: break
+            case .review, .trash, nil: break
             }
         }
-        .modifier(ArtifactDeleteConfirmation())
         .modifier(PersonDeleteAndMerge())
     }
 
@@ -263,6 +267,20 @@ struct ArchiveSidebar: View {
         }
     }
 
+    // MARK: - Trash
+
+    /// The Trash row (slice 86): the place, with how much it holds. The icon names the
+    /// place and doesn't report state, as a sidebar's icons don't (fork 2); the count
+    /// does, and hides at zero.
+    private var trashRow: some View {
+        let count = model.trashCount
+        return Label(SidebarSection.trash.title, systemImage: ArchiveTab.trash.systemImage)
+            .badge(count)
+            .tag(SidebarItem.trash)
+            .id(SidebarRowID.item(.trash))
+            .accessibilityValue(count == 0 ? "Empty" : count == 1 ? "1 item" : "\(count) items")
+    }
+
     // MARK: - Rows shared by the sections
 
     /// Damaged-record placeholders (slice 56), pinned at the top of their section and
@@ -302,6 +320,9 @@ struct ArchiveSidebar: View {
 
     // MARK: - Reveal
 
+    /// The sections the list leaves out right now.
+    private var hidden: Set<SidebarSection> { SidebarSection.hidden(isSearching: isSearching) }
+
     private var collapsed: Set<SidebarSection> {
         var sections: Set<SidebarSection> = []
         if !reviewExpanded { sections.insert(.review) }
@@ -320,20 +341,21 @@ struct ArchiveSidebar: View {
                 || model.duplicateItems.contains { $0.id == id }
         case .artifact(let id): artifacts.visible.contains { $0.uid == id }
         case .person(let id): model.displayedPersons.contains { $0.uid == id }
+        case .trash: true
         }
     }
 
     /// Whether `item`'s row is on the list right now: listed, in an open section that
     /// isn't hidden.
     private func rowShows(_ item: SidebarItem, artifacts: ShownArtifacts) -> Bool {
-        !collapsed.contains(item.section) && !(isSearching && item.section == .review)
+        !collapsed.contains(item.section) && !hidden.contains(item.section)
             && isListed(item, artifacts: artifacts)
     }
 
     /// Scrolls the selected row into view, if its section is showing it.
     private func keepSelectionInView(_ proxy: ScrollViewProxy) {
         guard let item = selection.item, !collapsed.contains(item.section),
-            !(isSearching && item.section == .review)
+            !hidden.contains(item.section)
         else { return }
         let target = SidebarRowID.item(item)
         // Twice, for the reason `reveal` gives.
@@ -343,13 +365,13 @@ struct ArchiveSidebar: View {
 
     private func reveal(_ proxy: ScrollViewProxy, artifacts: ShownArtifacts) {
         let reveal = SidebarReveal(
-            for: selection, collapsed: collapsed, hidden: isSearching ? [.review] : []
+            for: selection, collapsed: collapsed, hidden: hidden
         ) { isListed($0, artifacts: artifacts) }
         switch reveal.expand {
         case .review: reviewExpanded = true
         case .artifacts: artifactsExpanded = true
         case .people: peopleExpanded = true
-        case nil: break
+        case .trash, nil: break
         }
         guard let target = reveal.target else { return }
         // Unanimated, and again once the list has laid out: rows below the fold have

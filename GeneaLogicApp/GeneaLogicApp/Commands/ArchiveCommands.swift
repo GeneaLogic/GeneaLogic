@@ -73,7 +73,7 @@ struct ArchiveCommands: Commands {
     private var viewMenuAdditions: some Commands {
         Group {
             CommandGroup(before: .sidebar) {
-                ForEach(ArchiveTab.allCases) { tab in
+                ForEach(ArchiveTab.numbered) { tab in
                     TabMenuItem(tab: tab, model: activeModel)
                 }
                 Divider()

@@ -39,10 +39,6 @@ struct ArtifactDetailView: View {
     /// `nil` shows no pane. Cleared when the artifact changes or the file goes away.
     @State private var selectedFileID: FileID?
 
-    /// The file a Delete File… is awaiting confirmation for, from the Artifact ▸ Selected
-    /// File menu or a file row's ⋯ menu.
-    @State private var confirmingFileDelete: FileEntry?
-
     /// The evidence links whose evidence side is this artifact — which person-mentions
     /// are resolved to a concluded person. Loaded with the record and reloaded off
     /// `mutationVersion` (see `filesLoadKey`), so a resolve/unlink refreshes the chips.
@@ -157,22 +153,6 @@ struct ArtifactDetailView: View {
             .environment(model)
         }
         .reportsModal(sheet != nil)
-        .confirmationDialog(
-            confirmingFileDelete.map { "Delete “\($0.originalName)”?" } ?? "",
-            isPresented: Binding(
-                get: { confirmingFileDelete != nil },
-                set: { if !$0 { confirmingFileDelete = nil } }),
-            titleVisibility: .visible, presenting: confirmingFileDelete
-        ) { entry in
-            Button("Delete File", role: .destructive) {
-                model.detachFile(entry.uid, from: artifact.uid)
-            }
-        } message: { _ in
-            Text(
-                "This moves the file to the Trash. Undo with ⌘Z, or restore it later from "
-                    + "File ▸ Show Trash.")
-        }
-        .reportsModal(confirmingFileDelete != nil)
         // Mirror the inspector's (view-owned) visibility down so the View menu can
         // label its toggle, and run the commands this view owns (F6, slice 82).
         .onAppear { model.inspectorVisible = inspectorShown }
@@ -273,7 +253,6 @@ struct ArtifactDetailView: View {
             model.scanFileForMetadata(
                 entry.uid, in: artifact.uid, originalName: entry.originalName)
         case .replaceFile: model.beginReplace(fileID: entry.uid, artifactID: artifact.uid)
-        case .deleteFile: confirmingFileDelete = entry
         default: break
         }
     }

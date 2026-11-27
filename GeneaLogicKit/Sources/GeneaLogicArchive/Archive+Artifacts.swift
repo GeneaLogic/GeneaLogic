@@ -252,6 +252,13 @@ extension Archive {
         }
     }
 
+    /// How many items the trash holds — `trashedArtifacts()` and `trashedFiles()`
+    /// together — without reading any entry's record (slice 86): what a count beside the
+    /// trash shows, asked far more often than the trash is opened.
+    public func trashedItemCount() -> Int {
+        withReadState { _, _ in TrashStore.entryCount(in: rootURL) }
+    }
+
     /// Permanently deletes one trashed artifact — irreversible (the bytes leave the
     /// package). Lenient if `uid` isn't in the trash.
     public func deleteFromTrash(_ uid: ArtifactID) throws {
