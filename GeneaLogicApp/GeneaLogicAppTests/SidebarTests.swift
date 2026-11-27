@@ -141,6 +141,12 @@ import Testing
         #expect(reveal(SidebarSelection(area: .artifacts), collapsed: [.review]).expand == nil)
     }
 
+    /// The Trash is pinned under the list, always in view, so a jump to it scrolls nothing
+    /// (slice 86).
+    @Test func theTrashHasNothingToScrollTo() {
+        #expect(reveal(SidebarSelection(area: .trash)) == SidebarReveal(expand: nil, target: nil))
+    }
+
     /// Review hides while searching, so there is nothing to scroll to or expand.
     @Test func aHiddenSectionHasNoTarget() {
         let state = SidebarSelection(area: .review, review: "name|ART-a|p1")
@@ -257,7 +263,9 @@ import Testing
         let person = PersonID("PER-a")
         let context = CommandContext(
             hasArchive: true, activeTab: .tree, selectedPerson: person, personCount: 2)
-        for command in [ArchiveCommand.addName, .addFact, .addRelationship, .mergePerson, .deletePerson] {
+        for command in [
+            ArchiveCommand.addName, .addFact, .addRelationship, .mergePerson, .deletePerson,
+        ] {
             #expect(context.isAvailable(command), "\(command) on the tree")
         }
     }

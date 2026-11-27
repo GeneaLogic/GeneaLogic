@@ -8,9 +8,9 @@ import SwiftUI
 /// scroll away (86's hand-test). Selecting a row sets the area (`SidebarSelection`); the
 /// detail column shows that area's item.
 ///
-/// The Trash is a one-row list of its own, so it keeps the sidebar's selection, badge
-/// and VoiceOver. The arrow keys don't cross from the main list into it, as they don't
-/// reach a Finder sidebar's footer; a click, Tab or File ▸ Show Trash does.
+/// The Trash is a button drawn as a sidebar row, a Tab stop of its own. The arrow keys
+/// don't cross from the main list into it, as they don't reach a Finder sidebar's footer;
+/// a click, Tab and Space, or File ▸ Show Trash does.
 ///
 /// **Why one sidebar** ([#39](https://github.com/GeneaLogic/GeneaLogic/issues/39)): the
 /// area was a toolbar control and its collection the sidebar, so the switcher read as,
@@ -74,11 +74,11 @@ struct ArchiveSidebar: View {
             ScrollViewReader { proxy in
                 list(artifacts)
                     .onChange(of: revealRequest) { reveal(proxy, artifacts: artifacts) }
-                // `List` doesn't follow a selection set from outside, and plenty sets it:
-                // the List | Tree control, a refocus in the tree, Review's keys walking
-                // down the worklist, a record just created. Whatever moved the area or its
-                // selection, the selected row is brought into view, no further than it
-                // has to go — so a row just clicked doesn't move (84's hand-test).
+                    // `List` doesn't follow a selection set from outside, and plenty sets it:
+                    // the List | Tree control, a refocus in the tree, Review's keys walking
+                    // down the worklist, a record just created. Whatever moved the area or its
+                    // selection, the selected row is brought into view, no further than it
+                    // has to go — so a row just clicked doesn't move (84's hand-test).
                     .onChange(of: selection.area) { keepSelectionInView(proxy) }
                     .onChange(of: selection.item) { keepSelectionInView(proxy) }
             }
@@ -281,36 +281,53 @@ struct ArchiveSidebar: View {
 
     // MARK: - Trash
 
-    /// The Trash row as a one-row list of its own, so it keeps the sidebar's selection,
-    /// badge and VoiceOver, pinned under the main list.
+    /// The Trash, pinned under the main list: a button drawn as a sidebar row (86's
+    /// hand-test). A one-row list of its own took Tab focus without selecting anything,
+    /// and selecting on focus would switch the detail as Tab passed by; a button is a Tab
+    /// stop that Space opens, as any other is. Selected, it draws the sidebar's highlight
+    /// itself: the main list's real one is a neutral rounded fill.
+    ///
+    /// The count hides at zero, and the icon dims while there is nothing in the can. The
+    /// spec kept the icon fixed (fork 2, against `trash.fill`, which reads as decoration);
+    /// the hand-test asked for full and empty. A symbol with paper over the rim is #92.
     private var trashFooter: some View {
-        List(
-            selection: Binding(
-                get: { selection.area == .trash ? SidebarItem.trash : nil },
-                set: { if $0 == .trash { selection.select(.trash) } })
-        ) {
-            trashRow
-        }
-        .listStyle(.sidebar)
-        .scrollDisabled(true)
-        .frame(height: 44)
-    }
-
-    /// The Trash row (slice 86): the place, with how much it holds. The icon names the
-    /// place and doesn't report state, as a sidebar's icons don't (fork 2); the count
-    /// does, and hides at zero.
-    private var trashRow: some View {
         let count = model.trashCount
-        return Label(SidebarSection.trash.title, systemImage: ArchiveTab.trash.systemImage)
-            .badge(count)
-            .tag(SidebarItem.trash)
-            .id(SidebarRowID.item(.trash))
-            // One element, its count in its name (86's hand-test). With a value added to
-            // the `Label`, VoiceOver read the row as "2 items" and never said "Trash"; named
-            // outright, it read the name and dropped the value. Mail's rows say their count
-            // the same way. Nothing at zero, where the badge hides too.
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Self.trashAccessibilityLabel(count: count))
+        let isSelected = selection.area == .trash
+        return Button {
+            selection.select(.trash)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: ArchiveTab.trash.systemImage)
+                    .foregroundStyle(count == 0 ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
+                    .frame(width: 20)
+                Text(SidebarSection.trash.title)
+                Spacer(minLength: 0)
+                if count > 0 {
+                    Text("\(count)")
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous).fill(.quaternary)
+                }
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .contextMenu { CommandButton(.emptyTrash, on: .archive, fromSidebar: true) }
+        // Its count in its name (86's hand-test). With the count as a value, VoiceOver
+        // read the row as "2 items" and never said "Trash"; named outright, it read the
+        // name and dropped the value. Mail's rows say their count the same way. Not
+        // `.accessibilityElement(children: .ignore)`: on a button that makes a new element
+        // without the button's action, so pressing it through accessibility did nothing.
+        .accessibilityLabel(Self.trashAccessibilityLabel(count: count))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     /// What VoiceOver calls the Trash row: "Trash", "Trash, 1 item", "Trash, 3 items".
@@ -396,8 +413,8 @@ struct ArchiveSidebar: View {
 
     /// Scrolls the selected row into view, if its section is showing it.
     private func keepSelectionInView(_ proxy: ScrollViewProxy) {
-        guard let item = selection.item, !collapsed.contains(item.section),
-            !hidden.contains(item.section)
+        guard let item = selection.item, item.section != .trash,
+            !collapsed.contains(item.section), !hidden.contains(item.section)
         else { return }
         let target = SidebarRowID.item(item)
         // Twice, for the reason `reveal` gives.

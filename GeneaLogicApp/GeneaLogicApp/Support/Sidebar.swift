@@ -147,7 +147,8 @@ struct SidebarReveal: Equatable {
         hidden: Set<SidebarSection>, isListed: (SidebarItem) -> Bool
     ) {
         let section = selection.area.section
-        guard !hidden.contains(section) else {
+        // The Trash is pinned under the list, always in view: nothing to scroll to.
+        guard !hidden.contains(section), section != .trash else {
             self.init(expand: nil, target: nil)
             return
         }

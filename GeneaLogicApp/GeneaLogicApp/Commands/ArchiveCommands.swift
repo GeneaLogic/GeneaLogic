@@ -32,6 +32,7 @@ struct ArchiveCommands: Commands {
             Divider()
             item(.verifyIntegrity)
             item(.showTrash)
+            item(.emptyTrash)
             DeleteMenuItem(model: activeModel)
         }
 

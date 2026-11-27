@@ -533,6 +533,7 @@ private struct OpenArchiveView: View {
             detail
         }
         .modifier(ReviewCommandHost(selection: $reviewSelection))
+        .modifier(EmptyTrashConfirmation())
         // Drag-in ingest, from any area: a create, so it switches to Artifacts once the
         // artifact exists (`commitIngest`).
         .dropDestination(for: URL.self) { urls, _ in

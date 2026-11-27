@@ -4508,10 +4508,14 @@ been two slices.
   was half true).
 
 - **86 — a visible trash** (app, plus engine reads; no format change). G7: #42, #4.
-  **Decided:** the trash is an area (`ArchiveTab.trash`), a row pinned under the
-  sidebar's list (a footer, from the hand-test: as its last row it scrolled away below
-  People) with a count hidden at zero, and the sheet is gone. VoiceOver reads one string
-  for the row, so the count is in its label. File ▸ Show Trash selects it; it has no
+  **Decided:** the trash is an area (`ArchiveTab.trash`), pinned under the sidebar's
+  list with a count hidden at zero, and the sheet is gone. **From the hand-test:** a
+  footer, since as the list's last row it scrolled away below People; a button drawn as
+  a row, since a one-row list took Tab focus without selecting; the empty can dims (a
+  full-trash symbol is #92); Empty Trash… is a command (⇧⌘⌫, the row's context menu);
+  the Trash's rows are in a scroll view, since a `List` row's buttons are no Tab stops.
+  VoiceOver reads one string for the row, so the count is in its label, and
+  `.accessibilityElement(children: .ignore)` on a button drops its press action. File ▸ Show Trash selects it; it has no
   ⌘-number, so the View menu walks `ArchiveTab.numbered`, not `allCases`. Moving an
   artifact or a file to the Trash no longer asks; Delete Person… still does (#11). #4 is
   fixed at read time: `trashedFiles()` names the artifact's current title, else its trashed

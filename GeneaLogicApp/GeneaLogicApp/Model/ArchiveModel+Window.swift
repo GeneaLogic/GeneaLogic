@@ -22,7 +22,7 @@ extension ArchiveModel {
             selectedPerson: selectedPerson, personCount: persons.count,
             isPresentingModal: isPresentingModal, inspectorVisible: inspectorVisible,
             selectedReview: selectedReviewRow, treeFocus: treeFocus, treeDepths: treeDepths,
-            isDecidingReview: reviewDecisionsInFlight > 0)
+            trashCount: trashCount, isDecidingReview: reviewDecisionsInFlight > 0)
     }
 
     /// The part of `commandContext` that `command`'s availability depends on, and nothing
@@ -59,6 +59,7 @@ extension ArchiveModel {
             context.selectedArtifact = selectedArtifact
             context.inspectorVisible = inspectorVisible
         case .mergePerson, .chooseFocus: context.personCount = persons.count
+        case .emptyTrash: context.trashCount = trashCount
         case .moreAncestors, .fewerAncestors, .moreDescendants, .fewerDescendants:
             context.personCount = persons.count
             context.treeDepths = treeDepths

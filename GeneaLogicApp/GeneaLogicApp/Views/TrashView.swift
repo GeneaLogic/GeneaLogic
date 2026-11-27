@@ -20,7 +20,6 @@ import SwiftUI
 struct TrashView: View {
     @Environment(ArchiveModel.self) private var model
 
-    @State private var confirmingEmpty = false
     @State private var pendingArtifactDelete: TrashedArtifact?
     @State private var pendingFileDelete: TrashedFile?
 
@@ -60,17 +59,7 @@ struct TrashView: View {
             } message: { _ in
                 Text("This removes the file from the archive for good. It can't be undone.")
             }
-            .confirmationDialog(
-                "Empty the Trash?", isPresented: $confirmingEmpty, titleVisibility: .visible
-            ) {
-                Button("Empty Trash", role: .destructive) {
-                    model.emptyTrash()
-                }
-            } message: {
-                Text("This permanently deletes everything in the trash. It can't be undone.")
-            }
-            .reportsModal(
-                confirmingEmpty || pendingArtifactDelete != nil || pendingFileDelete != nil)
+            .reportsModal(pendingArtifactDelete != nil || pendingFileDelete != nil)
     }
 
     /// The strip above the list, as Finder's Trash has: what it holds, and Empty.
@@ -82,8 +71,8 @@ struct TrashView: View {
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
             Spacer(minLength: 8)
-            Button("Empty Trash…") { confirmingEmpty = true }
-                .disabled(isEmpty)
+            Button(ArchiveCommand.emptyTrash.title) { model.perform(.emptyTrash) }
+                .disabled(!model.canOffer(.emptyTrash, on: .archive))
                 .help("Permanently delete everything in the trash")
         }
         .padding(.horizontal, 16)
@@ -112,38 +101,46 @@ struct TrashView: View {
                         + "space for good.")
             }
         } else {
-            List {
-                if !model.trashedArtifacts.isEmpty {
-                    Section("Artifacts") {
-                        ForEach(model.trashedArtifacts, id: \.uid) { item in
-                            TrashRow(
-                                icon: "doc",
-                                title: Self.title(of: item),
-                                subtitle: "Deleted \(displayDate(item.deletedAt))",
-                                restoreHelp: "Put this artifact back in the archive.",
-                                deleteHelp: "Remove this artifact for good. This can't be undone.",
-                                onRestore: { model.restoreFromTrash(item.uid) },
-                                onDelete: { pendingArtifactDelete = item })
+            // A scroll view, not a `List`: a list row's buttons are no Tab stops, so with
+            // keyboard navigation on, Restore and Delete Permanently… couldn't be reached
+            // (86's hand-test). Here they are ordinary buttons in the Tab order.
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    if !model.trashedArtifacts.isEmpty {
+                        TrashSection("Artifacts") {
+                            ForEach(model.trashedArtifacts, id: \.uid) { item in
+                                TrashRow(
+                                    icon: "doc",
+                                    title: Self.title(of: item),
+                                    subtitle: "Deleted \(displayDate(item.deletedAt))",
+                                    restoreHelp: "Put this artifact back in the archive.",
+                                    deleteHelp:
+                                        "Remove this artifact for good. This can't be undone.",
+                                    onRestore: { model.restoreFromTrash(item.uid) },
+                                    onDelete: { pendingArtifactDelete = item })
+                            }
+                        }
+                    }
+                    if !model.trashedFiles.isEmpty {
+                        TrashSection("Files") {
+                            ForEach(model.trashedFiles, id: \.uid) { item in
+                                TrashRow(
+                                    icon: "doc.text",
+                                    title: Self.name(of: item),
+                                    subtitle:
+                                        "From “\(Self.artifactTitle(of: item))” · Deleted \(displayDate(item.deletedAt))",
+                                    restoreHelp:
+                                        "Re-attach this file to “\(Self.artifactTitle(of: item))”.",
+                                    deleteHelp: "Remove this file for good. This can't be undone.",
+                                    onRestore: { model.restoreFile(item) },
+                                    onDelete: { pendingFileDelete = item })
+                            }
                         }
                     }
                 }
-                if !model.trashedFiles.isEmpty {
-                    Section("Files") {
-                        ForEach(model.trashedFiles, id: \.uid) { item in
-                            TrashRow(
-                                icon: "doc.text",
-                                title: Self.name(of: item),
-                                subtitle:
-                                    "From “\(Self.artifactTitle(of: item))” · Deleted \(displayDate(item.deletedAt))",
-                                restoreHelp: "Re-attach this file to “\(Self.artifactTitle(of: item))”.",
-                                deleteHelp: "Remove this file for good. This can't be undone.",
-                                onRestore: { model.restoreFile(item) },
-                                onDelete: { pendingFileDelete = item })
-                        }
-                    }
-                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
             }
-            .listStyle(.inset)
         }
     }
 
@@ -160,6 +157,35 @@ struct TrashView: View {
 
     private static func name(of item: TrashedFile) -> String {
         item.originalName.isEmpty ? "Untitled File" : item.originalName
+    }
+}
+
+/// A titled group of trashed items, as an inset list's section looks: a heading, then the
+/// rows with a divider between each.
+private struct TrashSection<Rows: View>: View {
+    let title: String
+    @ViewBuilder let rows: Rows
+
+    init(_ title: String, @ViewBuilder rows: () -> Rows) {
+        self.title = title
+        self.rows = rows()
+    }
+
+    var body: some View {
+        Text(title)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.top, 12)
+            .padding(.bottom, 4)
+            .accessibilityAddTraits(.isHeader)
+        Divider()
+        Group(subviews: rows) { subviews in
+            ForEach(subviews) { row in
+                row
+                    .padding(.vertical, 6)
+                Divider()
+            }
+        }
     }
 }
 
@@ -198,6 +224,32 @@ private struct TrashRow: View {
             Button("Restore", action: onRestore)
             Button("Delete Permanently…", role: .destructive, action: onDelete)
         }
+    }
+}
+
+/// Empty Trash…'s confirmation, from the Trash's strip, its sidebar row and the File menu
+/// (86's hand-test). On the window rather than the Trash's view, so the menu bar and the
+/// sidebar reach it from any area.
+struct EmptyTrashConfirmation: ViewModifier {
+    @Environment(ArchiveModel.self) private var model
+    @State private var isConfirming = false
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: model.pendingCommand) {
+                guard model.claimPendingCommand({ $0 == .emptyTrash }) != nil else { return }
+                isConfirming = true
+            }
+            .confirmationDialog(
+                "Empty the Trash?", isPresented: $isConfirming, titleVisibility: .visible
+            ) {
+                Button("Empty Trash", role: .destructive) {
+                    model.emptyTrash()
+                }
+            } message: {
+                Text("This permanently deletes everything in the trash. It can't be undone.")
+            }
+            .reportsModal(isConfirming)
     }
 }
 

@@ -1,6 +1,7 @@
 import Foundation
 import GeneaLogicArchive
 import GeneaLogicModel
+import SwiftUI
 import Testing
 
 @testable import GeneaLogicApp
@@ -177,6 +178,26 @@ import Testing
         #expect(!model.isPresentingModal)
         #expect(ArchiveCommand.showTrash.title == "Show Trash")
         #expect(ArchiveCommand.showTab(.trash) == .showTrash)
+    }
+
+    /// Empty Trash… runs from any area once there is something to empty, and leaves its
+    /// confirmation to the window (86's hand-test: the row's context menu and File).
+    @Test(arguments: ArchiveTab.allCases)
+    func emptyTrashWaitsForSomethingToEmpty(on area: ArchiveTab) async throws {
+        let (model, root) = try AppTestSupport.makeModel()
+        defer { AppTestSupport.remove(root) }
+        let (first, _, _) = try await makeTwo(in: model, root: root)
+        model.activeTab = area
+        #expect(!model.commandContext.isAvailable(.emptyTrash))
+
+        await model.act { model.deleteArtifact(first) }
+        #expect(model.commandContext.isAvailable(.emptyTrash))
+        model.perform(.emptyTrash)
+        #expect(model.claimPendingCommand { $0 == .emptyTrash } != nil)
+        #expect(model.trashCount == 1, "nothing is emptied until it is confirmed")
+        #expect(
+            ArchiveCommand.emptyTrash.shortcut
+                == KeyboardShortcut(.delete, modifiers: [.command, .shift]))
     }
 
     /// VoiceOver hears the row's count in its name, and nothing at zero (86's hand-test).
