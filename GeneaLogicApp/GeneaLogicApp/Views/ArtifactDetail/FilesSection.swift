@@ -132,7 +132,9 @@ private struct FileRow: View {
         let file = CommandSubject.file(entry.uid, in: artifactID)
         CommandButton(.openFileInWindow, on: file)
         CommandButton(.openFileInDefaultApp, on: file)
+        CommandButton(.quickLookFile, on: file)
         CommandButton(.saveFileCopy, on: file)
+        CommandButton(.copyFile, on: file)
         CommandButton(.scanFileForMetadata, on: file)
         Divider()
         // Change the file's archival role after the fact (slice 32). A Picker renders the

@@ -8,13 +8,16 @@ import UniformTypeIdentifiers
 /// word-processing documents. Anything else shows a placeholder pointing at the file's
 /// ⋯ menu.
 ///
-/// **Why no Quick Look:** `QLPreviewView` renders HTML-backed previews (e.g. `.docx`)
-/// through an out-of-process path that stalls ~30 s in this sandboxed app, and
-/// `QLThumbnailGenerator` fails outright (`QLThumbnailErrorDomain`) for the same files —
-/// the sandbox blocks Quick Look's out-of-process generators for Office documents, even
-/// though `qlmanage` renders them in ~0.1 s outside the sandbox (measured for the slow `.docx` preview fix). AppKit's
-/// `NSAttributedString(url:)` reads those documents **in-process** (the app can read the
-/// package file directly), so we show their actual text instead.
+/// **Why no Quick Look:** `QLPreviewView` stalled ~30 s on HTML-backed previews (e.g.
+/// `.docx`), and `QLThumbnailGenerator` failed outright (`QLThumbnailErrorDomain`) for the
+/// same files, while `qlmanage` rendered them in ~0.1 s outside the sandbox (measured for
+/// the slow `.docx` preview fix). AppKit's `NSAttributedString(url:)` reads those
+/// documents **in-process**, so we show their actual text instead.
+///
+/// Slice 87 found the cause: Quick Look draws them in a WebKit view whose helper
+/// processes inherit this sandbox, and without `com.apple.security.network.client` they
+/// exited at launch. The app now has it (for the Quick Look panel), so the stall may be
+/// gone here too; this view is unchanged until that is measured.
 struct FilePreviewContent: View {
     let url: URL
 
@@ -34,8 +37,8 @@ struct FilePreviewContent: View {
     private enum Kind { case image, pdf, richText, other }
 
     /// Word-processing document extensions `NSAttributedString` can read in-process.
-    /// (`html`/`htm` are deliberately excluded — AppKit's HTML import can block on
-    /// remote resource loads, which would hang in this no-network sandbox.)
+    /// (`html`/`htm` are deliberately excluded — AppKit's HTML import loads remote
+    /// resources, which hung while the app had no network and would now fetch them.)
     private static let richTextExtensions: Set<String> = [
         "doc", "docx", "rtf", "rtfd", "odt", "txt", "text",
     ]

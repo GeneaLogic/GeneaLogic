@@ -117,7 +117,8 @@ struct TrashView: View {
                                     deleteHelp:
                                         "Remove this artifact for good. This can't be undone.",
                                     onRestore: { model.restoreFromTrash(item.uid) },
-                                    onDelete: { pendingArtifactDelete = item })
+                                    onDelete: { pendingArtifactDelete = item },
+                                    onQuickLook: { model.quickLookTrashed(item.uid) })
                             }
                         }
                     }
@@ -133,7 +134,9 @@ struct TrashView: View {
                                         "Re-attach this file to “\(Self.artifactTitle(of: item))”.",
                                     deleteHelp: "Remove this file for good. This can't be undone.",
                                     onRestore: { model.restoreFile(item) },
-                                    onDelete: { pendingFileDelete = item })
+                                    onDelete: { pendingFileDelete = item },
+                                    onQuickLook: { model.quickLookTrashed(item.uid) },
+                                    canQuickLook: model.canQuickLookTrashed(item.uid))
                             }
                         }
                     }
@@ -190,7 +193,9 @@ private struct TrashSection<Rows: View>: View {
 }
 
 /// One trashed item's row, for both kinds: leading icon, title + subtitle, and the
-/// Restore / Delete Permanently… buttons, which its context menu repeats.
+/// Restore / Delete Permanently… buttons, which its context menu repeats. The menu also
+/// has Quick Look (slice 87, fork 4), to see what a permanent delete would destroy; the
+/// rows have no selection, so there is no Space for it.
 private struct TrashRow: View {
     let icon: String
     let title: String
@@ -199,6 +204,9 @@ private struct TrashRow: View {
     let deleteHelp: String
     let onRestore: () -> Void
     let onDelete: () -> Void
+    let onQuickLook: () -> Void
+    /// A record-only trashed file has no bytes to show.
+    var canQuickLook = true
 
     var body: some View {
         HStack(spacing: 12) {
@@ -221,6 +229,9 @@ private struct TrashRow: View {
         }
         .padding(.vertical, 2)
         .contextMenu {
+            Button(ArchiveCommand.quickLook.title, action: onQuickLook)
+                .disabled(!canQuickLook)
+            Divider()
             Button("Restore", action: onRestore)
             Button("Delete Permanently…", role: .destructive, action: onDelete)
         }

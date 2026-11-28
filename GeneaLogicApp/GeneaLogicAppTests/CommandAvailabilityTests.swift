@@ -17,7 +17,7 @@ import Testing
         CommandContext(
             hasArchive: true, activeTab: tab, selectedArtifact: artifact, selectedFile: file,
             selectedPerson: person, personCount: persons, selectedReview: reviewRow,
-            treeFocus: person)
+            treeFocus: person, artifactsWithFiles: [artifact])
     }
 
     private func available(in context: CommandContext) -> Set<ArchiveCommand> {

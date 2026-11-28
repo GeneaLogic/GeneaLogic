@@ -119,6 +119,9 @@ final class ArchiveModel {
     /// are left as they were, and the count comes from one directory listing.
     var trashedArtifacts: [TrashedArtifact] = []
     var trashedFiles: [TrashedFile] = []
+    /// Which of `trashedFiles` still have their bytes, for Quick Look (slice 87): a
+    /// record-only entry has nothing to show. A `stat` each, read with the listing.
+    var trashedFilesWithContent: Set<FileID> = []
 
     /// What `trashedItemCount()` said at the last `reloadTrash`, for the poll to compare
     /// against (`reloadTrashIfChangedExternally`). Never shown.

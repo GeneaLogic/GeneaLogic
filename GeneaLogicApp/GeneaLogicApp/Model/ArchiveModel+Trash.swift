@@ -27,6 +27,8 @@ extension ArchiveModel {
         let files = archive.trashedFiles()
         if artifacts != trashedArtifacts { trashedArtifacts = artifacts }
         if files != trashedFiles { trashedFiles = files }
+        let withContent = Set(files.lazy.map(\.uid).filter { archive.trashedFileContent($0) != nil })
+        if withContent != trashedFilesWithContent { trashedFilesWithContent = withContent }
         trashCount = artifacts.count + files.count
     }
 

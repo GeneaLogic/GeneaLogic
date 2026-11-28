@@ -16,13 +16,24 @@ extension ArchiveModel {
 
     /// Everything command availability depends on, read from this window's state.
     var commandContext: CommandContext {
-        CommandContext(
+        var context = CommandContext(
             hasArchive: archive != nil, activeTab: activeTab,
             selectedArtifact: selectedArtifact, selectedFile: selectedFile,
             selectedPerson: selectedPerson, personCount: persons.count,
             isPresentingModal: isPresentingModal, inspectorVisible: inspectorVisible,
             selectedReview: selectedReviewRow, treeFocus: treeFocus, treeDepths: treeDepths,
             trashCount: trashCount, isDecidingReview: reviewDecisionsInFlight > 0)
+        noteQuickLookable(selectedArtifact, in: &context)
+        context.selectedArtifactTitle = selectedArtifact.flatMap { summary(of: $0)?.title }
+        return context
+    }
+
+    /// Adds `artifact` to what Quick Look can show, if it has a file (slice 87).
+    private func noteQuickLookable(_ artifact: ArtifactID?, in context: inout CommandContext) {
+        guard let artifact, let summary = summary(of: artifact), summary.fileCount > 0 else {
+            return
+        }
+        context.artifactsWithFiles.insert(artifact)
     }
 
     /// The part of `commandContext` that `command`'s availability depends on, and nothing
@@ -64,6 +75,9 @@ extension ArchiveModel {
             context.personCount = persons.count
             context.treeDepths = treeDepths
         case .showInPeople: context.treeFocus = treeFocus
+        case .quickLook:
+            noteQuickLookable(selectedArtifact, in: &context)
+            context.selectedArtifactTitle = selectedArtifact.flatMap { summary(of: $0)?.title }
         case .acceptSuggestion, .declineSuggestion, .confirmCandidate, .rejectCandidate,
             .recordSuggestedFact, .recordSuggestedRelationship, .dismissSuggestedRelationship:
             context.isDecidingReview = reviewDecisionsInFlight > 0
@@ -77,8 +91,21 @@ extension ArchiveModel {
     func canPerform(
         _ command: ArchiveCommand, on subject: CommandSubject, fromSidebar: Bool = false
     ) -> Bool {
-        commandContext(for: command, resolvingSelection: subject.kind != .review)
-            .canPerform(command, on: subject, fromSidebar: fromSidebar)
+        commandContext(for: command, on: subject).canPerform(
+            command, on: subject, fromSidebar: fromSidebar)
+    }
+
+    /// `commandContext(for:)`, with what `subject` itself brings: a row's artifact may
+    /// not be the selected one.
+    private func commandContext(
+        for command: ArchiveCommand, on subject: CommandSubject, readingModal: Bool = true
+    ) -> CommandContext {
+        var context = commandContext(
+            for: command, resolvingSelection: subject.kind != .review, readingModal: readingModal)
+        if command == .quickLook, case .artifact(let id) = subject {
+            noteQuickLookable(id, in: &context)
+        }
+        return context
     }
 
     /// Whether a surface inside the window can offer `command` on `subject`: the same rule,
@@ -87,10 +114,8 @@ extension ArchiveModel {
     func canOffer(
         _ command: ArchiveCommand, on subject: CommandSubject, fromSidebar: Bool = false
     ) -> Bool {
-        commandContext(
-            for: command, resolvingSelection: subject.kind != .review, readingModal: false
-        )
-        .canPerform(command, on: subject, fromSidebar: fromSidebar)
+        commandContext(for: command, on: subject, readingModal: false)
+            .canPerform(command, on: subject, fromSidebar: fromSidebar)
     }
 
     /// Whether a sheet, dialog, alert or panel is up in this window: the ones this model
@@ -143,6 +168,17 @@ extension ArchiveModel {
         case .refreshReview:
             refreshReviewWorklist()
             refreshDuplicateCandidates()
+        // Slice 87: the pasteboard and the Quick Look panel need no view.
+        case .copyArtifact, .copyPerson:
+            copyText(of: subject)
+        case .copyFile:
+            if case .file(let fileID, let artifactID) = subject { copyFile(fileID, of: artifactID) }
+        case .quickLook:
+            if case .artifact(let id) = subject { toggleQuickLook(id) }
+        case .quickLookFile:
+            if case .file(let fileID, let artifactID) = subject {
+                toggleQuickLook(artifactID, at: fileID)
+            }
         default:
             if command.subjectKind.isRow, performRowCommand(command, on: subject) { return }
             pendingCommand = PendingCommand(command: command, subject: subject)
