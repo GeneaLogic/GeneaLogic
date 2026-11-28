@@ -64,7 +64,6 @@ struct FilesSection: View {
 /// Takes `isSelected` to read and the selection binding only to write, so selecting a
 /// file redraws the two rows whose highlight changes and no others.
 private struct FileRow: View {
-    @Environment(ArchiveModel.self) private var model
     let artifactID: ArtifactID
     let entry: FileEntry
     let isSelected: Bool
@@ -102,7 +101,7 @@ private struct FileRow: View {
             .help("Click to preview")
 
             Menu {
-                fileMenu
+                FileCommandsMenu(artifactID: artifactID, entry: entry)
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .imageScale(.large)
@@ -121,18 +120,32 @@ private struct FileRow: View {
         .hoverRowBackground(isHovering: isHovering, isSelected: isSelected)
         .onHover { isHovering = $0 }
         // The ⋯ menu's contents, on a right-click anywhere on the row (slice 83b).
-        .contextMenu { fileMenu }
+        .contextMenu { FileCommandsMenu(artifactID: artifactID, entry: entry) }
     }
 
-    /// The Artifact ▸ Selected File verbs, in the same order, on this row's file (slice
-    /// 82), for the ⋯ menu and the context menu alike. The detail view runs them, Delete
-    /// File…'s confirm included.
-    @ViewBuilder
-    private var fileMenu: some View {
+    private var subtitle: String {
+        let size = ByteCountFormatter.string(fromByteCount: entry.byteLength, countStyle: .file)
+        return "\(entry.path) · \(entry.format) · \(size)"
+    }
+}
+
+/// A file's verbs: the Artifact ▸ Selected File items in the same order (slice 82), plus
+/// Quick Look (87), which the menu bar has as File ▸ Quick Look on the artifact, opening
+/// at the selected file. One menu for every surface that shows a file: a Files row's ⋯
+/// and context menus, and the document pane's chip and preview (87's hand-test). The
+/// detail view runs them, Replace…'s importer included.
+struct FileCommandsMenu: View {
+    @Environment(ArchiveModel.self) private var model
+    let artifactID: ArtifactID
+    let entry: FileEntry
+
+    var body: some View {
         let file = CommandSubject.file(entry.uid, in: artifactID)
         CommandButton(.openFileInWindow, on: file)
         CommandButton(.openFileInDefaultApp, on: file)
+        CommandButton(.quickLookFile, on: file)
         CommandButton(.saveFileCopy, on: file)
+        CommandButton(.copyFile, on: file)
         CommandButton(.scanFileForMetadata, on: file)
         Divider()
         // Change the file's archival role after the fact (slice 32). A Picker renders the
@@ -148,17 +161,12 @@ private struct FileRow: View {
     }
 
     /// Bridges the file's current role to the Role picker: reads `entry.role`
-    /// (always fresh — the row rebuilds from the reloaded record after a change)
+    /// (always fresh — the menu rebuilds from the reloaded record after a change)
     /// and routes a new selection through the undoable `setFileRole`.
     private var roleBinding: Binding<FileRole> {
         Binding(
             get: { entry.role },
             set: { model.setFileRole(entry.uid, in: artifactID, to: $0) })
-    }
-
-    private var subtitle: String {
-        let size = ByteCountFormatter.string(fromByteCount: entry.byteLength, countStyle: .file)
-        return "\(entry.path) · \(entry.format) · \(size)"
     }
 }
 

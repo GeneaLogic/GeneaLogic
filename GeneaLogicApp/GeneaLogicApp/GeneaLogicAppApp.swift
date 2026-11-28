@@ -1,4 +1,5 @@
 import AppKit
+import Quartz
 import SwiftUI
 
 @main
@@ -136,5 +137,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ sender: NSApplication, hasVisibleWindows: Bool
     ) -> Bool {
         return ArchiveOpenCoordinator.shared.reopen()
+    }
+
+    // MARK: - Quick Look (slice 87)
+
+    // The end of every window's responder chain, so the panel finds its controller here
+    // whatever has the focus (`QuickLookPanel`). Declared nonisolated on `NSObject`; the
+    // panel calls them on the main thread.
+    nonisolated override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool {
+        true
+    }
+
+    nonisolated override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        MainActor.assumeIsolated { QuickLookPanel.shared.beginControl(panel) }
+    }
+
+    nonisolated override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        MainActor.assumeIsolated { QuickLookPanel.shared.endControl(panel) }
     }
 }

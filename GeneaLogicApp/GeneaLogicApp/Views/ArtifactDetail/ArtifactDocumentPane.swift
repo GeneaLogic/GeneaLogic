@@ -35,10 +35,11 @@ struct ArtifactDocumentPane: View {
                 VStack(spacing: 0) {
                     // A single file needs no selector.
                     if files.count > 1 {
-                        FileSelectorStrip(files: files, selectedFileID: $selectedFileID)
+                        FileSelectorStrip(
+                            artifactID: artifactID, files: files, selectedFileID: $selectedFileID)
                         Divider()
                     }
-                    DocumentPreview(artifactID: artifactID, fileID: selectedFile?.uid)
+                    DocumentPreview(artifactID: artifactID, file: selectedFile)
                 }
             }
         }
@@ -93,6 +94,7 @@ private struct DocumentHeader: View {
 
 /// Horizontal strip of the artifact's files; selecting one previews it.
 private struct FileSelectorStrip: View {
+    let artifactID: ArtifactID
     let files: [FileEntry]
     @Binding var selectedFileID: FileID?
 
@@ -101,8 +103,8 @@ private struct FileSelectorStrip: View {
             HStack(spacing: 8) {
                 ForEach(files, id: \.uid) { entry in
                     FileChip(
-                        entry: entry, isSelected: entry.uid == selectedFileID,
-                        selectedFileID: $selectedFileID)
+                        artifactID: artifactID, entry: entry,
+                        isSelected: entry.uid == selectedFileID, selectedFileID: $selectedFileID)
                 }
             }
             .padding(.horizontal, 12)
@@ -112,21 +114,25 @@ private struct FileSelectorStrip: View {
     }
 }
 
-/// The selected file's preview, or why there isn't one.
+/// The selected file's preview, or why there isn't one. Its context menu is the file's
+/// (87's hand-test), where the preview's own view has none of its own.
 private struct DocumentPreview: View {
     @Environment(ArchiveModel.self) private var model
     let artifactID: ArtifactID
     /// The file to preview: `nil` when nothing is selected.
-    let fileID: FileID?
+    let file: FileEntry?
 
     var body: some View {
-        if let fileID {
-            if let url = model.fileURL(of: fileID, in: artifactID) {
-                // `.id` resets the preview's own state (scroll, loaded image) when a
-                // different file is selected.
+        if let file {
+            if let url = model.fileURL(of: file.uid, in: artifactID) {
+                // `.id` resets the preview's own state (scroll, loaded image) when another
+                // file is selected, **or this one's bytes are replaced** (#3): Replace keeps
+                // the `uid` and moves the bytes to a new path, and keyed on the `uid` alone
+                // the pane kept drawing the old file until you went away and back.
                 FilePreviewContent(url: url)
-                    .id(fileID)
+                    .id(PreviewIdentity(file))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contextMenu { FileCommandsMenu(artifactID: artifactID, entry: file) }
             } else {
                 ContentUnavailableView(
                     "File Unavailable", systemImage: "exclamationmark.triangle",
@@ -146,6 +152,7 @@ private struct DocumentPreview: View {
 /// Takes `isSelected` to read and the selection binding only to write, so selecting a
 /// file redraws the two chips whose highlight changes and no others.
 private struct FileChip: View {
+    let artifactID: ArtifactID
     let entry: FileEntry
     let isSelected: Bool
     @Binding var selectedFileID: FileID?
@@ -177,5 +184,19 @@ private struct FileChip: View {
         }
         .buttonStyle(.plain)
         .help(entry.originalName)
+        .contextMenu { FileCommandsMenu(artifactID: artifactID, entry: entry) }
+    }
+}
+
+/// What a file's preview is drawn from: the file, where its bytes are, and which bytes.
+private struct PreviewIdentity: Hashable {
+    let uid: FileID
+    let path: String
+    let sha256: String
+
+    init(_ file: FileEntry) {
+        uid = file.uid
+        path = file.path
+        sha256 = file.sha256
     }
 }

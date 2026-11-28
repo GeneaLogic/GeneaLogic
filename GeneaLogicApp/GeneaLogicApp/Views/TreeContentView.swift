@@ -268,6 +268,7 @@ private struct TreePersonCard: View {
         .contextMenu {
             CommandButton(.focusHere, on: .person(person))
             CommandButton(.showInPeople, on: .person(person))
+            CommandButton(.copyPerson, on: .person(person))
         }
     }
 

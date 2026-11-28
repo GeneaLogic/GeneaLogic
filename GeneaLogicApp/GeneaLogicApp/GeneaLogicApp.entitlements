@@ -15,5 +15,13 @@
 	     Recent), since a restored URL window-value carries no live sandbox scope. -->
 	<key>com.apple.security.files.bookmarks.app-scope</key>
 	<true/>
+	<!-- Outgoing connections, for WebKit's helper processes, not for the app (slice 87).
+	     Quick Look draws Office documents as HTML in a WebKit view hosted in this
+	     process; its networking helper inherits this sandbox and exits at launch
+	     without this ("does not have permission to communicate with network
+	     resources"), so a .docx spun for ~30 s and fell back to a file card. The app
+	     itself opens no connections. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
 </dict>
 </plist>

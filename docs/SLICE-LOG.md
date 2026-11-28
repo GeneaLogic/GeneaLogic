@@ -4535,6 +4535,36 @@ been two slices.
   With no confirmation, a double ⌘⌫ reached the engine twice and the second failed, so a
   move still on its way drops a repeat (`/code-review`).
 
+- **87 — copy and Quick Look** (app, plus engine reads and an entitlement; no format
+  change). G6, G16: #43. **Decided:** ⌘C on the sidebar copies one line of text, the
+  row's name and the primary date it shows; a row's context menu writes the same line.
+  ⌘C is the focus-scoped `.copyable` on the sidebar's list, not a replaced Edit ▸ Copy,
+  so a text field keeps its own. A file's Copy puts the file on the pasteboard under its
+  `originalName`. Space and ⌘Y show the system Quick Look panel on the selected
+  artifact's files; it follows the selection while up. The Trash's rows gain Quick Look
+  from `.trash/` (`trashedFileContents(ofArtifact:)`, `trashedFileContent(_:)`). Copying
+  a record between archives is #93. **The invariant:** another process gets a copy,
+  never the package's bytes: the panel's items are made by `temporaryCopy` as it asks
+  for each. The app delegate controls the panel, since it ends every window's responder
+  chain. **The gotcha that cost a round:** a `.docx` spun 15–30 s and fell back to a file
+  card, the same ~30 s stall that kept `QLPreviewView` out of the in-pane preview. Quick
+  Look draws Office files as HTML in a WebKit view hosted in the app, and WebKit's
+  helpers inherit its sandbox: without `com.apple.security.network.client` the
+  networking helper exits at launch ("does not have permission to communicate with
+  network resources"), with no crash report. The app now has it; it opens no
+  connections itself. **From `/code-review`:** the panel's first open set its index
+  before the data source was attached (it attaches as the panel comes up), so it is
+  applied again on taking control. The key panel takes ⌘Y from the window's menu, so
+  the panel closes on it itself. A request is keyed, so Quick Look on another row
+  switches the panel rather than closing it. **From the hand-test:** `.copyable` given
+  nothing still leaves Edit ▸ Copy live, so ⌘C is `onCopyCommand`, whose `nil` dims it.
+  A key no other command has now shows on every tab, dimmed where it can't run (⌘Y,
+  ⌘L, ⌘T, ⌘R); a shared one still shows only on its own. The Trash's rows gained an eye
+  button. A preview is keyed on its file's path and checksum, since Replace keeps the
+  `uid` (#3). PDFKit and the text view answer a right-click with their own menus, so the
+  file's menu is on the chip above them. Quick Look's own Copy copies its selection or
+  an empty string, as Finder's does. A trashed artifact's record view is #96.
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the

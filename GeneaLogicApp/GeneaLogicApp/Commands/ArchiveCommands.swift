@@ -30,6 +30,9 @@ struct ArchiveCommands: Commands {
             item(.addArtifact)
             item(.newPerson)
             Divider()
+            // Finder's, in its File menu (slice 87).
+            item(.quickLook)
+            Divider()
             item(.verifyIntegrity)
             item(.showTrash)
             item(.emptyTrash)
@@ -121,6 +124,7 @@ struct ArchiveCommands: Commands {
                 item(.openFileInWindow)
                 item(.openFileInDefaultApp)
                 item(.saveFileCopy)
+                item(.copyFile)
                 item(.scanFileForMetadata)
                 Divider()
                 item(.replaceFile)

@@ -452,6 +452,71 @@ import Testing
         #expect(archive.trashedItemCount() == 0 && agrees())
     }
 
+    /// Slice 87: a trashed artifact's files and a trashed file can be read where they lie
+    /// in `.trash/`, under the user's names, for Quick Look.
+    @Test func trashedContentsPointAtTheStagedBytes() throws {
+        let root = TestSupport.makeTempDirectory()
+        let archive = try Archive.create(at: root)
+        let artifact = try archive.addArtifact(.sample(title: "Two files"))
+        let first = try archive.attachFile(
+            copyingFrom: try TestSupport.makeSourceFile(named: "page 1.txt", contents: "one"),
+            to: artifact.uid, role: .accessCopy)
+        let second = try archive.attachFile(
+            copyingFrom: try TestSupport.makeSourceFile(named: "page 2.txt", contents: "two"),
+            to: artifact.uid, role: .accessCopy)
+        #expect(archive.trashedFileContents(ofArtifact: artifact.uid).isEmpty)
+
+        // A detached file: its own payload.
+        try archive.detachFile(second.entry.uid, in: artifact.uid)
+        let file = try #require(archive.trashedFileContent(second.entry.uid))
+        #expect(file.originalName == "page 2.txt")
+        #expect(archive.trashedFiles().map(\.hasContent) == [true])
+        #expect(try Data(contentsOf: file.url) == Data("two".utf8))
+        // Not an artifact, so it holds no artifact's files.
+        #expect(
+            archive.trashedFileContents(ofArtifact: ArtifactID(second.entry.uid.raw)).isEmpty)
+
+        // A trashed artifact: the files its payload record still names.
+        _ = try archive.removeArtifact(artifact.uid)
+        let contents = archive.trashedFileContents(ofArtifact: artifact.uid)
+        #expect(contents.map(\.originalName) == ["page 1.txt"])
+        #expect(archive.trashedArtifacts().map(\.hasContent) == [true])
+        #expect(contents.map(\.uid) == [first.entry.uid])
+        #expect(try Data(contentsOf: try #require(contents.first).url) == Data("one".utf8))
+        #expect(archive.trashedFileContent(FileID(artifact.uid.raw)) == nil)
+
+        // Restored, it's no longer the trash's to show.
+        _ = try archive.restoreFromTrash(artifact.uid)
+        #expect(archive.trashedFileContents(ofArtifact: artifact.uid).isEmpty)
+    }
+
+    /// Slice 87: a file whose bytes were gone when it was detached has nothing to show.
+    @Test func aRecordOnlyTrashedFileHasNoContent() throws {
+        let root = TestSupport.makeTempDirectory()
+        let archive = try Archive.create(at: root)
+        let artifact = try archive.addArtifact(.sample(title: "Lost its bytes"))
+        let attached = try archive.attachFile(
+            copyingFrom: try TestSupport.makeSourceFile(named: "gone.txt", contents: "x"),
+            to: artifact.uid, role: .accessCopy)
+        let onDisk = try #require(archive.fileURL(of: attached.entry.uid, in: artifact.uid))
+        try FileManager.default.removeItem(at: onDisk)
+
+        try archive.detachFile(attached.entry.uid, in: artifact.uid)
+        #expect(archive.trashedFiles().map(\.uid) == [attached.entry.uid])
+        #expect(archive.trashedFiles().map(\.hasContent) == [false])
+        #expect(archive.trashedFileContent(attached.entry.uid) == nil)
+    }
+
+    /// Slice 87: a trashed artifact that had no files has nothing to show either.
+    @Test func aFilelessTrashedArtifactHasNoContent() throws {
+        let root = TestSupport.makeTempDirectory()
+        let archive = try Archive.create(at: root)
+        let artifact = try archive.addArtifact(.sample(title: "Just a record"))
+        _ = try archive.removeArtifact(artifact.uid)
+        #expect(archive.trashedArtifacts().map(\.hasContent) == [false])
+        #expect(archive.trashedFileContents(ofArtifact: artifact.uid).isEmpty)
+    }
+
     @Test func restoreFileReattachesItAndClearsEntry() throws {
         let root = TestSupport.makeTempDirectory()
         let archive = try Archive.create(at: root)

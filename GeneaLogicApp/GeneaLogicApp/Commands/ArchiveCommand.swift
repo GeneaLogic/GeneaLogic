@@ -12,6 +12,8 @@ import SwiftUI
 enum ArchiveCommand: Hashable, CaseIterable {
     // File
     case addArtifact, newPerson, verifyIntegrity, showTrash, emptyTrash
+    // File ▸ Quick Look, on the selected artifact's files (slice 87)
+    case quickLook
     // Edit
     case find
     // View. One case per tab rather than `showTab(ArchiveTab)`, so `allCases` is the
@@ -19,9 +21,14 @@ enum ArchiveCommand: Hashable, CaseIterable {
     case showArtifacts, showPeople, showTree, showReview, toggleInspector
     // Artifact
     case addEvent, addPlace, addMention, editTranscript, attachFile, deleteArtifact
+    // Copy on an artifact's or a person's row (slice 87). No menu-bar item: Edit ▸ Copy is
+    // the system's, and the sidebar answers it (`.copyable`).
+    case copyArtifact, copyPerson
     // Artifact ▸ Selected File
     case openFileInWindow, openFileInDefaultApp, saveFileCopy, scanFileForMetadata
     case replaceFile, deleteFile
+    // A file's own Copy and Quick Look (slice 87)
+    case copyFile, quickLookFile
     // Person
     case addName, addFact, addRelationship, showInTree, showInPeople, mergePerson, deletePerson
     // Review (slice 83)
@@ -109,13 +116,14 @@ enum ArchiveCommand: Hashable, CaseIterable {
             .showPeople, .showTree, .showReview, .toggleInspector, .refreshReview, .moreAncestors,
             .fewerAncestors, .moreDescendants, .fewerDescendants, .chooseFocus:
             .archive
-        case .addEvent, .addPlace, .addMention, .editTranscript, .attachFile, .deleteArtifact:
+        case .addEvent, .addPlace, .addMention, .editTranscript, .attachFile, .deleteArtifact,
+            .copyArtifact, .quickLook:
             .artifact
         case .openFileInWindow, .openFileInDefaultApp, .saveFileCopy, .scanFileForMetadata,
-            .replaceFile, .deleteFile:
+            .replaceFile, .deleteFile, .copyFile, .quickLookFile:
             .file
         case .addName, .addFact, .addRelationship, .showInTree, .showInPeople, .mergePerson,
-            .deletePerson, .focusHere:
+            .deletePerson, .focusHere, .copyPerson:
             .person
         case .acceptSuggestion, .declineSuggestion, .mergeDuplicate, .somebodyNew:
             .review
@@ -170,6 +178,9 @@ enum ArchiveCommand: Hashable, CaseIterable {
         // hand-test). It still asks: it can't be undone.
         case .emptyTrash: "Empty Trash…"
         case .find: "Find…"
+        // Finder's. The menu bar names the artifact (`title(in:)`).
+        case .quickLook, .quickLookFile: "Quick Look"
+        case .copyArtifact, .copyPerson, .copyFile: "Copy"
         case .showArtifacts, .showPeople, .showTree, .showReview: shownTab?.label ?? ""
         case .toggleInspector: "Hide Inspector"
         case .addEvent: "Add Event…"
@@ -244,6 +255,13 @@ enum ArchiveCommand: Hashable, CaseIterable {
                 self == .acceptSuggestion ? target.lane.canAccept : target.lane.canDecline
             else { return title }
             return Self.reviewRowTitle(of: self, on: target)
+        // Finder's Quick Look “name”, on the artifact whose files it shows. Unnamed while it
+        // can't run, so it doesn't name a selection another area left behind.
+        case .quickLook:
+            guard context.isAvailable(self), let name = context.selectedArtifactTitle?.trimmed,
+                !name.isEmpty
+            else { return title }
+            return "Quick Look “\(name)”"
         default:
             return title
         }
@@ -361,6 +379,8 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .showTrash: "trash"
         case .emptyTrash: "trash.slash"
         case .find: "magnifyingglass"
+        case .quickLook, .quickLookFile: "eye"
+        case .copyArtifact, .copyPerson, .copyFile: "doc.on.doc"
         case .showArtifacts, .showPeople, .showTree, .showReview: "square.grid.2x2"
         case .toggleInspector: "info.circle"
         case .addEvent: "calendar"
@@ -476,6 +496,8 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .deleteArtifact, .deletePerson: KeyboardShortcut(.delete, modifiers: [.command])
         // Finder's Empty Trash.
         case .emptyTrash: KeyboardShortcut(.delete, modifiers: [.command, .shift])
+        // Finder's Quick Look. Space is the sidebar's, on the list, not a menu key.
+        case .quickLook: KeyboardShortcut("y", modifiers: [.command])
         // One key per role, shared across tabs as ⌘⌫ is (slice 83, fork 6). ⌘E and ⌘T are
         // text-editing keys elsewhere, whose actions mean nothing here: there is no find
         // panel and no styled text.
@@ -491,6 +513,15 @@ enum ArchiveCommand: Hashable, CaseIterable {
         default: nil
         }
     }
+
+    /// The commands whose shortcut no other command has.
+    static let unsharedShortcuts: Set<ArchiveCommand> = {
+        let keyed = allCases.compactMap { command in command.shortcut.map { (command, $0) } }
+        return Set(
+            keyed.filter { command, key in
+                !keyed.contains { $0.0 != command && $0.1 == key }
+            }.map(\.0))
+    }()
 
     /// Whether a held key runs this command once. Every other key undoes or opens
     /// something; these two write a human verdict and move to the next row, so a repeat
@@ -578,6 +609,11 @@ struct CommandContext: Equatable {
     var treeDepths = TreeDepths()
     /// How many items the trash holds: Empty Trash… needs something to empty.
     var trashCount = 0
+    /// Which of the artifacts asked about have a file to show: Quick Look needs one
+    /// (slice 87). Only the ones a command is asked about, not every artifact.
+    var artifactsWithFiles: Set<ArtifactID> = []
+    /// The selected artifact's title, which File ▸ Quick Look names.
+    var selectedArtifactTitle: String?
     /// A Review decision is still being written. Its row stays until the write lands, so
     /// Review's two verbs wait rather than decide that row a second time.
     var isDecidingReview = false
@@ -622,6 +658,9 @@ struct CommandContext: Equatable {
         case .toggleInspector: return selectedArtifact != nil
         case .mergePerson: return personCount > 1
         case .emptyTrash: return trashCount > 0
+        case .quickLook:
+            if case .artifact(let id) = subject { return artifactsWithFiles.contains(id) }
+            return false
         // The tree runs People's verbs, but this one would show what is already showing:
         // the tree's focus is the people selection. A sidebar row names its own person.
         case .showInTree: return fromSidebar || activeTab != .tree
@@ -659,8 +698,12 @@ struct CommandContext: Equatable {
     /// another tab don't, so two tabs can each use ⌘⌫. This is not only tidiness: SwiftUI
     /// drops a duplicate key from the later menu item, enabled or not (measured), so a
     /// key attached to both would leave Delete Person… with none.
+    ///
+    /// A key no other command uses keeps it on every tab, dimmed where it can't run, as
+    /// Finder's ⌘Y does (87's hand-test): hiding it there shared nothing.
     func ownsShortcut(_ command: ArchiveCommand) -> Bool {
         command.tab.map(activeTab.runs) ?? true
+            || ArchiveCommand.unsharedShortcuts.contains(command)
     }
 }
 

@@ -17,7 +17,7 @@ import Testing
         CommandContext(
             hasArchive: true, activeTab: tab, selectedArtifact: artifact, selectedFile: file,
             selectedPerson: person, personCount: persons, selectedReview: reviewRow,
-            treeFocus: person)
+            treeFocus: person, artifactsWithFiles: [artifact])
     }
 
     private func available(in context: CommandContext) -> Set<ArchiveCommand> {
@@ -417,6 +417,19 @@ import Testing
             guard let shortcut = command.shortcut else { continue }
             #expect(!Self.reserved.contains(shortcut), "\(command) takes a reserved key")
         }
+    }
+
+    /// Slice 87's hand-test: a key nobody else uses stays on its item on every tab, dimmed
+    /// where it can't run; a shared key shows only on its own tab.
+    @Test(arguments: ArchiveTab.allCases)
+    func anUnsharedKeyShowsEverywhere(_ tab: ArchiveTab) {
+        let context = CommandContext(hasArchive: true, activeTab: tab)
+        for command in [ArchiveCommand.quickLook, .addPlace, .editTranscript, .refreshReview] {
+            #expect(ArchiveCommand.unsharedShortcuts.contains(command))
+            #expect(context.ownsShortcut(command), "\(command) on \(tab)")
+        }
+        #expect(!ArchiveCommand.unsharedShortcuts.contains(.addEvent))
+        #expect(context.ownsShortcut(.addEvent) == (tab == .artifacts))
     }
 
     @Test(arguments: ArchiveTab.allCases)

@@ -106,6 +106,14 @@ struct ArchiveSidebar: View {
         .onChange(of: selection.item, initial: true) { _, item in
             if listSelection != item { listSelection = item }
         }
+        // An open Quick Look panel follows the selection, as Finder's does (slice 87).
+        .onChange(of: selection.item) { _, item in
+            if case .artifact(let id) = item {
+                model.quickLookFollowSelection(id)
+            } else {
+                model.quickLookFollowSelection(nil)
+            }
+        }
         // Whatever brought the row back, once it is in the list (84's `/code-review`:
         // restoring on a search alone missed the rest).
         .onChange(of: selectedRowShows) { _, shows in
@@ -173,6 +181,17 @@ struct ArchiveSidebar: View {
             }
         }
         .listStyle(.sidebar)
+        // ⌘C copies the selected row as a line of text (slice 87, fork 2). Scoped to the
+        // list's focus, so a text field's Copy is its own. Not `.copyable`: given nothing
+        // to copy (a Review row), it left Edit ▸ Copy live, copying nothing (87's
+        // hand-test). A `nil` action dims it.
+        .onCopyCommand(perform: copyAction)
+        // Space shows the selected artifact's files in Quick Look, as Finder's does.
+        .onKeyPress(.space) {
+            guard case .artifact(let id) = selection.item else { return .ignored }
+            model.perform(.quickLook, on: .artifact(id), fromSidebar: true)
+            return .handled
+        }
         // ⌫ does what the context menu does: an artifact moves to the Trash at once
         // (slice 86), a person asks first. On the selected row, so from the tree too.
         .onDeleteCommand {
@@ -185,6 +204,26 @@ struct ArchiveSidebar: View {
             }
         }
         .modifier(PersonDeleteAndMerge())
+    }
+
+    // MARK: - Copy (slice 87)
+
+    /// ⌘C's action: the selected row's copy, or `nil` for a row that has none, which
+    /// dims Edit ▸ Copy. Only an artifact or a person has one.
+    private var copyAction: (() -> [NSItemProvider])? {
+        switch selection.item {
+        case .artifact, .person:
+            let item = selection.item
+            return {
+                model.copiedRecords(for: item).map { record in
+                    let provider = NSItemProvider()
+                    provider.register(record)
+                    return provider
+                }
+            }
+        case .review, .trash, nil:
+            return nil
+        }
     }
 
     // MARK: - Selection and search
@@ -255,6 +294,9 @@ struct ArchiveSidebar: View {
                 .tag(SidebarItem.artifact(artifact.uid))
                 .id(SidebarRowID.item(.artifact(artifact.uid)))
                 .contextMenu {
+                    CommandButton(.quickLook, on: .artifact(artifact.uid), fromSidebar: true)
+                    CommandButton(.copyArtifact, on: .artifact(artifact.uid), fromSidebar: true)
+                    Divider()
                     CommandButton(.deleteArtifact, on: .artifact(artifact.uid), fromSidebar: true)
                 }
         }
@@ -282,6 +324,8 @@ struct ArchiveSidebar: View {
                 .contextMenu {
                     CommandButton(.showInTree, on: .person(person.uid), fromSidebar: true)
                     CommandButton(.mergePerson, on: .person(person.uid), fromSidebar: true)
+                    CommandButton(.copyPerson, on: .person(person.uid), fromSidebar: true)
+                    Divider()
                     CommandButton(.deletePerson, on: .person(person.uid), fromSidebar: true)
                 }
         }

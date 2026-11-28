@@ -247,7 +247,8 @@ extension Archive {
                 guard entry.kind == .artifact, let info = entry.artifact else { return nil }
                 return TrashedArtifact(
                     uid: info.uid, title: info.title,
-                    deletedAt: entry.deletedAt, originalSlug: info.originalSlug)
+                    deletedAt: entry.deletedAt, originalSlug: info.originalSlug,
+                    hasContent: TrashStore.payloadHoldsFiles(uid: uid, in: rootURL))
             }
         }
     }
@@ -368,6 +369,10 @@ public struct TrashedArtifact: Sendable, Equatable {
     /// ISO 8601 timestamp of deletion.
     public let deletedAt: String
     public let originalSlug: String
+    /// Whether its payload holds any file besides the record (slice 87), so a preview
+    /// has something to show. One directory listing, in the listing's pass, rather
+    /// than decoding the record: `trashedFileContents(ofArtifact:)` says which.
+    public let hasContent: Bool
 }
 
 extension Provenance {

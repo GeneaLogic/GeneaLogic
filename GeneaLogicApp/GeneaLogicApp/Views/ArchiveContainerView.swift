@@ -167,6 +167,8 @@ struct ArchiveContainerView: View {
             // model is captured here and outlives the view, so the task completes
             // even though the window is gone.
             .onDisappear {
+                // The panel's items are this window's files (slice 87).
+                QuickLookPanel.shared.close(for: model)
                 if ArchiveAccessStore.shared.resignWindow(url, token: windowToken) {
                     let model = model
                     Task {

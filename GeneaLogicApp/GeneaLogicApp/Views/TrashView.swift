@@ -117,7 +117,9 @@ struct TrashView: View {
                                     deleteHelp:
                                         "Remove this artifact for good. This can't be undone.",
                                     onRestore: { model.restoreFromTrash(item.uid) },
-                                    onDelete: { pendingArtifactDelete = item })
+                                    onDelete: { pendingArtifactDelete = item },
+                                    onQuickLook: { model.quickLookTrashed(item.uid) },
+                                    canQuickLook: item.hasContent)
                             }
                         }
                     }
@@ -133,7 +135,9 @@ struct TrashView: View {
                                         "Re-attach this file to “\(Self.artifactTitle(of: item))”.",
                                     deleteHelp: "Remove this file for good. This can't be undone.",
                                     onRestore: { model.restoreFile(item) },
-                                    onDelete: { pendingFileDelete = item })
+                                    onDelete: { pendingFileDelete = item },
+                                    onQuickLook: { model.quickLookTrashed(item.uid) },
+                                    canQuickLook: item.hasContent)
                             }
                         }
                     }
@@ -145,15 +149,13 @@ struct TrashView: View {
     }
 
     private static func title(of item: TrashedArtifact) -> String {
-        item.title.isEmpty ? untitledArtifact : item.title
+        ArtifactTitle.display(item.title)
     }
 
     /// The artifact a trashed file came from, named as a trashed artifact is.
     private static func artifactTitle(of item: TrashedFile) -> String {
-        item.artifactTitle.isEmpty ? untitledArtifact : item.artifactTitle
+        ArtifactTitle.display(item.artifactTitle)
     }
-
-    private static let untitledArtifact = "Untitled Artifact"
 
     private static func name(of item: TrashedFile) -> String {
         item.originalName.isEmpty ? "Untitled File" : item.originalName
@@ -190,7 +192,9 @@ private struct TrashSection<Rows: View>: View {
 }
 
 /// One trashed item's row, for both kinds: leading icon, title + subtitle, and the
-/// Restore / Delete Permanently… buttons, which its context menu repeats.
+/// Quick Look, Restore and Delete Permanently… buttons, which its context menu repeats.
+/// Quick Look (slice 87, fork 4) shows what a permanent delete would destroy; the rows
+/// have no selection, so there is no Space for it.
 private struct TrashRow: View {
     let icon: String
     let title: String
@@ -199,6 +203,10 @@ private struct TrashRow: View {
     let deleteHelp: String
     let onRestore: () -> Void
     let onDelete: () -> Void
+    let onQuickLook: () -> Void
+    /// Whether the item has bytes to show: not a record-only file, nor an artifact that
+    /// had no files.
+    let canQuickLook: Bool
 
     var body: some View {
         HStack(spacing: 12) {
@@ -214,6 +222,15 @@ private struct TrashRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
+            // In view as well as in the context menu (87's hand-test): the rows have no
+            // selection, so Space can't reach it.
+            Button(action: onQuickLook) {
+                Image(systemName: ArchiveCommand.quickLook.systemImage)
+            }
+            .buttonStyle(.borderless)
+            .disabled(!canQuickLook)
+            .help(canQuickLook ? "Quick Look" : "No file to show")
+            .accessibilityLabel(ArchiveCommand.quickLook.title)
             Button("Restore", action: onRestore)
                 .help(restoreHelp)
             Button("Delete Permanently…", role: .destructive, action: onDelete)
@@ -221,6 +238,9 @@ private struct TrashRow: View {
         }
         .padding(.vertical, 2)
         .contextMenu {
+            Button(ArchiveCommand.quickLook.title, action: onQuickLook)
+                .disabled(!canQuickLook)
+            Divider()
             Button("Restore", action: onRestore)
             Button("Delete Permanently…", role: .destructive, action: onDelete)
         }

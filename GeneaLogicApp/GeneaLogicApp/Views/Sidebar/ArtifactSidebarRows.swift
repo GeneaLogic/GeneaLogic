@@ -14,7 +14,7 @@ struct ArtifactRow: View {
         HStack(spacing: 8) {
             ArtifactThumbnail(summary: summary)
             VStack(alignment: .leading, spacing: 2) {
-                Text(summary.title)
+                Text(ArtifactTitle.display(summary.title))
                     .font(.headline)
                     .lineLimit(1)
                 subtitle
