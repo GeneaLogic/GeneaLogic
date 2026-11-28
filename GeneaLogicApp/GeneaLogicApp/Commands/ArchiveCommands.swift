@@ -32,6 +32,7 @@ struct ArchiveCommands: Commands {
             Divider()
             item(.verifyIntegrity)
             item(.showTrash)
+            item(.emptyTrash)
             DeleteMenuItem(model: activeModel)
         }
 
@@ -73,7 +74,7 @@ struct ArchiveCommands: Commands {
     private var viewMenuAdditions: some Commands {
         Group {
             CommandGroup(before: .sidebar) {
-                ForEach(ArchiveTab.allCases) { tab in
+                ForEach(ArchiveTab.numbered) { tab in
                     TabMenuItem(tab: tab, model: activeModel)
                 }
                 Divider()

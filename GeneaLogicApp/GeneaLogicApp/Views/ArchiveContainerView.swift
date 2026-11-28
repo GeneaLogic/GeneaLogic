@@ -84,7 +84,7 @@ struct ArchiveContainerView: View {
     /// An `ArchiveTab` view over the stored raw value, driving the tab bar.
     private var tab: Binding<ArchiveTab> {
         Binding(
-            get: { ArchiveTab(rawValue: selectedTabRaw) ?? .artifacts },
+            get: { ArchiveTab(stored: selectedTabRaw) },
             set: { tab in
                 selectedTabRaw = tab.rawValue
                 if tab.section == .people { peopleShowsTree = tab == .tree }
@@ -200,12 +200,6 @@ struct ArchiveContainerView: View {
             // content wouldn't inherit it — inject the model explicitly.
             .sheet(isPresented: $model.isShowingIntegrityReport) {
                 IntegrityReportSheet()
-                    .environment(model)
-            }
-            // The trash panel (File ▸ Show Trash…). Same env-injection caution as the
-            // integrity sheet — the modifier sits outside `.environment(model)` above.
-            .sheet(isPresented: $model.isShowingTrash) {
-                TrashSheet()
                     .environment(model)
             }
             // The single shared add-media importer (open-archive is handled at the
@@ -448,8 +442,13 @@ private struct OpenArchiveView: View {
                 if let target {
                     // Going to Review ends a search (84's hand-test): Review's rows aren't
                     // search results, so its section hides while one is on, and the row
-                    // the window opens on would be nowhere in the sidebar.
-                    if target == .review, !model.searchText.trimmed.isEmpty { model.endSearch() }
+                    // the window opens on would be nowhere in the sidebar. Trash's row
+                    // hides the same way (slice 86).
+                    if SidebarSection.hidden(isSearching: true).contains(target.section),
+                        !model.searchText.trimmed.isEmpty
+                    {
+                        model.endSearch()
+                    }
                     tab = target
                     model.pendingTab = nil
                     revealRequest += 1
@@ -534,6 +533,7 @@ private struct OpenArchiveView: View {
             detail
         }
         .modifier(ReviewCommandHost(selection: $reviewSelection))
+        .modifier(EmptyTrashConfirmation())
         // Drag-in ingest, from any area: a create, so it switches to Artifacts once the
         // artifact exists (`commitIngest`).
         .dropDestination(for: URL.self) { urls, _ in
@@ -581,6 +581,8 @@ private struct OpenArchiveView: View {
             TreeTab(focus: $personSelection)
                 // The Person menu's adds, whose sheets the person's page owns elsewhere.
                 .modifier(TreePersonAdds())
+        case .trash:
+            TrashView()
         }
     }
 

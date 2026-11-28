@@ -1,10 +1,17 @@
+import AppKit
 import GeneaLogicArchive
 import GeneaLogicModel
 import SwiftUI
 
 /// The window's one sidebar (slice 84): **Review, Artifacts and People** as collapsible
-/// sections of one list, each an area's collection. Selecting a row sets the area
-/// (`SidebarSelection`); the detail column shows that area's item.
+/// sections of one list, each an area's collection, and the **Trash** pinned below the
+/// list (slice 86), always in view: a delete asks nothing, so where it went must not
+/// scroll away (86's hand-test). Selecting a row sets the area (`SidebarSelection`); the
+/// detail column shows that area's item.
+///
+/// The Trash is a button drawn as a sidebar row, a Tab stop of its own. The arrow keys
+/// don't cross from the main list into it, as they don't reach a Finder sidebar's footer;
+/// a click, Tab and Space, or File ▸ Show Trash does.
 ///
 /// **Why one sidebar** ([#39](https://github.com/GeneaLogic/GeneaLogic/issues/39)): the
 /// area was a toolbar control and its collection the sidebar, so the switcher read as,
@@ -12,9 +19,10 @@ import SwiftUI
 /// column of areas left the document 30 pt at the window's minimum width with the
 /// inspector open; this keeps what the two-column window had.
 ///
-/// One search field filters Artifacts and People. **Review's section hides while a
-/// search is active**, so the results start at the top and nothing unfiltered sits
-/// among them: the worklist was never searchable, because filtering work owed hides it.
+/// One search field filters Artifacts and People. **Review's section and the Trash row
+/// hide while a search is active**, so the results start at the top and nothing
+/// unfiltered sits among them: the worklist was never searchable, because filtering work
+/// owed hides it, and the trash isn't searched.
 struct ArchiveSidebar: View {
     @Environment(ArchiveModel.self) private var model
     @Binding var selection: SidebarSelection
@@ -54,23 +62,44 @@ struct ArchiveSidebar: View {
     /// nothing it reads changed.
     @State private var listSelection: SidebarItem?
 
+    /// Whether the Trash's row has the keyboard focus, which turns its highlight from gray
+    /// to the accent, as a list's does.
+    @FocusState private var isTrashFocused: Bool
+
+    /// Whether the window is the active one: an inactive window's selections are all gray.
+    @Environment(\.appearsActive) private var appearsActive
+
     var body: some View {
         // Filtered once per draw: the rows, the header's count, the Filter menu and the
         // reveal all read the same answer.
         let artifacts = ShownArtifacts(
             displayed: model.displayedArtifacts, uncataloguedOnly: uncataloguedOnly)
         let selectedRowShows = selection.item.map { rowShows($0, artifacts: artifacts) } ?? false
-        ScrollViewReader { proxy in
-            list(artifacts)
-                .onChange(of: revealRequest) { reveal(proxy, artifacts: artifacts) }
-                // `List` doesn't follow a selection set from outside, and plenty sets it:
-                // the List | Tree control, a refocus in the tree, Review's keys walking
-                // down the worklist, a record just created. Whatever moved the area or its
-                // selection, the selected row is brought into view, no further than it
-                // has to go — so a row just clicked doesn't move (84's hand-test).
-                .onChange(of: selection.area) { keepSelectionInView(proxy) }
-                .onChange(of: selection.item) { keepSelectionInView(proxy) }
+        // The Trash, pinned below the list so it stays in view however long the sections
+        // run (86's hand-test). Under the list rather than inset into it: an inset drew
+        // over the rows, which showed through.
+        VStack(spacing: 0) {
+            ScrollViewReader { proxy in
+                list(artifacts)
+                    .onChange(of: revealRequest) { reveal(proxy, artifacts: artifacts) }
+                    // `List` doesn't follow a selection set from outside, and plenty sets it:
+                    // the List | Tree control, a refocus in the tree, Review's keys walking
+                    // down the worklist, a record just created. Whatever moved the area or its
+                    // selection, the selected row is brought into view, no further than it
+                    // has to go — so a row just clicked doesn't move (84's hand-test).
+                    .onChange(of: selection.area) { keepSelectionInView(proxy) }
+                    .onChange(of: selection.item) { keepSelectionInView(proxy) }
+            }
+            if !isSearching {
+                Divider()
+                trashFooter
+            }
         }
+        // On the sidebar column's root, which keeps it a sidebar field: on a view that
+        // isn't the leading column's root it becomes a toolbar field (seen in 84's
+        // prototype).
+        .searchable(text: searchText, placement: .sidebar, prompt: "Search")
+        .searchFocused(isSearchFocused)
         .onChange(of: listSelection) { _, item in
             if let item, item != selection.item { selection.select(item) }
         }
@@ -144,22 +173,17 @@ struct ArchiveSidebar: View {
             }
         }
         .listStyle(.sidebar)
-        // On the sidebar column, which keeps it a sidebar field: on a list that isn't the
-        // leading column it becomes a toolbar field (seen in 84's prototype).
-        .searchable(text: searchText, placement: .sidebar, prompt: "Search")
-        .searchFocused(isSearchFocused)
-        // ⌫ raises the same confirm as the context menu, not a silent delete. On the
-        // selected row, so from the tree too.
+        // ⌫ does what the context menu does: an artifact moves to the Trash at once
+        // (slice 86), a person asks first. On the selected row, so from the tree too.
         .onDeleteCommand {
             switch selection.item {
             case .artifact(let id):
                 model.perform(.deleteArtifact, on: .artifact(id), fromSidebar: true)
             case .person(let id):
                 model.perform(.deletePerson, on: .person(id), fromSidebar: true)
-            case .review, nil: break
+            case .review, .trash, nil: break
             }
         }
-        .modifier(ArtifactDeleteConfirmation())
         .modifier(PersonDeleteAndMerge())
     }
 
@@ -263,6 +287,103 @@ struct ArchiveSidebar: View {
         }
     }
 
+    // MARK: - Trash
+
+    /// The Trash, pinned under the main list: a focusable row drawn as the sidebar's are
+    /// (86's hand-test). A one-row list of its own took Tab focus without selecting
+    /// anything, and selecting on focus would switch the detail as Tab passed by. A
+    /// `Button` was a Tab stop, but never takes focus from a click, so its highlight could
+    /// only be the unfocused gray. This takes focus from a click or Tab, as a list does, and
+    /// draws the sidebar's own selection (`SidebarSelectionHighlight`): the accent while it
+    /// has focus in an active window, gray otherwise. Space and Return open it.
+    ///
+    /// The count hides at zero, and the icon dims while there is nothing in the can. The
+    /// spec kept the icon fixed (fork 2, against `trash.fill`, which reads as decoration);
+    /// the hand-test asked for full and empty. A symbol with paper over the rim is #92.
+    private var trashFooter: some View {
+        let count = model.trashCount
+        let isSelected = selection.area == .trash
+        let isEmphasized = isSelected && isTrashFocused && appearsActive
+        return HStack(spacing: 6) {
+            Image(systemName: ArchiveTab.trash.systemImage)
+                .foregroundStyle(trashIconStyle(isEmpty: count == 0, emphasized: isEmphasized))
+                .frame(width: 20)
+            Text(SidebarSection.trash.title)
+            Spacer(minLength: 0)
+            if count > 0 {
+                Text("\(count)")
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        isEmphasized
+                            ? AnyShapeStyle(Self.emphasizedText.opacity(0.75))
+                            : AnyShapeStyle(.secondary))
+            }
+        }
+        .foregroundStyle(
+            isEmphasized ? AnyShapeStyle(Self.emphasizedText) : AnyShapeStyle(.primary)
+        )
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background {
+            if isSelected {
+                SidebarSelectionHighlight(isEmphasized: isEmphasized)
+                    .clipShape(.rect(cornerRadius: 8, style: .continuous))
+            }
+        }
+        .contentShape(.rect)
+        .focusable()
+        .focused($isTrashFocused)
+        // Selected, the highlight shows the focus, as a list row's does; the ring is for
+        // focus on the row while another area shows.
+        .focusEffectDisabled(isSelected)
+        .onTapGesture { openTrash() }
+        .onKeyPress(keys: [.space, .return]) { _ in
+            openTrash()
+            return .handled
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .contextMenu { CommandButton(.emptyTrash, on: .archive, fromSidebar: true) }
+        // One element, its count in its name (86's hand-test). With the count as a value,
+        // VoiceOver read the row as "2 items" and never said "Trash"; named outright, it
+        // read the name and dropped the value. Mail's rows say their count the same way.
+        // Not a `Button`, so its press is given outright.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Self.trashAccessibilityLabel(count: count))
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { openTrash() }
+    }
+
+    /// Selects the Trash and gives its row the focus, as a click in a list does.
+    private func openTrash() {
+        selection.select(.trash)
+        isTrashFocused = true
+    }
+
+    /// The can's color: dimmed while empty, in the accent while full, and in the selected
+    /// text color (dimmed or not) on the focused highlight, where the accent wouldn't show.
+    private func trashIconStyle(isEmpty: Bool, emphasized: Bool) -> AnyShapeStyle {
+        switch (emphasized, isEmpty) {
+        case (true, true): AnyShapeStyle(Self.emphasizedText.opacity(0.5))
+        case (true, false): AnyShapeStyle(Self.emphasizedText)
+        case (false, true): AnyShapeStyle(.secondary)
+        case (false, false): AnyShapeStyle(.tint)
+        }
+    }
+
+    /// Text on the focused selection's highlight, as AppKit draws it.
+    private static let emphasizedText = Color(nsColor: .alternateSelectedControlTextColor)
+
+    /// What VoiceOver calls the Trash row: "Trash", "Trash, 1 item", "Trash, 3 items".
+    static func trashAccessibilityLabel(count: Int) -> String {
+        let title = SidebarSection.trash.title
+        switch count {
+        case 0: return title
+        case 1: return "\(title), 1 item"
+        default: return "\(title), \(count) items"
+        }
+    }
+
     // MARK: - Rows shared by the sections
 
     /// Damaged-record placeholders (slice 56), pinned at the top of their section and
@@ -302,6 +423,9 @@ struct ArchiveSidebar: View {
 
     // MARK: - Reveal
 
+    /// The sections the list leaves out right now.
+    private var hidden: Set<SidebarSection> { SidebarSection.hidden(isSearching: isSearching) }
+
     private var collapsed: Set<SidebarSection> {
         var sections: Set<SidebarSection> = []
         if !reviewExpanded { sections.insert(.review) }
@@ -320,20 +444,21 @@ struct ArchiveSidebar: View {
                 || model.duplicateItems.contains { $0.id == id }
         case .artifact(let id): artifacts.visible.contains { $0.uid == id }
         case .person(let id): model.displayedPersons.contains { $0.uid == id }
+        case .trash: true
         }
     }
 
     /// Whether `item`'s row is on the list right now: listed, in an open section that
     /// isn't hidden.
     private func rowShows(_ item: SidebarItem, artifacts: ShownArtifacts) -> Bool {
-        !collapsed.contains(item.section) && !(isSearching && item.section == .review)
+        !collapsed.contains(item.section) && !hidden.contains(item.section)
             && isListed(item, artifacts: artifacts)
     }
 
     /// Scrolls the selected row into view, if its section is showing it.
     private func keepSelectionInView(_ proxy: ScrollViewProxy) {
-        guard let item = selection.item, !collapsed.contains(item.section),
-            !(isSearching && item.section == .review)
+        guard let item = selection.item, item.section != .trash,
+            !collapsed.contains(item.section), !hidden.contains(item.section)
         else { return }
         let target = SidebarRowID.item(item)
         // Twice, for the reason `reveal` gives.
@@ -343,13 +468,13 @@ struct ArchiveSidebar: View {
 
     private func reveal(_ proxy: ScrollViewProxy, artifacts: ShownArtifacts) {
         let reveal = SidebarReveal(
-            for: selection, collapsed: collapsed, hidden: isSearching ? [.review] : []
+            for: selection, collapsed: collapsed, hidden: hidden
         ) { isListed($0, artifacts: artifacts) }
         switch reveal.expand {
         case .review: reviewExpanded = true
         case .artifacts: artifactsExpanded = true
         case .people: peopleExpanded = true
-        case nil: break
+        case .trash, nil: break
         }
         guard let target = reveal.target else { return }
         // Unanimated, and again once the list has laid out: rows below the fold have
@@ -427,5 +552,26 @@ private struct SidebarSectionHeader<Controls: View>: View {
 
     private func toggle() {
         withAnimation(.snappy(duration: 0.2)) { isExpanded.toggle() }
+    }
+}
+
+/// A sidebar row's selection highlight, as AppKit draws it: the `.selection` material,
+/// emphasized while the row has focus (86's hand-test). A sidebar's selection is a
+/// vibrant material that blends with the translucent sidebar behind it, so a flat fill of
+/// the system's selection colors came out a shade off from the list's rows beside it.
+private struct SidebarSelectionHighlight: NSViewRepresentable {
+    let isEmphasized: Bool
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .selection
+        view.blendingMode = .withinWindow
+        view.state = .followsWindowActiveState
+        view.isEmphasized = isEmphasized
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        view.isEmphasized = isEmphasized
     }
 }

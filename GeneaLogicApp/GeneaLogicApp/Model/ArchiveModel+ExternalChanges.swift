@@ -47,6 +47,7 @@ extension ArchiveModel {
         // transient; the cost is one `stat` per manifest entry per second, on an
         // archive that is by definition busy receiving one.
         if deliveryInFlightSince != nil || fileSweepCoalesced { reloadFileDamage() }
+        reloadTrashIfChangedExternally()
         guard let token = archive.externalChangeToken() else { return }
         defer { lastExternalChangeToken = token }
         // No baseline yet (the token was unreadable at load) — adopt this one

@@ -8,7 +8,7 @@ import GeneaLogicModel
 /// Deleting an artifact or detaching a file moves its bytes into a reserved
 /// `.trash/<uid>/` inside the package rather than destroying them, so a deletion
 /// survives quitting the app. The CLI had no view of that store at all; these
-/// commands are the headless door to the same one the app's Trash sheet opens.
+/// commands are the headless door to the same one the app's Trash shows.
 ///
 /// **One namespace, two kinds.** Artifacts (`ART-…`) and files (`FIL-…`) share
 /// the trash, keyed by their own uids — the `TrashEntry.kind` discriminator — and

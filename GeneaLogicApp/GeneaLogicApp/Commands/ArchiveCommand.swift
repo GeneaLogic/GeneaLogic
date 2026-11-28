@@ -11,7 +11,7 @@ import SwiftUI
 /// on.
 enum ArchiveCommand: Hashable, CaseIterable {
     // File
-    case addArtifact, newPerson, verifyIntegrity, showTrash
+    case addArtifact, newPerson, verifyIntegrity, showTrash, emptyTrash
     // Edit
     case find
     // View. One case per tab rather than `showTab(ArchiveTab)`, so `allCases` is the
@@ -47,13 +47,14 @@ enum ArchiveCommand: Hashable, CaseIterable {
     // A candidate in Review's names lane
     case confirmCandidate, rejectCandidate
 
-    /// The command that shows `tab` (View ▸ ⌘1–⌘4).
+    /// The command that shows `tab`: View ▸ ⌘1–⌘4, and File ▸ Show Trash (slice 86).
     nonisolated static func showTab(_ tab: ArchiveTab) -> ArchiveCommand {
         switch tab {
         case .artifacts: .showArtifacts
         case .people: .showPeople
         case .tree: .showTree
         case .review: .showReview
+        case .trash: .showTrash
         }
     }
 
@@ -64,20 +65,22 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .artifacts: .deleteArtifact
         // The tree is People too (slice 84's hand-test).
         case .people, .tree: .deletePerson
-        case .review: nil
+        // The Trash's rows have their own Delete Permanently… (slice 86).
+        case .review, .trash: nil
         }
     }
 
     /// File ▸ Delete's title on a tab with nothing to delete, dimmed.
     static let idleDeleteTitle = "Delete…"
 
-    /// The tab this command shows, if it is one of View's tab commands.
+    /// The tab this command shows, if it is one of View's tab commands or Show Trash.
     var shownTab: ArchiveTab? {
         switch self {
         case .showArtifacts: .artifacts
         case .showPeople: .people
         case .showTree: .tree
         case .showReview: .review
+        case .showTrash: .trash
         default: nil
         }
     }
@@ -101,7 +104,8 @@ enum ArchiveCommand: Hashable, CaseIterable {
 
     var subjectKind: SubjectKind {
         switch self {
-        case .addArtifact, .newPerson, .verifyIntegrity, .showTrash, .find, .showArtifacts,
+        case .addArtifact, .newPerson, .verifyIntegrity, .showTrash, .emptyTrash, .find,
+            .showArtifacts,
             .showPeople, .showTree, .showReview, .toggleInspector, .refreshReview, .moreAncestors,
             .fewerAncestors, .moreDescendants, .fewerDescendants, .chooseFocus:
             .archive
@@ -160,7 +164,11 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .addArtifact: "Add Artifact…"
         case .newPerson: "New Person…"
         case .verifyIntegrity: "Verify Integrity…"
-        case .showTrash: "Show Trash…"
+        // No dialog follows since slice 86: it selects the sidebar's Trash row.
+        case .showTrash: "Show Trash"
+        // Finder's, from the Trash's own strip, its sidebar row and the File menu (86's
+        // hand-test). It still asks: it can't be undone.
+        case .emptyTrash: "Empty Trash…"
         case .find: "Find…"
         case .showArtifacts, .showPeople, .showTree, .showReview: shownTab?.label ?? ""
         case .toggleInspector: "Hide Inspector"
@@ -170,13 +178,15 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .addMention: "Add Person Mentioned…"
         case .editTranscript: "Edit Transcript…"
         case .attachFile: "Attach File…"
-        case .deleteArtifact: "Delete Artifact…"
+        // Finder's name, which says where it goes (slice 86, fork 3). No confirm: ⌘Z and
+        // the sidebar's Trash both bring it back. Delete Person… still asks (#11).
+        case .deleteArtifact: "Move to Trash"
         case .openFileInWindow: "Open in Separate Window"
         case .openFileInDefaultApp: "Open in Default App"
         case .saveFileCopy: "Save a Copy…"
         case .scanFileForMetadata: "Scan for Metadata"
         case .replaceFile: "Replace…"
-        case .deleteFile: "Delete File…"
+        case .deleteFile: "Move to Trash"
         case .addName: "Add Name…"
         case .addFact: "Add Fact…"
         case .addRelationship: "Add Relationship…"
@@ -349,6 +359,7 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .newPerson: "person.badge.plus"
         case .verifyIntegrity: "checkmark.shield"
         case .showTrash: "trash"
+        case .emptyTrash: "trash.slash"
         case .find: "magnifyingglass"
         case .showArtifacts, .showPeople, .showTree, .showReview: "square.grid.2x2"
         case .toggleInspector: "info.circle"
@@ -405,7 +416,8 @@ enum ArchiveCommand: Hashable, CaseIterable {
 
     var isDestructive: Bool {
         switch self {
-        case .deleteArtifact, .deleteFile, .deletePerson, .removeMention, .removeRelationship:
+        case .deleteArtifact, .deleteFile, .deletePerson, .removeMention, .removeRelationship,
+            .emptyTrash:
             true
         default: false
         }
@@ -457,11 +469,13 @@ enum ArchiveCommand: Hashable, CaseIterable {
         case .newPerson: KeyboardShortcut("n", modifiers: [.command, .shift])
         case .find: KeyboardShortcut("f", modifiers: [.command])
         case .showArtifacts, .showPeople, .showTree, .showReview:
-            shownTab.map { KeyboardShortcut($0.shortcutKey, modifiers: [.command]) }
+            shownTab?.shortcutKey.map { KeyboardShortcut($0, modifiers: [.command]) }
         // Finder, Calendar and Pages put the inspector on ⌥⌘I.
         case .toggleInspector: KeyboardShortcut("i", modifiers: [.command, .option])
         // Finder's Move to Trash, and both deletes go to the archive's trash or undo.
         case .deleteArtifact, .deletePerson: KeyboardShortcut(.delete, modifiers: [.command])
+        // Finder's Empty Trash.
+        case .emptyTrash: KeyboardShortcut(.delete, modifiers: [.command, .shift])
         // One key per role, shared across tabs as ⌘⌫ is (slice 83, fork 6). ⌘E and ⌘T are
         // text-editing keys elsewhere, whose actions mean nothing here: there is no find
         // panel and no styled text.
@@ -562,6 +576,8 @@ struct CommandContext: Equatable {
     /// The person the Tree is drawn around, while it shows.
     var treeFocus: PersonID?
     var treeDepths = TreeDepths()
+    /// How many items the trash holds: Empty Trash… needs something to empty.
+    var trashCount = 0
     /// A Review decision is still being written. Its row stays until the write lands, so
     /// Review's two verbs wait rather than decide that row a second time.
     var isDecidingReview = false
@@ -605,6 +621,7 @@ struct CommandContext: Equatable {
         // The inspector belongs to the artifact detail, which shows only with a selection.
         case .toggleInspector: return selectedArtifact != nil
         case .mergePerson: return personCount > 1
+        case .emptyTrash: return trashCount > 0
         // The tree runs People's verbs, but this one would show what is already showing:
         // the tree's focus is the people selection. A sidebar row names its own person.
         case .showInTree: return fromSidebar || activeTab != .tree
@@ -662,13 +679,15 @@ extension ArchiveTab {
         tab == self || (self == .tree && tab == .people)
     }
 
-    /// ⌘1–⌘4, in the switcher's order, as Finder and Mail number theirs (G2).
-    fileprivate var shortcutKey: KeyEquivalent {
+    /// ⌘1–⌘4, in the switcher's order, as Finder and Mail number theirs (G2). Trash has
+    /// none, as Finder's and Notes' have none (slice 86).
+    fileprivate var shortcutKey: KeyEquivalent? {
         switch self {
         case .artifacts: "1"
         case .people: "2"
         case .tree: "3"
         case .review: "4"
+        case .trash: nil
         }
     }
 }

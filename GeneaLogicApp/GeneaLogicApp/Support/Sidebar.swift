@@ -2,15 +2,16 @@ import GeneaLogicArchive
 import GeneaLogicModel
 
 /// The window's one sidebar (slice 84): **Review, Artifacts and People** as sections of
-/// one list, each section an area's collection. The types here are the sidebar's logic
-/// with no SwiftUI in it, so it can be tested as values: which area a row belongs to,
+/// one list, each section an area's collection, and the **Trash** pinned below it (86).
+/// The types here are the sidebar's logic with no SwiftUI in it, so it can be tested as values: which area a row belongs to,
 /// where a switch of area scrolls to, what a header's count says, and the order of
 /// Review's rows.
 
-/// One of the sidebar's three sections, in the sidebar's order. Review is first: it is
-/// the work owed.
+/// One of the sidebar's sections, in the sidebar's order. Review is first: it is the work
+/// owed. Trash is last: one row, pinned under the list rather than in it, so it neither
+/// collapses nor scrolls away.
 enum SidebarSection: String, CaseIterable, Identifiable {
-    case review, artifacts, people
+    case review, artifacts, people, trash
 
     var id: String { rawValue }
 
@@ -19,7 +20,14 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         case .review: "Review"
         case .artifacts: "Artifacts"
         case .people: "People"
+        case .trash: "Trash"
         }
+    }
+
+    /// The sections a search hides. Their rows aren't search results, and left among the
+    /// results they would sit there unfiltered: Review (slice 84) and Trash (86).
+    static func hidden(isSearching: Bool) -> Set<SidebarSection> {
+        isSearching ? [.review, .trash] : []
     }
 }
 
@@ -31,6 +39,7 @@ extension ArchiveTab {
         case .artifacts: .artifacts
         case .people, .tree: .people
         case .review: .review
+        case .trash: .trash
         }
     }
 }
@@ -41,12 +50,15 @@ enum SidebarItem: Hashable {
     case review(ReviewItem.ID)
     case artifact(ArtifactID)
     case person(PersonID)
+    /// The Trash row, which is its area's only row (slice 86).
+    case trash
 
     var section: SidebarSection {
         switch self {
         case .review: .review
         case .artifact: .artifacts
         case .person: .people
+        case .trash: .trash
         }
     }
 }
@@ -78,6 +90,7 @@ struct SidebarSelection: Equatable {
         case .artifacts: artifact.map(SidebarItem.artifact)
         case .people: person.map(SidebarItem.person)
         case .review: review.map(SidebarItem.review)
+        case .trash: .trash
         }
     }
 
@@ -101,6 +114,8 @@ struct SidebarSelection: Equatable {
         case .person(let id):
             if area.section != .people { area = peopleShowsTree ? .tree : .people }
             person = id
+        case .trash:
+            area = .trash
         case nil:
             break
         }
@@ -112,7 +127,7 @@ struct SidebarSelection: Equatable {
 ///
 /// It scrolls to the area's selection if the list shows it, else to the section's
 /// header, and expands the section first if it is collapsed. A hidden section (Review
-/// while searching) has nothing to scroll to.
+/// and Trash while searching) has nothing to scroll to.
 struct SidebarReveal: Equatable {
     /// The section to expand before scrolling, if it is collapsed.
     var expand: SidebarSection?
@@ -132,7 +147,8 @@ struct SidebarReveal: Equatable {
         hidden: Set<SidebarSection>, isListed: (SidebarItem) -> Bool
     ) {
         let section = selection.area.section
-        guard !hidden.contains(section) else {
+        // The Trash is pinned under the list, always in view: nothing to scroll to.
+        guard !hidden.contains(section), section != .trash else {
             self.init(expand: nil, target: nil)
             return
         }

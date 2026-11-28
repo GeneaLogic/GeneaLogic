@@ -304,15 +304,35 @@ extension Archive {
     }
 
     /// The files currently in the trash, **most recently deleted first** — what a Trash
-    /// UI lists alongside `trashedArtifacts()`. Reads only the `deletion.json` sidecars
-    /// (name + owning-artifact title are denormalized there), so no payload is decoded.
+    /// UI lists alongside `trashedArtifacts()`. Reads the `deletion.json` sidecars, so no
+    /// payload is decoded.
+    ///
+    /// **`artifactTitle` is the owning artifact's title now, not at deletion** (slice 86,
+    /// #4): the artifact's current title while it exists, else its trashed entry's if it
+    /// is in the trash too, else the title `deletion.json` stored. The stored title is
+    /// only the fallback, so a rename after the detach shows here and nothing on disk
+    /// changes. One index lookup per owning artifact, not per file.
     public func trashedFiles() -> [TrashedFile] {
-        withReadState { _, _ in
-            TrashStore.entries(in: rootURL).compactMap { _, entry in
+        withReadState { _, index in
+            let entries = TrashStore.entries(in: rootURL)
+            var trashedTitles: [ArtifactID: String] = [:]
+            for (_, entry) in entries where entry.kind == .artifact {
+                if let info = entry.artifact { trashedTitles[info.uid] = info.title }
+            }
+            var titles: [ArtifactID: String] = [:]
+            func title(of info: FileTrashInfo) -> String {
+                if let known = titles[info.artifactUID] { return known }
+                let current =
+                    ((try? index.artifact(info.artifactUID)) ?? nil)?.title
+                    ?? trashedTitles[info.artifactUID] ?? info.artifactTitle
+                titles[info.artifactUID] = current
+                return current
+            }
+            return entries.compactMap { _, entry in
                 guard entry.kind == .file, let info = entry.file else { return nil }
                 return TrashedFile(
                     uid: info.entry.uid, originalName: info.entry.originalName,
-                    artifactUID: info.artifactUID, artifactTitle: info.artifactTitle,
+                    artifactUID: info.artifactUID, artifactTitle: title(of: info),
                     deletedAt: entry.deletedAt)
             }
         }

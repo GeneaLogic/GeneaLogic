@@ -439,7 +439,7 @@ import Testing
             ArchiveCommand.newPerson.shortcut
                 == KeyboardShortcut("n", modifiers: [.command, .shift]))
         #expect(
-            ArchiveTab.allCases.map { ArchiveCommand.showTab($0).shortcut }
+            ArchiveTab.numbered.map { ArchiveCommand.showTab($0).shortcut }
                 == "1234".map { KeyboardShortcut(KeyEquivalent($0), modifiers: .command) })
         #expect(
             ArchiveCommand.deleteArtifact.shortcut == KeyboardShortcut(.delete, modifiers: .command)

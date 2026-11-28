@@ -4507,6 +4507,34 @@ been two slices.
   restore tells it, which also brings it to the front (hand-test; 85b's "it follows"
   was half true).
 
+- **86 — a visible trash** (app, plus engine reads; no format change). G7: #42, #4.
+  **Decided:** the trash is an area (`ArchiveTab.trash`), pinned under the sidebar's
+  list with a count hidden at zero, and the sheet is gone. **From the hand-test:** a
+  footer, since as the list's last row it scrolled away below People; a focusable row
+  drawn as the list's, since a one-row list took Tab focus without selecting and a
+  `Button` never takes focus from a click, so it could only show the unfocused gray. Its
+  highlight is the `.selection` material, not the flat selection colors, which came out a
+  shade off beside the list's vibrant one. The empty can dims (a
+  full-trash symbol is #92); Empty Trash… is a command (⇧⌘⌫, the row's context menu);
+  the Trash's rows are in a scroll view, since a `List` row's buttons are no Tab stops.
+  VoiceOver reads one string for the row, so the count is in its label, and
+  `.accessibilityElement(children: .ignore)` on a button drops its press action. File ▸ Show Trash selects it; it has no
+  ⌘-number, so the View menu walks `ArchiveTab.numbered`, not `allCases`. Moving an
+  artifact or a file to the Trash no longer asks; Delete Person… still does (#11). #4 is
+  fixed at read time: `trashedFiles()` names the artifact's current title, else its trashed
+  entry's, else the one `deletion.json` stored. **The invariant:** a refresh reads only
+  `trashedItemCount()` (one directory listing); the listings are read only while the
+  Trash shows. **Measured, as the spec asked** (1,000 entries, release): the two listings
+  take ~60 ms, all I/O on each entry's `deletion.json`. A `stat` per record to make the
+  count exact costs ~10 ms, and the listing alone ~2 ms. The count can run high only by
+  a torn or undecodable entry, and where the list shows, its own count stands in.
+  **Gotchas:** a purge by another process (`genea trash empty`) commits nothing to the
+  index, so the poll's token can't see it; the poll compares the count each tick, against
+  the last cheap count, since the listings skip a damaged entry and would differ forever.
+  An mtime cache for `.trash/` was rejected: an entry's folder appears before its record.
+  With no confirmation, a double ⌘⌫ reached the engine twice and the second failed, so a
+  move still on its way drops a repeat (`/code-review`).
+
 ## Carryovers and parked work
 
 *(Verbatim from the pre-split CLAUDE.md. ROADMAP's "Immediate next step" is the

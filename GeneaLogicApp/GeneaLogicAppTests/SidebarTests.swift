@@ -23,6 +23,7 @@ import Testing
         #expect(selection(on: .people).item == .person(person))
         #expect(selection(on: .tree).item == .person(person))
         #expect(selection(on: .review).item == .review(review))
+        #expect(selection(on: .trash).item == .trash)
     }
 
     /// Selecting a row sets the area, and leaves the other areas' selections alone.
@@ -42,6 +43,12 @@ import Testing
         state.select(.artifact(ArtifactID("ART-b")))
         #expect(state.area == .artifacts)
         #expect(state.item == .artifact(ArtifactID("ART-b")))
+
+        // The Trash row is its area's only row (slice 86).
+        state.select(.trash)
+        #expect(state.area == .trash)
+        #expect(state.artifact == ArtifactID("ART-b"))
+        #expect(state.person == otherPerson)
     }
 
     /// Picking someone while the tree shows refocuses the tree.
@@ -80,10 +87,18 @@ import Testing
     }
 
     @Test func eachAreaHasItsSection() {
-        #expect(ArchiveTab.allCases.map(\.section) == [.artifacts, .people, .people, .review])
+        #expect(
+            ArchiveTab.allCases.map(\.section) == [.artifacts, .people, .people, .review, .trash])
         #expect(SidebarItem.review(review).section == .review)
         #expect(SidebarItem.artifact(artifact).section == .artifacts)
         #expect(SidebarItem.person(person).section == .people)
+        #expect(SidebarItem.trash.section == .trash)
+    }
+
+    /// Like Review, the Trash row hides while a search is active (slice 86).
+    @Test func aSearchHidesReviewAndTheTrash() {
+        #expect(SidebarSection.hidden(isSearching: true) == [.review, .trash])
+        #expect(SidebarSection.hidden(isSearching: false).isEmpty)
     }
 }
 
@@ -124,6 +139,12 @@ import Testing
         let result = reveal(state, collapsed: [.review, .people])
         #expect(result == SidebarReveal(expand: .review, target: .item(.review("name|ART-a|p1"))))
         #expect(reveal(SidebarSelection(area: .artifacts), collapsed: [.review]).expand == nil)
+    }
+
+    /// The Trash is pinned under the list, always in view, so a jump to it scrolls nothing
+    /// (slice 86).
+    @Test func theTrashHasNothingToScrollTo() {
+        #expect(reveal(SidebarSelection(area: .trash)) == SidebarReveal(expand: nil, target: nil))
     }
 
     /// Review hides while searching, so there is nothing to scroll to or expand.
@@ -242,7 +263,9 @@ import Testing
         let person = PersonID("PER-a")
         let context = CommandContext(
             hasArchive: true, activeTab: .tree, selectedPerson: person, personCount: 2)
-        for command in [ArchiveCommand.addName, .addFact, .addRelationship, .mergePerson, .deletePerson] {
+        for command in [
+            ArchiveCommand.addName, .addFact, .addRelationship, .mergePerson, .deletePerson,
+        ] {
             #expect(context.isAvailable(command), "\(command) on the tree")
         }
     }
@@ -284,17 +307,27 @@ import Testing
         #expect(!context.canPerform(.deletePerson, on: .person(person), fromSidebar: true))
     }
 
-    /// From another area the verb reaches the view that runs it.
-    @Test func aSidebarDeleteFromReviewIsLeftForTheSidebar() throws {
+    /// From another area the sidebar's Move to Trash runs, at once (slice 86); the menu
+    /// bar's doesn't.
+    @Test func aSidebarMoveToTrashFromReviewRuns() async throws {
         let (model, root) = try AppTestSupport.makeModel()
         defer { AppTestSupport.remove(root) }
+        let source = root.deletingLastPathComponent()
+            .appendingPathComponent("src-\(UUID().uuidString)-census.txt")
+        try Data("scan".utf8).write(to: source)
+        await model.act { model.ingest([source]) }
+        let artifact = try #require(model.artifacts.first?.uid)
         model.activeTab = .review
 
-        model.perform(.deleteArtifact, on: .artifact(artifact))
-        #expect(model.pendingCommand == nil)
+        await model.act { model.perform(.deleteArtifact, on: .artifact(artifact)) }
+        #expect(model.artifacts.map(\.uid) == [artifact])
 
-        model.perform(.deleteArtifact, on: .artifact(artifact), fromSidebar: true)
-        #expect(model.claimPendingCommand { $0 == .deleteArtifact } != nil)
+        await model.act {
+            model.perform(.deleteArtifact, on: .artifact(artifact), fromSidebar: true)
+        }
+        #expect(model.pendingCommand == nil)
+        #expect(model.artifacts.isEmpty)
+        #expect(model.trashCount == 1)
     }
 
     /// The tree is People too, so a new person stays on it, as its new focus.

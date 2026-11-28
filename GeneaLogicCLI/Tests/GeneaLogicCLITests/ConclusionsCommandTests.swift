@@ -721,7 +721,7 @@ import Testing
 
     /// `remove` moves an artifact to the package trash rather than destroying it, and
     /// `trash restore` brings it back uid-faithfully — the headless door onto the
-    /// same store the app's Trash sheet opens.
+    /// same store the app's Trash shows.
     @Test func artifactRoundTripsThroughTheTrash() throws {
         let archive = try makeArchive()
         let artifact = try addArtifact(archive, title: "1920 Census")

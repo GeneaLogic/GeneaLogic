@@ -22,9 +22,10 @@ struct PersonRow: View {
 }
 
 /// Delete Person…'s confirm and Merge Into…'s picker and confirm, from ⌫, the Person
-/// menu and a row's context menu. On the sidebar as a whole, like
-/// `ArtifactDeleteConfirmation`, so they work with the section collapsed or a search
-/// showing none of the people.
+/// menu and a row's context menu. On the sidebar as a whole, so they work with the
+/// section collapsed or a search showing none of the people. A person still confirms
+/// where an artifact no longer does (slice 86): its delete is undone only in this session,
+/// until #11 gives conclusions a trash.
 struct PersonDeleteAndMerge: ViewModifier {
     @Environment(ArchiveModel.self) private var model
 

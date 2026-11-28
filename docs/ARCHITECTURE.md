@@ -1183,9 +1183,9 @@ attach-to-existing + file roles; sidebar search via `artifacts(matching:)`; and 
 transcript editor — a dedicated `TextEditor` sheet for the inline `transcript`, plus
 indexing `role:"transcript"` *file* text (the `artifact.search_text` index column,
 §5.1) so search covers file transcripts; **undo/redo + detach/replace file** (the
-app-layer-durability bullet below); and **undoable artifact deletion** (sidebar
-Delete Artifact… → confirm; the engine stages the whole folder so `removeArtifact`/
-`restoreArtifact` round-trip). Still to come: people/tree, explainable confidence.
+app-layer-durability bullet below); and **undoable artifact deletion** (Move to Trash,
+without a confirmation since slice 86, the sidebar's Trash row showing what it holds; the
+engine stages the whole folder so `removeArtifact`/`restoreArtifact` round-trip). Still to come: people/tree, explainable confidence.
 
 - **Archive management**: ingest media (assign UID, compute checksum, create
   sidecar), browse/search artifacts, edit metadata, manage transcripts, attach
