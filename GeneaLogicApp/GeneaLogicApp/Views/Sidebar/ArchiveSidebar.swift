@@ -182,8 +182,10 @@ struct ArchiveSidebar: View {
         }
         .listStyle(.sidebar)
         // ⌘C copies the selected row as a line of text (slice 87, fork 2). Scoped to the
-        // list's focus, so a text field's Copy is its own.
-        .copyable(model.copiedRecords(for: selection.item))
+        // list's focus, so a text field's Copy is its own. Not `.copyable`: given nothing
+        // to copy (a Review row), it left Edit ▸ Copy live, copying nothing (87's
+        // hand-test). A `nil` action dims it.
+        .onCopyCommand(perform: copyAction)
         // Space shows the selected artifact's files in Quick Look, as Finder's does.
         .onKeyPress(.space) {
             guard case .artifact(let id) = selection.item else { return .ignored }
@@ -202,6 +204,26 @@ struct ArchiveSidebar: View {
             }
         }
         .modifier(PersonDeleteAndMerge())
+    }
+
+    // MARK: - Copy (slice 87)
+
+    /// ⌘C's action: the selected row's copy, or `nil` for a row that has none, which
+    /// dims Edit ▸ Copy. Only an artifact or a person has one.
+    private var copyAction: (() -> [NSItemProvider])? {
+        switch selection.item {
+        case .artifact, .person:
+            let item = selection.item
+            return {
+                model.copiedRecords(for: item).map { record in
+                    let provider = NSItemProvider()
+                    provider.register(record)
+                    return provider
+                }
+            }
+        case .review, .trash, nil:
+            return nil
+        }
     }
 
     // MARK: - Selection and search
