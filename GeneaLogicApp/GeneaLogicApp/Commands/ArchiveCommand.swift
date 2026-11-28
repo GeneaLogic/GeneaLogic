@@ -258,7 +258,7 @@ enum ArchiveCommand: Hashable, CaseIterable {
         // Finder's Quick Look “name”, on the artifact whose files it shows. Unnamed while it
         // can't run, so it doesn't name a selection another area left behind.
         case .quickLook:
-            guard context.isAvailable(self), let name = context.selectedArtifactTitle,
+            guard context.isAvailable(self), let name = context.selectedArtifactTitle?.trimmed,
                 !name.isEmpty
             else { return title }
             return "Quick Look “\(name)”"

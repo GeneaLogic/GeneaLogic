@@ -58,18 +58,21 @@ extension ArchiveModel {
     // MARK: - Quick Look (slice 87, G16)
 
     /// Space and ⌘Y on an artifact, and Quick Look on one of its files: the panel on the
-    /// artifact's files, from `file`, else the one the detail previews, else the first. A
-    /// second press closes it.
+    /// artifact's files, from `file`, else the one the detail previews, else the first.
+    /// Asking again for the same closes it; asking for another artifact, or naming another
+    /// of its files, switches it.
     func toggleQuickLook(_ artifactID: ArtifactID, at file: FileID? = nil) {
         let (items, index) = quickLookItems(of: artifactID, at: file)
-        QuickLookPanel.shared.toggle(items, at: index, for: self)
+        QuickLookPanel.shared.toggle(
+            items, at: index, key: QuickLookPanel.key(artifactID.raw, file: file?.raw), for: self)
     }
 
     /// Moves the panel to the newly selected artifact while it is up, as Finder's follows
     /// its selection. With nothing to show, the panel closes.
     func quickLookFollowSelection(_ artifactID: ArtifactID?) {
         let (items, index) = artifactID.map { quickLookItems(of: $0) } ?? ([], 0)
-        QuickLookPanel.shared.follow(items, at: index, for: self)
+        QuickLookPanel.shared.follow(
+            items, at: index, key: QuickLookPanel.key(artifactID?.raw ?? ""), for: self)
     }
 
     private func quickLookItems(
@@ -86,28 +89,25 @@ extension ArchiveModel {
     }
 
     /// Quick Look on a trashed artifact (slice 87, fork 4): what its payload still holds,
-    /// read from `.trash/`, so you can see what Delete Permanently… would destroy.
+    /// read from `.trash/`, so you can see what Delete Permanently… would destroy. Its item
+    /// is dimmed when there is nothing (`TrashedArtifact.hasContent`).
     func quickLookTrashed(_ artifactID: ArtifactID) {
         let items = (archive?.trashedFileContents(ofArtifact: artifactID) ?? []).map(trashItem)
-        QuickLookPanel.shared.toggle(items, at: 0, for: self)
+        QuickLookPanel.shared.toggle(
+            items, at: 0, key: QuickLookPanel.key("trash/\(artifactID.raw)"), for: self)
     }
 
     /// Quick Look on a trashed file. A record-only one has no bytes, and its item is dimmed
-    /// (`canQuickLookTrashed`).
+    /// (`TrashedFile.hasContent`).
     func quickLookTrashed(_ file: FileID) {
         let items = archive?.trashedFileContent(file).map { [trashItem($0)] } ?? []
-        QuickLookPanel.shared.toggle(items, at: 0, for: self)
-    }
-
-    /// Whether a trashed file has bytes to show: not a record-only entry.
-    func canQuickLookTrashed(_ file: FileID) -> Bool {
-        trashedFilesWithContent.contains(file)
+        QuickLookPanel.shared.toggle(
+            items, at: 0, key: QuickLookPanel.key("trash/\(file.raw)"), for: self)
     }
 
     private func trashItem(_ content: TrashedFileContent) -> QuickLookPanel.Item {
         QuickLookPanel.Item(name: content.originalName) { [weak self] in
-            self?.temporaryCopy(
-                of: content.url, id: content.uid.raw, originalName: content.originalName)
+            self?.temporaryCopy(of: content.url, id: content.uid, originalName: content.originalName)
         }
     }
 }

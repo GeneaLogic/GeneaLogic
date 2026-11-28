@@ -14,8 +14,7 @@ enum CopyText {
 
 extension ArtifactSummary {
     var copyText: String {
-        CopyText.line(
-            name: title.trimmed.isEmpty ? "Untitled artifact" : title, primaryDate: primaryDate)
+        CopyText.line(name: ArtifactTitle.display(title), primaryDate: primaryDate)
     }
 }
 

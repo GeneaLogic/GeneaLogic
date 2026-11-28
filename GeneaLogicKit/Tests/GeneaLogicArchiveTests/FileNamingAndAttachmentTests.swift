@@ -470,6 +470,7 @@ import Testing
         try archive.detachFile(second.entry.uid, in: artifact.uid)
         let file = try #require(archive.trashedFileContent(second.entry.uid))
         #expect(file.originalName == "page 2.txt")
+        #expect(archive.trashedFiles().map(\.hasContent) == [true])
         #expect(try Data(contentsOf: file.url) == Data("two".utf8))
         // Not an artifact, so it holds no artifact's files.
         #expect(
@@ -479,6 +480,7 @@ import Testing
         _ = try archive.removeArtifact(artifact.uid)
         let contents = archive.trashedFileContents(ofArtifact: artifact.uid)
         #expect(contents.map(\.originalName) == ["page 1.txt"])
+        #expect(archive.trashedArtifacts().map(\.hasContent) == [true])
         #expect(contents.map(\.uid) == [first.entry.uid])
         #expect(try Data(contentsOf: try #require(contents.first).url) == Data("one".utf8))
         #expect(archive.trashedFileContent(FileID(artifact.uid.raw)) == nil)
@@ -501,7 +503,18 @@ import Testing
 
         try archive.detachFile(attached.entry.uid, in: artifact.uid)
         #expect(archive.trashedFiles().map(\.uid) == [attached.entry.uid])
+        #expect(archive.trashedFiles().map(\.hasContent) == [false])
         #expect(archive.trashedFileContent(attached.entry.uid) == nil)
+    }
+
+    /// Slice 87: a trashed artifact that had no files has nothing to show either.
+    @Test func aFilelessTrashedArtifactHasNoContent() throws {
+        let root = TestSupport.makeTempDirectory()
+        let archive = try Archive.create(at: root)
+        let artifact = try archive.addArtifact(.sample(title: "Just a record"))
+        _ = try archive.removeArtifact(artifact.uid)
+        #expect(archive.trashedArtifacts().map(\.hasContent) == [false])
+        #expect(archive.trashedFileContents(ofArtifact: artifact.uid).isEmpty)
     }
 
     @Test func restoreFileReattachesItAndClearsEntry() throws {

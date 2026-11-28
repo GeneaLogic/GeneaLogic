@@ -118,7 +118,8 @@ struct TrashView: View {
                                         "Remove this artifact for good. This can't be undone.",
                                     onRestore: { model.restoreFromTrash(item.uid) },
                                     onDelete: { pendingArtifactDelete = item },
-                                    onQuickLook: { model.quickLookTrashed(item.uid) })
+                                    onQuickLook: { model.quickLookTrashed(item.uid) },
+                                    canQuickLook: item.hasContent)
                             }
                         }
                     }
@@ -136,7 +137,7 @@ struct TrashView: View {
                                     onRestore: { model.restoreFile(item) },
                                     onDelete: { pendingFileDelete = item },
                                     onQuickLook: { model.quickLookTrashed(item.uid) },
-                                    canQuickLook: model.canQuickLookTrashed(item.uid))
+                                    canQuickLook: item.hasContent)
                             }
                         }
                     }
@@ -148,15 +149,13 @@ struct TrashView: View {
     }
 
     private static func title(of item: TrashedArtifact) -> String {
-        item.title.isEmpty ? untitledArtifact : item.title
+        ArtifactTitle.display(item.title)
     }
 
     /// The artifact a trashed file came from, named as a trashed artifact is.
     private static func artifactTitle(of item: TrashedFile) -> String {
-        item.artifactTitle.isEmpty ? untitledArtifact : item.artifactTitle
+        ArtifactTitle.display(item.artifactTitle)
     }
-
-    private static let untitledArtifact = "Untitled Artifact"
 
     private static func name(of item: TrashedFile) -> String {
         item.originalName.isEmpty ? "Untitled File" : item.originalName
@@ -205,8 +204,9 @@ private struct TrashRow: View {
     let onRestore: () -> Void
     let onDelete: () -> Void
     let onQuickLook: () -> Void
-    /// A record-only trashed file has no bytes to show.
-    var canQuickLook = true
+    /// Whether the item has bytes to show: not a record-only file, nor an artifact that
+    /// had no files.
+    let canQuickLook: Bool
 
     var body: some View {
         HStack(spacing: 12) {

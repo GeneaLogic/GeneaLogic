@@ -4552,7 +4552,11 @@ been two slices.
   helpers inherit its sandbox: without `com.apple.security.network.client` the
   networking helper exits at launch ("does not have permission to communicate with
   network resources"), with no crash report. The app now has it; it opens no
-  connections itself.
+  connections itself. **From `/code-review`:** the panel's first open set its index
+  before the data source was attached (it attaches as the panel comes up), so it is
+  applied again on taking control. The key panel takes ⌘Y from the window's menu, so
+  the panel closes on it itself. A request is keyed, so Quick Look on another row
+  switches the panel rather than closing it.
 
 ## Carryovers and parked work
 

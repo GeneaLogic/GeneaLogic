@@ -24,8 +24,13 @@ extension ArchiveModel {
             selectedReview: selectedReviewRow, treeFocus: treeFocus, treeDepths: treeDepths,
             trashCount: trashCount, isDecidingReview: reviewDecisionsInFlight > 0)
         noteQuickLookable(selectedArtifact, in: &context)
-        context.selectedArtifactTitle = selectedArtifact.flatMap { summary(of: $0)?.title }
+        context.selectedArtifactTitle = selectedArtifact.flatMap(quickLookTitle)
         return context
+    }
+
+    /// What File ▸ Quick Look calls `artifact`: its title as the row reads it.
+    private func quickLookTitle(_ artifact: ArtifactID) -> String? {
+        summary(of: artifact).map { ArtifactTitle.display($0.title) }
     }
 
     /// Adds `artifact` to what Quick Look can show, if it has a file (slice 87).
@@ -42,8 +47,8 @@ extension ArchiveModel {
     /// editing a person doesn't redraw every file row's ⋯ menu. `CommandAvailabilityTests`
     /// pins that it decides as the whole context does.
     ///
-    /// `resolvingSelection: false` leaves out the Review row the menu bar would act on,
-    /// for a surface that names its own (a row's context menu), so it neither pays for the
+    /// `resolvingSelection: false` leaves out the Review row, or the artifact Quick Look
+    /// would show, that the menu bar would act on, for a surface that names its own (a row's context menu), so it neither pays for the
     /// lookup nor redraws when the selection moves. `readingModal: false` leaves out
     /// whether a sheet is up, for a surface inside the window (`canOffer`), so opening one
     /// doesn't redraw every row behind it.
@@ -75,9 +80,11 @@ extension ArchiveModel {
             context.personCount = persons.count
             context.treeDepths = treeDepths
         case .showInPeople: context.treeFocus = treeFocus
-        case .quickLook:
+        // The menu bar's: its artifact and title are the selection's. A row names its own
+        // artifact, so it doesn't redraw as the selection moves (`/code-review`).
+        case .quickLook where resolvingSelection:
             noteQuickLookable(selectedArtifact, in: &context)
-            context.selectedArtifactTitle = selectedArtifact.flatMap { summary(of: $0)?.title }
+            context.selectedArtifactTitle = selectedArtifact.flatMap(quickLookTitle)
         case .acceptSuggestion, .declineSuggestion, .confirmCandidate, .rejectCandidate,
             .recordSuggestedFact, .recordSuggestedRelationship, .dismissSuggestedRelationship:
             context.isDecidingReview = reviewDecisionsInFlight > 0
@@ -100,8 +107,10 @@ extension ArchiveModel {
     private func commandContext(
         for command: ArchiveCommand, on subject: CommandSubject, readingModal: Bool = true
     ) -> CommandContext {
+        // Quick Look's subject is its own artifact, so the selection isn't read for it.
+        let resolvingSelection = subject.kind != .review && command != .quickLook
         var context = commandContext(
-            for: command, resolvingSelection: subject.kind != .review, readingModal: readingModal)
+            for: command, resolvingSelection: resolvingSelection, readingModal: readingModal)
         if command == .quickLook, case .artifact(let id) = subject {
             noteQuickLookable(id, in: &context)
         }

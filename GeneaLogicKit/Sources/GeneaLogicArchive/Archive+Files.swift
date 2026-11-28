@@ -333,7 +333,9 @@ extension Archive {
                 return TrashedFile(
                     uid: info.entry.uid, originalName: info.entry.originalName,
                     artifactUID: info.artifactUID, artifactTitle: title(of: info),
-                    deletedAt: entry.deletedAt)
+                    deletedAt: entry.deletedAt,
+                    hasContent: FileManager.default.fileExists(
+                        atPath: TrashStore.payloadURL(uid: info.entry.uid.raw, in: rootURL).path))
             }
         }
     }
@@ -585,4 +587,8 @@ public struct TrashedFile: Sendable, Equatable {
     public let artifactTitle: String
     /// ISO 8601 timestamp of deletion.
     public let deletedAt: String
+    /// Whether its bytes are in the trash to show (slice 87): not a record-only entry,
+    /// whose bytes were already gone when it was detached. One `stat`, in the listing's
+    /// pass.
+    public let hasContent: Bool
 }

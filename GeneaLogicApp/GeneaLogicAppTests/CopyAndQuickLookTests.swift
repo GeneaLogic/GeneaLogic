@@ -38,7 +38,8 @@ import Testing
 
     @Test func aNamelessRowCopiesWhatItsRowSays() {
         #expect(person(nil, date: "1872").copyText == "Unnamed person (1872)")
-        #expect(artifact("", date: nil).copyText == "Untitled artifact")
+        #expect(artifact("", date: nil).copyText == "Untitled Artifact")
+        #expect(artifact("  ", date: "1903").copyText == "Untitled Artifact (1903)")
     }
 }
 
@@ -82,6 +83,14 @@ import Testing
         #expect(!context.canPerform(.quickLook, on: .artifact(other), fromSidebar: true))
         context.artifactsWithFiles.insert(other)
         #expect(context.canPerform(.quickLook, on: .artifact(other), fromSidebar: true))
+    }
+
+    /// A blank title is named as the row names it, never `Quick Look “  ”`.
+    @Test func aBlankTitleIsNamedAsTheRowNamesIt() {
+        var context = context(withFiles: true)
+        context.selectedArtifactTitle = "  "
+        #expect(ArchiveCommand.quickLook.title(in: context) == "Quick Look")
+        #expect(ArtifactTitle.display("  ") == "Untitled Artifact")
     }
 
     @Test func quickLookIsFindersKey() {
@@ -159,6 +168,19 @@ import Testing
             })
     }
 
+    /// A row's Quick Look asks about its own artifact: it runs with nothing selected.
+    @Test func aRowsQuickLookDoesntNeedTheSelection() async throws {
+        let (model, root) = try AppTestSupport.makeModel()
+        defer { AppTestSupport.remove(root) }
+        try await ingest("letter.pdf", into: model, root: root)
+        let summary = try #require(model.artifacts.first)
+        model.activeTab = .people
+        model.selectedArtifact = nil
+
+        #expect(model.canOffer(.quickLook, on: .artifact(summary.uid), fromSidebar: true))
+        #expect(!model.commandContext.isAvailable(.quickLook))
+    }
+
     /// A trashed file whose bytes were gone when it was detached has nothing to show.
     @Test func aRecordOnlyTrashedFileCantBeQuickLooked() async throws {
         let (model, root) = try AppTestSupport.makeModel()
@@ -177,7 +199,43 @@ import Testing
         await model.act { model.detachFile(lost.1.uid, from: lost.0) }
         model.reloadTrash(listing: true)
 
-        #expect(model.canQuickLookTrashed(kept.1.uid))
-        #expect(!model.canQuickLookTrashed(lost.1.uid))
+        let hasContent = Dictionary(
+            uniqueKeysWithValues: model.trashedFiles.map { ($0.uid, $0.hasContent) })
+        #expect(hasContent[kept.1.uid] == true)
+        #expect(hasContent[lost.1.uid] == false)
+    }
+}
+
+/// Slice 87's `/code-review`: asking for what the panel shows closes it; asking for
+/// anything else switches it, and Space or ⌘Y inside it closes it.
+@Suite struct QuickLookToggleTests {
+    private let a = QuickLookPanel.key("ART-a")
+
+    @Test func askingAgainClosesThePanel() {
+        #expect(QuickLookPanel.closes(isVisible: true, sameOwner: true, shownKey: a, key: a))
+    }
+
+    @Test func askingForSomethingElseSwitchesIt() {
+        // Another artifact's row.
+        #expect(
+            !QuickLookPanel.closes(
+                isVisible: true, sameOwner: true, shownKey: a, key: QuickLookPanel.key("ART-b")))
+        // Another of the same artifact's files.
+        #expect(
+            !QuickLookPanel.closes(
+                isVisible: true, sameOwner: true, shownKey: a,
+                key: QuickLookPanel.key("ART-a", file: "FIL-2")))
+        // Another window, or the panel down.
+        #expect(!QuickLookPanel.closes(isVisible: true, sameOwner: false, shownKey: a, key: a))
+        #expect(!QuickLookPanel.closes(isVisible: false, sameOwner: true, shownKey: a, key: a))
+    }
+
+    @Test func spaceAndCommandYCloseItFromInside() {
+        #expect(QuickLookPanel.closesPanel(key: " ", modifiers: []))
+        #expect(QuickLookPanel.closesPanel(key: "y", modifiers: .command))
+        #expect(QuickLookPanel.closesPanel(key: "y", modifiers: [.command, .capsLock]))
+        #expect(!QuickLookPanel.closesPanel(key: "y", modifiers: []))
+        #expect(!QuickLookPanel.closesPanel(key: " ", modifiers: .command))
+        #expect(!QuickLookPanel.closesPanel(key: "y", modifiers: [.command, .shift]))
     }
 }

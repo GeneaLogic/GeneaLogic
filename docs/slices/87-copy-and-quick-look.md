@@ -56,7 +56,8 @@ No format change.
 4. **The Trash's rows gain Quick Look** *(agreed 2026-11-27)*, from their context menus. 86 left previewing a
    trashed item to this slice, and it is the one way to see what Delete Permanently…
    would destroy. A trashed artifact previews its files from `.trash/`, read-only; a
-   record-only trashed file has nothing to show, so the item dims. Trash rows have no
+   record-only trashed file, or a trashed artifact that had no files, has nothing to show,
+   so the item dims. Trash rows have no
    selection, so there's no Space there. *The alternative:* leave the Trash out.
    **Recommended: include it.**
 

@@ -235,16 +235,16 @@ extension ArchiveModel {
             actionError = "Couldn't locate that file in the archive."
             return nil
         }
-        return temporaryCopy(of: source, id: fileID.raw, originalName: originalName)
+        return temporaryCopy(of: source, id: fileID, originalName: originalName)
     }
 
     /// `temporaryCopy(of:in:originalName:)`, from any file the archive holds: a trashed
     /// one's bytes too (slice 87). `id` keeps two same-named files apart.
-    func temporaryCopy(of source: URL, id: String, originalName: String) -> URL? {
+    func temporaryCopy(of source: URL, id: FileID, originalName: String) -> URL? {
         let name = originalName.isEmpty ? source.lastPathComponent : originalName
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("GeneaLogicPreview", isDirectory: true)
-            .appendingPathComponent(id, isDirectory: true)
+            .appendingPathComponent(id.raw, isDirectory: true)
         let destination = directory.appendingPathComponent(name)
         do {
             try FileManager.default.createDirectory(

@@ -125,7 +125,8 @@ private struct FileRow: View {
     }
 
     /// The Artifact ▸ Selected File verbs, in the same order, on this row's file (slice
-    /// 82), for the ⋯ menu and the context menu alike. The detail view runs them, Delete
+    /// 82), for the ⋯ menu and the context menu alike, plus Quick Look (87), which the menu
+    /// bar has as File ▸ Quick Look on the artifact, opening at the selected file. The detail view runs them, Delete
     /// File…'s confirm included.
     @ViewBuilder
     private var fileMenu: some View {

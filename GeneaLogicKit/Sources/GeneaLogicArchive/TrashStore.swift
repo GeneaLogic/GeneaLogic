@@ -127,6 +127,16 @@ enum TrashStore {
         ArchiveLayout.trashPayloadURL(in: root, uid: uid)
     }
 
+    /// Whether a trashed artifact's payload folder holds anything besides its record:
+    /// the files it had (slice 87). A stray file counts too; the preview then finds
+    /// nothing the record names and shows nothing.
+    static func payloadHoldsFiles(uid: String, in root: URL) -> Bool {
+        let items =
+            (try? FileManager.default.contentsOfDirectory(
+                atPath: payloadURL(uid: uid, in: root).path)) ?? []
+        return items.contains { !$0.hasPrefix(".") && $0 != ArchiveLayout.recordFileName }
+    }
+
     /// The prefix of an entry folder a purge has taken out of the listing and not
     /// yet finished deleting.
     private static let purgingPrefix = ".purging-"
