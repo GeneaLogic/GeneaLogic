@@ -514,6 +514,15 @@ enum ArchiveCommand: Hashable, CaseIterable {
         }
     }
 
+    /// The commands whose shortcut no other command has.
+    static let unsharedShortcuts: Set<ArchiveCommand> = {
+        let keyed = allCases.compactMap { command in command.shortcut.map { (command, $0) } }
+        return Set(
+            keyed.filter { command, key in
+                !keyed.contains { $0.0 != command && $0.1 == key }
+            }.map(\.0))
+    }()
+
     /// Whether a held key runs this command once. Every other key undoes or opens
     /// something; these two write a human verdict and move to the next row, so a repeat
     /// would confirm a queue nobody read.
@@ -689,8 +698,12 @@ struct CommandContext: Equatable {
     /// another tab don't, so two tabs can each use ⌘⌫. This is not only tidiness: SwiftUI
     /// drops a duplicate key from the later menu item, enabled or not (measured), so a
     /// key attached to both would leave Delete Person… with none.
+    ///
+    /// A key no other command uses keeps it on every tab, dimmed where it can't run, as
+    /// Finder's ⌘Y does (87's hand-test): hiding it there shared nothing.
     func ownsShortcut(_ command: ArchiveCommand) -> Bool {
         command.tab.map(activeTab.runs) ?? true
+            || ArchiveCommand.unsharedShortcuts.contains(command)
     }
 }
 

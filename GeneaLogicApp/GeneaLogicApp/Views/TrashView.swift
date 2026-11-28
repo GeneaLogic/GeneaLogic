@@ -192,9 +192,9 @@ private struct TrashSection<Rows: View>: View {
 }
 
 /// One trashed item's row, for both kinds: leading icon, title + subtitle, and the
-/// Restore / Delete Permanently… buttons, which its context menu repeats. The menu also
-/// has Quick Look (slice 87, fork 4), to see what a permanent delete would destroy; the
-/// rows have no selection, so there is no Space for it.
+/// Quick Look, Restore and Delete Permanently… buttons, which its context menu repeats.
+/// Quick Look (slice 87, fork 4) shows what a permanent delete would destroy; the rows
+/// have no selection, so there is no Space for it.
 private struct TrashRow: View {
     let icon: String
     let title: String
@@ -222,6 +222,15 @@ private struct TrashRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
+            // In view as well as in the context menu (87's hand-test): the rows have no
+            // selection, so Space can't reach it.
+            Button(action: onQuickLook) {
+                Image(systemName: ArchiveCommand.quickLook.systemImage)
+            }
+            .buttonStyle(.borderless)
+            .disabled(!canQuickLook)
+            .help(canQuickLook ? "Quick Look" : "No file to show")
+            .accessibilityLabel(ArchiveCommand.quickLook.title)
             Button("Restore", action: onRestore)
                 .help(restoreHelp)
             Button("Delete Permanently…", role: .destructive, action: onDelete)

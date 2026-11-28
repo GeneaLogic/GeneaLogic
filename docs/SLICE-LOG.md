@@ -4556,7 +4556,14 @@ been two slices.
   before the data source was attached (it attaches as the panel comes up), so it is
   applied again on taking control. The key panel takes ⌘Y from the window's menu, so
   the panel closes on it itself. A request is keyed, so Quick Look on another row
-  switches the panel rather than closing it.
+  switches the panel rather than closing it. **From the hand-test:** `.copyable` given
+  nothing still leaves Edit ▸ Copy live, so ⌘C is `onCopyCommand`, whose `nil` dims it.
+  A key no other command has now shows on every tab, dimmed where it can't run (⌘Y,
+  ⌘L, ⌘T, ⌘R); a shared one still shows only on its own. The Trash's rows gained an eye
+  button. A preview is keyed on its file's path and checksum, since Replace keeps the
+  `uid` (#3). PDFKit and the text view answer a right-click with their own menus, so the
+  file's menu is on the chip above them. Quick Look's own Copy copies its selection or
+  an empty string, as Finder's does. A trashed artifact's record view is #96.
 
 ## Carryovers and parked work
 

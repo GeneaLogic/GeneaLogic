@@ -57,7 +57,8 @@ No format change.
    trashed item to this slice, and it is the one way to see what Delete Permanently…
    would destroy. A trashed artifact previews its files from `.trash/`, read-only; a
    record-only trashed file, or a trashed artifact that had no files, has nothing to show,
-   so the item dims. Trash rows have no
+   so the item dims. *From the hand-test:* each row also has an eye button, and a
+   trashed artifact's record view is [#96](https://github.com/GeneaLogic/GeneaLogic/issues/96). Trash rows have no
    selection, so there's no Space there. *The alternative:* leave the Trash out.
    **Recommended: include it.**
 

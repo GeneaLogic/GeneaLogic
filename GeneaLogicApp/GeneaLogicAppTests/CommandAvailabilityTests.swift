@@ -419,6 +419,19 @@ import Testing
         }
     }
 
+    /// Slice 87's hand-test: a key nobody else uses stays on its item on every tab, dimmed
+    /// where it can't run; a shared key shows only on its own tab.
+    @Test(arguments: ArchiveTab.allCases)
+    func anUnsharedKeyShowsEverywhere(_ tab: ArchiveTab) {
+        let context = CommandContext(hasArchive: true, activeTab: tab)
+        for command in [ArchiveCommand.quickLook, .addPlace, .editTranscript, .refreshReview] {
+            #expect(ArchiveCommand.unsharedShortcuts.contains(command))
+            #expect(context.ownsShortcut(command), "\(command) on \(tab)")
+        }
+        #expect(!ArchiveCommand.unsharedShortcuts.contains(.addEvent))
+        #expect(context.ownsShortcut(.addEvent) == (tab == .artifacts))
+    }
+
     @Test(arguments: ArchiveTab.allCases)
     func noKeyMeansTwoThingsInOneTab(_ tab: ArchiveTab) {
         let context = CommandContext(hasArchive: true, activeTab: tab)
